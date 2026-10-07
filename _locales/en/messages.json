@@ -42,10 +42,13 @@
     "message": "Unknown ticket and no AI or guessing enabled, stopped."
   },
   "statusThinking": {
-    "message": "Asking Claude about $P1$...",
+    "message": "Solving $P1$ with $P2$...",
     "placeholders": {
       "p1": {
         "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
       }
     }
   },
@@ -63,7 +66,10 @@
   "source_bank": {
     "message": "known"
   },
-  "source_ai": {
+  "source_local": {
+    "message": "on-device AI"
+  },
+  "source_claude": {
     "message": "Claude"
   },
   "source_guess": {
@@ -90,10 +96,70 @@
     "message": "Botter settings"
   },
   "optionsAiHeading": {
-    "message": "Claude solver"
+    "message": "AI solver"
   },
-  "optionsUseAi": {
-    "message": "Ask Claude when a ticket is not in the bank"
+  "optionsSolver": {
+    "message": "When a ticket is not in the bank, ask"
+  },
+  "solver_local": {
+    "message": "On-device AI in Chrome (Gemini Nano, free)"
+  },
+  "solver_claude": {
+    "message": "Claude API (needs a key, more accurate)"
+  },
+  "solver_off": {
+    "message": "Nobody (bank and guessing only)"
+  },
+  "optionsLocalHeading": {
+    "message": "On-device AI"
+  },
+  "optionsLocalHint": {
+    "message": "Chrome 138+ built-in Prompt API. Needs about 22 GB free disk and a GPU with more than 4 GB VRAM or 16 GB RAM. Free and offline, but a small model, so expect more misses on tricky output puzzles."
+  },
+  "optionsLocalStatus": {
+    "message": "Status: $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsLocalPrepare": {
+    "message": "Download the model"
+  },
+  "optionsLocalProgress": {
+    "message": "Downloading the model: $P1$ %",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsLocalFailed": {
+    "message": "Could not prepare the model: $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "localState_available": {
+    "message": "ready"
+  },
+  "localState_downloadable": {
+    "message": "model not downloaded yet"
+  },
+  "localState_downloading": {
+    "message": "downloading"
+  },
+  "localState_unavailable": {
+    "message": "not supported on this device"
+  },
+  "localState_unsupported": {
+    "message": "this Chrome has no Prompt API"
+  },
+  "optionsClaudeHeading": {
+    "message": "Claude API"
   },
   "optionsApiKey": {
     "message": "Anthropic API key"

@@ -42,10 +42,13 @@
     "message": "Neznámý ticket a AI ani hádání nejsou zapnuté, zastaveno."
   },
   "statusThinking": {
-    "message": "Ptám se Clauda na $P1$...",
+    "message": "Řeším $P1$ přes $P2$...",
     "placeholders": {
       "p1": {
         "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
       }
     }
   },
@@ -63,7 +66,10 @@
   "source_bank": {
     "message": "známé"
   },
-  "source_ai": {
+  "source_local": {
+    "message": "AI v prohlížeči"
+  },
+  "source_claude": {
     "message": "Claude"
   },
   "source_guess": {
@@ -90,10 +96,70 @@
     "message": "Nastavení Botteru"
   },
   "optionsAiHeading": {
-    "message": "Řešení přes Clauda"
+    "message": "Řešení přes AI"
   },
-  "optionsUseAi": {
-    "message": "Ptát se Clauda, když ticket není v bance"
+  "optionsSolver": {
+    "message": "Když ticket není v bance, zeptat se"
+  },
+  "solver_local": {
+    "message": "AI v Chromu na tomto zařízení (Gemini Nano, zdarma)"
+  },
+  "solver_claude": {
+    "message": "Claude API (potřebuje klíč, přesnější)"
+  },
+  "solver_off": {
+    "message": "Nikoho (jen banka a hádání)"
+  },
+  "optionsLocalHeading": {
+    "message": "AI v prohlížeči"
+  },
+  "optionsLocalHint": {
+    "message": "Vestavěné Prompt API v Chromu 138+. Potřebuje asi 22 GB volného místa a GPU s více než 4 GB VRAM nebo 16 GB RAM. Zdarma a offline, ale je to malý model, takže u záludných výstupů bude chybovat častěji."
+  },
+  "optionsLocalStatus": {
+    "message": "Stav: $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsLocalPrepare": {
+    "message": "Stáhnout model"
+  },
+  "optionsLocalProgress": {
+    "message": "Stahuji model: $P1$ %",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsLocalFailed": {
+    "message": "Model se nepodařilo připravit: $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "localState_available": {
+    "message": "připraveno"
+  },
+  "localState_downloadable": {
+    "message": "model ještě není stažený"
+  },
+  "localState_downloading": {
+    "message": "stahuje se"
+  },
+  "localState_unavailable": {
+    "message": "na tomto zařízení není podporováno"
+  },
+  "localState_unsupported": {
+    "message": "tento Chrome nemá Prompt API"
+  },
+  "optionsClaudeHeading": {
+    "message": "Claude API"
   },
   "optionsApiKey": {
     "message": "Anthropic API klíč"

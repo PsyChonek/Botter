@@ -85,6 +85,10 @@
     ].join('\n');
   }
 
+  const SYSTEM_PROMPT =
+    'You solve short programming puzzles from a code-review game. ' +
+    'Read the code carefully, reason about the exact runtime behaviour, and answer with the index only.';
+
   const ANSWER_SCHEMA = {
     type: 'object',
     properties: { index: { type: 'integer' } },
@@ -127,6 +131,7 @@
   const api = {
     TYPES,
     ANSWER_SCHEMA,
+    SYSTEM_PROMPT,
     hash,
     taskKey,
     bankEntry,

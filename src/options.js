@@ -1,10 +1,10 @@
 const msg = (key, subs) => chrome.i18n.getMessage(key, subs) || key;
 
-const CHECKBOXES = ['useAi', 'guessUnknown', 'stopAtNorm'];
-const SELECTS = ['model', 'effort', 'logLevel'];
+const CHECKBOXES = ['guessUnknown', 'stopAtNorm'];
+const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel'];
 const NUMBERS = ['minDelayMs', 'maxDelayMs'];
 const DEFAULTS = {
-  useAi: true,
+  aiSolver: 'local',
   guessUnknown: true,
   stopAtNorm: false,
   model: 'claude-opus-5-5',
@@ -27,7 +27,32 @@ async function load() {
   for (const name of [...SELECTS, ...NUMBERS]) field(name).value = values[name];
   $('apiKey').value = apiKey;
   showBankSize(bank);
+  showLocalStatus();
 }
+
+async function showLocalStatus(state) {
+  state ??= await BotterLocal.availability().catch(() => 'unavailable');
+  $('localStatus').textContent = msg('optionsLocalStatus', [msg(`localState_${state}`)]);
+  $('prepareLocal').hidden = state !== 'downloadable' && state !== 'downloading';
+}
+
+// The first create() downloads Gemini Nano and needs this click as user activation.
+$('prepareLocal').addEventListener('click', async () => {
+  $('prepareLocal').disabled = true;
+  try {
+    const session = await BotterLocal.create((monitor) => {
+      monitor.addEventListener('downloadprogress', (e) => {
+        $('localStatus').textContent = msg('optionsLocalProgress', [String(Math.round(e.loaded * 100))]);
+      });
+    });
+    session.destroy();
+    await showLocalStatus();
+  } catch (err) {
+    $('localStatus').textContent = msg('optionsLocalFailed', [err.message]);
+  } finally {
+    $('prepareLocal').disabled = false;
+  }
+});
 
 function showBankSize(bank) {
   $('bankSize').textContent = msg('optionsBankSize', [String(Object.keys(bank).length)]);

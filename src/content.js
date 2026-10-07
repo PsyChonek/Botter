@@ -11,13 +11,14 @@
     minDelayMs: 1500,
     maxDelayMs: 4000,
     stopAtNorm: false,
-    useAi: true,
+    aiSolver: 'local',
     guessUnknown: true,
     logLevel: 'info',
   };
   const EMPTY_STATS = {
     bank: { correct: 0, wrong: 0 },
-    ai: { correct: 0, wrong: 0 },
+    local: { correct: 0, wrong: 0 },
+    claude: { correct: 0, wrong: 0 },
     guess: { correct: 0, wrong: 0 },
     manual: { correct: 0, wrong: 0 },
   };
@@ -116,13 +117,14 @@
     const known = C.answerFromBank(current, bank[C.taskKey(current)]);
     if (known !== null) return { index: known, source: 'bank' };
 
-    if (settings.useAi) {
-      setStatus('statusThinking', [C.ticketLabel(current.id)]);
+    if (settings.aiSolver !== 'off') {
+      const source = settings.aiSolver;
+      setStatus('statusThinking', [C.ticketLabel(current.id), msg(`source_${source}`)]);
       const res = await chrome.runtime.sendMessage({ kind: 'solve', task: current }).catch((err) => ({
         ok: false,
         error: String(err),
       }));
-      if (res?.ok && C.isValidAnswer(current, res.index)) return { index: res.index, source: 'ai' };
+      if (res?.ok && C.isValidAnswer(current, res.index)) return { index: res.index, source };
       if (res?.error !== 'no_api_key') log.warn('ai_failed', { error: res?.error ?? 'invalid_index' });
     }
 
@@ -295,7 +297,7 @@
     ui.stats.textContent = msg('panelStats', [
       String(Object.keys(bank).length),
       sum(stats.bank),
-      sum(stats.ai),
+      sum(stats[settings.aiSolver] ?? stats.local),
       sum(stats.guess),
     ]);
   }

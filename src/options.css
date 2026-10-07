@@ -28,6 +28,7 @@ main {
 }
 h1 { font-size: 1.5rem; }
 h2 { font-size: 1.1rem; margin-top: 28px; }
+h3 { font-size: 1rem; margin: 20px 0 4px; }
 label { display: block; margin: 12px 0 4px; }
 label.check { display: flex; gap: 8px; align-items: center; }
 input, select, button, label.button {

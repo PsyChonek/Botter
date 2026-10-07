@@ -17,9 +17,17 @@ Chrome extension (Manifest V3) that solves the work tickets ("Práce") in
      (`result.answer`), so each ticket is learned the first time it is seen,
      whether the bot or you answered it. Output puzzles are stored by option text,
      so a reshuffled copy of the same puzzle still matches.
-  2. **Claude** (optional): `src/background.js` calls the Messages API with
-     structured output (`{"index": n}`). Default model is `claude-opus-5-5`
-     at `medium` effort.
+  2. **AI solver**, chosen in settings:
+     - **On-device AI** (default): Chrome's built-in Prompt API with Gemini Nano
+       (`src/local-model.js`), JSON-constrained to `{"index": n}`. Free, offline, no key.
+       It runs in the service worker if Chrome exposes `LanguageModel` there, otherwise
+       in an offscreen document (`src/offscreen.html`). Requires Chrome 138+, about 22 GB
+       free disk and a GPU with more than 4 GB VRAM or 16 GB RAM. The first download
+       needs a click, so use **Download the model** on the settings page once.
+       It is a small model: expect noticeably more misses than Claude on tricky
+       "what does it print" puzzles.
+     - **Claude API**: `src/background.js` calls the Messages API with structured
+       output. Default model `claude-opus-5-5` at `medium` effort. Needs an API key.
   3. **Guess** (optional): a random valid choice. A wrong answer costs energy
      but teaches the bank.
 - A small panel in the bottom-left corner of the page has Start/Stop, the
@@ -28,9 +36,10 @@ Chrome extension (Manifest V3) that solves the work tickets ("Práce") in
 ## Install
 
 1. `chrome://extensions` > enable Developer mode > Load unpacked > pick this folder.
-2. Click the extension icon to open the settings. Optionally paste an Anthropic API
-   key. It is stored only in `chrome.storage.local` of that browser profile and
-   never leaves the extension except in calls to `api.anthropic.com`.
+2. Click the extension icon to open the settings. For the default on-device solver,
+   press **Download the model** once. For Claude, switch the solver and paste an
+   Anthropic API key; it is stored only in `chrome.storage.local` of that browser
+   profile and is sent only to `api.anthropic.com`.
 3. Open the casino, log in, and press **Start** in the panel.
 
 The bank can be exported and imported as JSON from the settings page, so a

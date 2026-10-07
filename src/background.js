@@ -1,22 +1,44 @@
-// Service worker: asks Claude for an answer when the bank does not know a task.
-// Raw fetch because the extension ships unbundled and the SDK needs a build step.
+// Service worker: answers tickets the bank does not know, either with Chrome's
+// on-device model or with Claude. Claude goes through raw fetch because the
+// extension ships unbundled and the SDK needs a build step.
 import './core.js';
+import './local-model.js';
 
-const { buildPrompt, parseAnswer, ANSWER_SCHEMA, createLogger } = globalThis.BotterCore;
+const { buildPrompt, parseAnswer, ANSWER_SCHEMA, SYSTEM_PROMPT, createLogger } = globalThis.BotterCore;
+const local = globalThis.BotterLocal;
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const DEFAULT_MODEL = 'claude-opus-5-5';
 const DEFAULT_EFFORT = 'medium';
 const TIMEOUT_MS = 60_000;
 
-const SYSTEM_PROMPT =
-  'You solve short programming puzzles from a code-review game. ' +
-  'Read the code carefully, reason about the exact runtime behaviour, and answer with the index only.';
+let offscreenPromise = null;
 
-async function solve(task) {
-  const { apiKey, settings = {} } = await chrome.storage.local.get(['apiKey', 'settings']);
+async function ensureOffscreen() {
+  if (await chrome.offscreen.hasDocument()) return;
+  offscreenPromise ??= chrome.offscreen
+    .createDocument({
+      url: 'src/offscreen.html',
+      reasons: ['WORKERS'],
+      justification: 'Runs the on-device Prompt API, which is only exposed to window contexts.',
+    })
+    .finally(() => (offscreenPromise = null));
+  await offscreenPromise;
+}
+
+// The Prompt API may not be exposed to the service worker; fall back to the
+// offscreen document, which is a regular window context.
+async function solveLocal(task) {
+  if (local.supported()) return local.solve(task);
+  await ensureOffscreen();
+  const res = await chrome.runtime.sendMessage({ kind: 'solve-local', task });
+  if (!res?.ok) throw new Error(res?.error ?? 'offscreen_no_response');
+  return res.index;
+}
+
+async function solveClaude(task, settings, log) {
+  const { apiKey } = await chrome.storage.local.get('apiKey');
   if (!apiKey) throw new Error('no_api_key');
-  const log = createLogger(settings.logLevel);
   const model = settings.model || DEFAULT_MODEL;
   const isHaiku = model.startsWith('claude-haiku');
 
@@ -64,6 +86,15 @@ async function solve(task) {
     inputTokens: data.usage?.input_tokens,
     outputTokens: data.usage?.output_tokens,
   });
+  return index;
+}
+
+async function solve(task) {
+  const { settings = {} } = await chrome.storage.local.get('settings');
+  const log = createLogger(settings.logLevel);
+  const started = Date.now();
+  const index = settings.aiSolver === 'claude' ? await solveClaude(task, settings, log) : await solveLocal(task);
+  log.debug('ai_solved', { solver: settings.aiSolver, type: task.type, index, ms: Date.now() - started });
   return index;
 }
 

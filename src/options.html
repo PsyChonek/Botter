@@ -12,7 +12,19 @@
 
       <section aria-labelledby="ai-heading">
         <h2 id="ai-heading" data-i18n="optionsAiHeading"></h2>
-        <label class="check"><input type="checkbox" name="useAi" /> <span data-i18n="optionsUseAi"></span></label>
+        <label for="aiSolver" data-i18n="optionsSolver"></label>
+        <select id="aiSolver" name="aiSolver">
+          <option value="local" data-i18n="solver_local"></option>
+          <option value="claude" data-i18n="solver_claude"></option>
+          <option value="off" data-i18n="solver_off"></option>
+        </select>
+
+        <h3 data-i18n="optionsLocalHeading"></h3>
+        <p class="hint" data-i18n="optionsLocalHint"></p>
+        <p id="localStatus" role="status" aria-live="polite"></p>
+        <button id="prepareLocal" type="button" data-i18n="optionsLocalPrepare"></button>
+
+        <h3 data-i18n="optionsClaudeHeading"></h3>
         <label for="apiKey" data-i18n="optionsApiKey"></label>
         <input id="apiKey" type="password" autocomplete="off" spellcheck="false" />
         <p class="hint" data-i18n="optionsApiKeyHint"></p>
@@ -69,6 +81,8 @@
         </div>
       </section>
     </main>
+    <script src="core.js"></script>
+    <script src="local-model.js"></script>
     <script src="options.js"></script>
   </body>
 </html>
