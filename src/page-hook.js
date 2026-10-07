@@ -53,7 +53,7 @@
   window.addEventListener('message', async (event) => {
     if (event.source !== window || event.data?.source !== 'botter-content' || event.data.kind !== 'api') return;
     const { id, path, body } = event.data;
-    if (typeof path !== 'string' || !/^\/api\/[\w/-]+$/.test(path)) {
+    if (typeof path !== 'string' || !/^\/api\/[\w/-]+(\?[\w=&-]+)?$/.test(path)) {
       post({ kind: 'api-result', id, ok: false, status: 0, data: { error: 'bad_path' } });
       return;
     }

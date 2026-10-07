@@ -81,6 +81,28 @@
         </select>
       </section>
 
+      <section aria-labelledby="auto-heading">
+        <h2 id="auto-heading" data-i18n="optionsAutoHeading"></h2>
+        <p class="hint" data-i18n="optionsAutoHint"></p>
+        <label class="check"><input type="checkbox" name="repayDebt" /> <span data-i18n="optionsRepayDebt"></span></label>
+        <label class="check"><input type="checkbox" name="loanTrick" /> <span data-i18n="optionsLoanTrick"></span></label>
+        <label class="check"><input type="checkbox" name="crashEnabled" /> <span data-i18n="optionsCrashEnabled"></span></label>
+        <div class="pair">
+          <div>
+            <label for="crashBet" data-i18n="optionsCrashBet"></label>
+            <select id="crashBet" name="crashBet"></select>
+          </div>
+          <div>
+            <label for="crashMinEv" data-i18n="optionsCrashMinEv"></label>
+            <input id="crashMinEv" name="crashMinEv" type="number" min="1" step="0.01" />
+          </div>
+          <div>
+            <label for="xpBudget" data-i18n="optionsXpBudget"></label>
+            <input id="xpBudget" name="xpBudget" type="number" min="0" step="100" />
+          </div>
+        </div>
+      </section>
+
       <section aria-labelledby="games-heading">
         <h2 id="games-heading" data-i18n="optionsGamesHeading"></h2>
         <p class="hint" data-i18n="optionsGamesHint"></p>

@@ -231,7 +231,7 @@
     "message": "Hry"
   },
   "optionsGamesHint": {
-    "message": "Herní bot hraje přes API kasina s tvým přihlášením, takže se hra na obrazovce neanimuje a kredit na stránce se obnoví při dalším kliknutí. Blackjack se řídí taháky stolu. Crash se nehraje ani nesleduje: je to jedno kolo denně a automatický výběr se vyplácí bez odpovědi. Dokud je energie na práci, má práce přednost."
+    "message": "Herní bot hraje přes API kasina s tvým přihlášením, takže se hra na obrazovce neanimuje a kredit na stránce se obnoví při dalším kliknutí. Blackjack hraje přesně spočítanou strategii pro vylepšení tvého stolu. Dokud je energie na práci, má práce přednost."
   },
   "optionsGameBet": {
     "message": "Sázka na kolo"
@@ -274,6 +274,87 @@
   },
   "optionsAutoClaim": {
     "message": "Automaticky vybírat denní bonus a při nule záchranný balíček"
+  },
+  "panelAuto": {
+    "message": "Auto"
+  },
+  "panelOn": {
+    "message": "zapnuto"
+  },
+  "panelOff": {
+    "message": "vypnuto"
+  },
+  "game_crash": {
+    "message": "Crash (Produkce padá)"
+  },
+  "crashHold": {
+    "message": "plánovanou odstávku"
+  },
+  "statusRepay": {
+    "message": "Splácím dluh $P1$...",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusLoanTrick": {
+    "message": "Beru a hned splácím půjčku 500 v bezúročné hodině (achievement +500)..."
+  },
+  "statusLeaderboard": {
+    "message": "Kontroluji žebříčky kvůli achievementu za stupně vítězů..."
+  },
+  "statusCrashBet": {
+    "message": "Crash: sázka $P1$, výběr na $P2$, očekávaně $P3$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "statusGrinding": {
+    "message": "Farmím XP na $P1$, dnes ztráta $P2$ z $P3$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "optionsAutoHeading": {
+    "message": "Automatický režim"
+  },
+  "optionsAutoHint": {
+    "message": "Auto dělá vše podle hodnoty: vybere denní bonus a záchranný balíček, splácí dluh (8 % za hodinu, pak 50 % z každé výplaty), jednou vezme achievement +500 za čistou půjčku, kontroluje žebříčky kvůli achievementu za stupně vítězů, sází na crash jen když historie kol dává očekávaný výnos nad prahem, dělá každý ticket a hraje ostatní hry jen kvůli XP v denním rozpočtu níže. Ostatní hry v průměru prodělávají, proto je rozpočet výchozí 0."
+  },
+  "optionsRepayDebt": {
+    "message": "Splácet dluh z volných kreditů"
+  },
+  "optionsLoanTrick": {
+    "message": "Vzít jednorázový achievement +500 za čistou půjčku"
+  },
+  "optionsCrashEnabled": {
+    "message": "Sázet na crash, když se to podle historie vyplatí"
+  },
+  "optionsCrashBet": {
+    "message": "Sázka na crash"
+  },
+  "optionsCrashMinEv": {
+    "message": "Minimální očekávaný výnos crashe (1,05 = +5 %)"
+  },
+  "optionsXpBudget": {
+    "message": "Denní rozpočet ztráty na farmění XP (0 = vypnuto)"
   },
   "optionsTitle": {
     "message": "Nastavení Botteru"

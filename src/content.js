@@ -6,6 +6,7 @@
   const C = globalThis.BotterCore;
   const G = globalThis.BotterGames;
   const BJ = globalThis.BotterBlackjack;
+  const A = globalThis.BotterAuto;
   const msg = (key, subs) => chrome.i18n.getMessage(key, subs) || key;
 
   const DEFAULT_SETTINGS = {
@@ -25,6 +26,13 @@
     reserve: 0,
     gameDelayMs: 800,
     autoClaim: true,
+    autoMode: false,
+    repayDebt: true,
+    loanTrick: true,
+    crashEnabled: true,
+    crashBet: 100,
+    crashMinEv: 1.05,
+    xpBudget: 0,
     logLevel: 'info',
   };
   const EMPTY_STATS = {
@@ -38,7 +46,14 @@
     games: {},
     work: { tickets: 0, net: 0, xp: 0 },
     free: { daily: 0, bailout: 0 },
+    crashBooked: [],
+    grind: { day: '', net: 0 },
+    flags: { cleanDone: false, boardsDay: '' },
   };
+  const CRASH_UNLOCK = 3;
+  const CRASH_POLL_MS = 60_000;
+  const LEADERBOARDS = ['level', 'credits', 'biggest', 'losers', 'debtors'];
+  const CLEAN_LOAN = 500;
   const FREE_PATHS = { '/api/bonus/daily': 'daily', '/api/bonus/bailout': 'bailout' };
   const CLAIM_RETRY_MS = 10 * 60_000;
   const TICK_MS = 700;
@@ -57,6 +72,8 @@
   let bjStake = 0; // stake of the open blackjack hand, to book doubles
   let sessionBase = 0; // total game net when the game bot was started
   const claimTried = {}; // kind -> last attempt, so a refused claim is not spammed
+  let crashPolledAt = 0;
+  let grindPausedUntil = 0;
   let busy = false;
   let status = { key: 'statusIdle' };
   let ui = null;
@@ -71,6 +88,10 @@
   const num = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
   const signed = new Intl.NumberFormat(locale, { maximumFractionDigits: 0, signDisplay: 'exceptZero' });
   const pct = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 });
+  const signedPct = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1, signDisplay: 'exceptZero' });
+
+  const workOn = () => settings.enabled || settings.autoMode;
+  const gamesOn = () => settings.gamesEnabled || settings.autoMode;
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
   const humanDelay = () => C.delayBetween(settings.minDelayMs, settings.maxDelayMs);
@@ -135,6 +156,7 @@
     const before = player?.credits;
     if (data?.player) player = data.player;
     if (!ok) return;
+    if (data?.crash) bookCrash(data.crash);
 
     if (path === '/api/work/start' && data.task) {
       task = data.task;
@@ -149,11 +171,24 @@
       if (delta) {
         bjStake = data.hand && !data.hand.done ? delta.stake : 0;
         G.addDelta(stats.games, delta);
+        if (stats.grind.day === A.dayKey()) stats.grind.net += delta.net;
         saveStats();
         log.debug('game_round', delta);
       }
     }
     render();
+  }
+
+  // Crash pays auto cash-outs without a response, so settled bets are booked
+  // from the round's bet list instead, once per bet id.
+  function bookCrash(crash) {
+    for (const bet of crash.bets ?? []) {
+      if (!bet.me || bet.status === 'open' || stats.crashBooked.includes(bet.id)) continue;
+      stats.crashBooked = [...stats.crashBooked, bet.id].slice(-50);
+      G.addDelta(stats.games, { game: 'crash', rounds: 1, wagered: bet.stake, net: (bet.payout ?? 0) - bet.stake, xp: 0 });
+      saveStats();
+      log.info('crash_settled', { stake: bet.stake, payout: bet.payout ?? 0, status: bet.status });
+    }
   }
 
   function onResult(taskId, data, creditsBefore) {
@@ -237,7 +272,7 @@
     setStatus('statusAnswering', [C.ticketLabel(current.id), msg(`source_${source}`)]);
     const timeLeft = current.expiresAt - Date.now() - 2000;
     await sleep(Math.min(humanDelay() - (Date.now() - started), timeLeft));
-    if (!settings.enabled || task?.id !== current.id) return;
+    if (!workOn() || task?.id !== current.id) return;
 
     const button = answerButton(taskEl, current, index);
     if (!button || button.disabled) {
@@ -298,7 +333,7 @@
     }
     setStatus('statusStarting');
     await sleep(humanDelay() / 2);
-    if (!settings.enabled) return;
+    if (!workOn()) return;
     lastType = type;
     card.click();
   }
@@ -311,13 +346,19 @@
     const open = player.blackjack && !player.blackjack.done ? player.blackjack : null;
     if (open) bjStake = open.stake ?? bjStake;
     let res = open ? { ok: true, data: { hand: open, player } } : await api('/api/blackjack/deal', { bet });
-    while (res.ok && res.data.hand && !res.data.hand.done && settings.gamesEnabled) {
+    while (res.ok && res.data.hand && !res.data.hand.done && gamesOn()) {
       await sleep(settings.gameDelayMs / 2);
       const rules = BJ.rulesFromUpgrades(player.upgrades?.blackjack);
       const action = BJ.decide(res.data.hand, rules, res.data.player?.credits ?? player.credits);
       res = await api('/api/blackjack/action', { action });
     }
     return res;
+  }
+
+  function playRound(game, bet) {
+    if (game === 'blackjack') return playBlackjack(bet);
+    if (game === 'roulette') return api('/api/roulette/spin', { bets: { [settings.rouletteBet]: bet } });
+    return api(G.GAMES[game].path, { bet });
   }
 
   async function gameStep() {
@@ -344,11 +385,7 @@
     if (!handOpen && player.credits - bet < settings.reserve) return stopGames('statusReserve');
 
     setStatus('statusPlaying', [msg(`game_${game}`), credits(bet), signed.format(sessionNet)]);
-    let res;
-    if (game === 'blackjack') res = await playBlackjack(bet);
-    else if (game === 'roulette') res = await api('/api/roulette/spin', { bets: { [settings.rouletteBet]: bet } });
-    else res = await api(info.path, { bet });
-
+    const res = await playRound(game, bet);
     if (!res.ok) {
       log.warn('game_failed', { game, status: res.status, error: res.data?.error });
       return stopGames('statusGameError', [res.data?.error ?? String(res.status)]);
@@ -373,7 +410,114 @@
     return true;
   }
 
+  // ---------- auto mode ----------
+
+  async function repayStep() {
+    if (!settings.repayDebt) return false;
+    const amount = A.repayAmount(player, settings.reserve);
+    if (amount < 1 || Date.now() - (claimTried.repay ?? 0) < CRASH_POLL_MS) return false;
+    claimTried.repay = Date.now();
+    setStatus('statusRepay', [credits(amount)]);
+    const res = await api('/api/loan/repay', { amount });
+    if (!res.ok) log.warn('repay_failed', { status: res.status, error: res.data?.error });
+    return true;
+  }
+
+  // One-time +500 achievement for repaying a loan within its interest-free hour.
+  async function loanTrickStep() {
+    if (!settings.loanTrick || stats.flags.cleanDone || player.loan) return false;
+    stats.flags.cleanDone = true;
+    saveStats();
+    setStatus('statusLoanTrick');
+    const take = await api('/api/loan/take', { amount: CLEAN_LOAN });
+    if (!take.ok) {
+      log.warn('loan_take_failed', { status: take.status, error: take.data?.error });
+      return true;
+    }
+    const debt = take.data.player?.loan?.debt ?? CLEAN_LOAN;
+    const repay = await api('/api/loan/repay', { amount: debt });
+    // A failed repay is retried by repayStep while the hour is still free.
+    if (!repay.ok) log.warn('loan_repay_failed', { status: repay.status, error: repay.data?.error });
+    return true;
+  }
+
+  // Opening the boards is what checks the podium achievement (top 3 on any board).
+  async function leaderboardStep() {
+    const today = A.dayKey();
+    if (stats.flags.boardsDay === today) return false;
+    stats.flags.boardsDay = today;
+    saveStats();
+    setStatus('statusLeaderboard');
+    for (const by of LEADERBOARDS) await api(`/api/leaderboard?by=${by}`);
+    return true;
+  }
+
+  // One bet per daily round, only when the round history says it pays.
+  async function crashStep() {
+    if (!settings.crashEnabled || player.level < CRASH_UNLOCK) return false;
+    if (Date.now() - crashPolledAt < CRASH_POLL_MS) return false;
+    crashPolledAt = Date.now();
+    const res = await api('/api/crash');
+    const crash = res.data?.crash;
+    if (!res.ok || !crash || crash.status !== 'running' || crash.bets?.some((bet) => bet.me)) return true;
+
+    const entry = A.crashMult(crash.startAt, crash.serverNow ?? Date.now());
+    const plan = A.bestCrashTarget(crash.history, entry, crash.rate ?? 1);
+    if (!plan || plan.ev < settings.crashMinEv) {
+      log.info('crash_skip', { entry, rate: crash.rate, history: crash.history?.length ?? 0, ev: plan?.ev ?? null });
+      return true;
+    }
+    const stake = G.betFor(settings.crashBet, player.maxBet);
+    if (player.credits - stake < settings.reserve) return true;
+    setStatus('statusCrashBet', [
+      credits(stake),
+      plan.target === null ? msg('crashHold') : `${plan.target.toFixed(2)}x`,
+      signedPct.format(plan.ev - 1),
+    ]);
+    const bet = await api('/api/crash/bet', { stake, auto: plan.target });
+    if (!bet.ok) log.warn('crash_bet_failed', { status: bet.status, error: bet.data?.error });
+    else log.info('crash_bet', { stake, entry, target: plan.target, ev: plan.ev });
+    return true;
+  }
+
+  // Every game loses on average, so gambling only buys XP, within a daily budget.
+  async function grindStep() {
+    if (settings.xpBudget <= 0 || Date.now() < grindPausedUntil) return false;
+    const today = A.dayKey();
+    if (stats.grind.day !== today) stats.grind = { day: today, net: 0 };
+    if (-stats.grind.net >= settings.xpBudget) return false;
+    const unlocks = Object.fromEntries(G.GAME_KEYS.map((game) => [game, G.GAMES[game].unlock]));
+    const game = A.grindGame(G.GAME_KEYS, player.level, stats.games, unlocks);
+    const bet = G.BET_LEVELS[0];
+    if (!game || player.credits - bet < settings.reserve) return false;
+    setStatus('statusGrinding', [msg(`game_${game}`), credits(Math.max(0, -stats.grind.net)), credits(settings.xpBudget)]);
+    const res = await playRound(game, bet);
+    if (!res.ok) {
+      log.warn('grind_failed', { game, status: res.status, error: res.data?.error });
+      grindPausedUntil = Date.now() + CLAIM_RETRY_MS;
+    }
+    await sleep(settings.gameDelayMs);
+    return true;
+  }
+
+  async function autoStep() {
+    if (!player) {
+      setStatus('statusLoading');
+      await api('/api/me');
+      return;
+    }
+    if (await claimFreebies()) return;
+    if (await repayStep()) return;
+    if (await loanTrickStep()) return;
+    if (await leaderboardStep()) return;
+    if (await crashStep()) return;
+    if (workAvailable()) return workStep();
+    if (await grindStep()) return;
+    return workStep();
+  }
+
   async function step() {
+    if (settings.autoMode) return autoStep();
     if (await claimFreebies()) return;
     if (settings.enabled && workAvailable()) return workStep();
     if (settings.gamesEnabled) return gameStep();
@@ -381,7 +525,7 @@
   }
 
   async function tick() {
-    if ((!settings.enabled && !settings.gamesEnabled) || busy) return;
+    if ((!settings.enabled && !settings.gamesEnabled && !settings.autoMode) || busy) return;
     busy = true;
     try {
       await step();
@@ -450,7 +594,10 @@
         .neg { color: #ff8f7a; }
       </style>
       <div class="panel" role="region">
-        <div class="row"><span class="title"></span></div>
+        <div class="row">
+          <span class="title"></span>
+          <button type="button" class="auto-toggle"></button>
+        </div>
         <div class="row">
           <label class="muted grow" for="type"></label>
           <select id="type">
@@ -482,6 +629,7 @@
       title: $('.title'),
       typeLabel: $('label[for="type"]'),
       type: $('#type'),
+      autoToggle: $('.auto-toggle'),
       workToggle: $('.work-toggle'),
       gameLabel: $('label[for="game"]'),
       game: $('#game'),
@@ -501,6 +649,10 @@
     ['colGame', 'colRounds', 'colNet', 'colRtp'].forEach((key, i) => (ui.head[i].textContent = msg(key)));
     for (const option of ui.type.options) option.textContent = msg(`type_${option.value}`);
     for (const game of G.GAME_KEYS) ui.game.add(new Option(msg(`game_${game}`), game));
+    ui.autoToggle.addEventListener('click', () => {
+      saveSettings({ autoMode: !settings.autoMode });
+      setStatus(settings.autoMode ? 'statusIdle' : 'statusStarting');
+    });
     ui.workToggle.addEventListener('click', () => (settings.enabled ? stopWork() : startWork()));
     ui.gamesToggle.addEventListener('click', () => (settings.gamesEnabled ? stopGames() : startGames()));
     ui.type.addEventListener('change', () => saveSettings({ taskType: ui.type.value }));
@@ -553,6 +705,8 @@
 
   function render() {
     if (!ui) return;
+    setToggle(ui.autoToggle, settings.autoMode);
+    ui.autoToggle.textContent = `${msg('panelAuto')}: ${msg(settings.autoMode ? 'panelOn' : 'panelOff')}`;
     setToggle(ui.workToggle, settings.enabled);
     setToggle(ui.gamesToggle, settings.gamesEnabled);
     ui.workToggle.setAttribute('aria-label', `${msg('panelWork')}: ${ui.workToggle.textContent}`);

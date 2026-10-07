@@ -48,12 +48,22 @@ progress shows at `chrome://on-device-internals`.
   page refreshes on the next app request. Guardrails: stop-loss and take-profit per
   session, a credit reserve, and the game's unlock level. With both bots on, work
   goes first and games fill the time while energy refills.
+- **Auto mode** (`src/auto.js`, one toggle in the panel) runs everything in order of
+  value each tick: claim the daily bonus and bailout, repay debt (8 %/h compounding
+  until 2.5x, then 50 % of every payout is garnished), take the one-time +500
+  clean-loan achievement (borrow 500, repay inside the free hour), open every
+  leaderboard once a day (the podium achievement pays +1000 for top 3 on any board,
+  debtors included), bet on crash only when the round history gives an expected
+  return above the threshold, work every ticket, and gamble other games only to grind
+  XP within a daily loss budget (default 0). Measured house edges: blackjack -12.4 %
+  base to -2.9 % fully upgraded (exact solver in `src/blackjack.js`), roulette -7.7 %
+  to -2.7 %, Blaze about 66 % RTP by simulation. Grinding explores each unlocked game
+  for 30 rounds, then sticks to the lowest measured loss per XP.
 - **Profit tracking**: every game response (bot or manual play) is booked per game
   from the credit balance before and after, plus anything the debt collector took
   from the win. The panel shows rounds, net and return rate per game; the settings
   page shows wagered, returned, net, return rate, net per round and XP, plus credits
-  earned per work ticket. Crash is neither auto-played nor tracked: it is one round a
-  day and its auto cash-out is paid without a response.
+  earned per work ticket. Crash bets are booked when they settle, from the round's bet list.
 - A small panel in the bottom-left corner of the page has Start/Stop for work and
   for games, the ticket type, the game, accuracy per answer source, AI cost and
   the profit table.

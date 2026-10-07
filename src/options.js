@@ -1,15 +1,21 @@
 const msg = (key, subs) => chrome.i18n.getMessage(key, subs) || key;
 
-const CHECKBOXES = ['guessUnknown', 'stopAtNorm', 'autoClaim'];
+const CHECKBOXES = ['guessUnknown', 'stopAtNorm', 'autoClaim', 'repayDebt', 'loanTrick', 'crashEnabled'];
 const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet'];
-const INT_SELECTS = ['gameBet'];
+const INT_SELECTS = ['gameBet', 'crashBet'];
 const TEXTS = ['openrouterModel'];
-const NUMBERS = ['minDelayMs', 'maxDelayMs', 'stopLoss', 'takeProfit', 'reserve', 'gameDelayMs'];
+const NUMBERS = ['minDelayMs', 'maxDelayMs', 'stopLoss', 'takeProfit', 'reserve', 'gameDelayMs', 'crashMinEv', 'xpBudget'];
 const DEFAULTS = {
   aiSolver: 'local',
   guessUnknown: true,
   stopAtNorm: false,
   autoClaim: true,
+  repayDebt: true,
+  loanTrick: true,
+  crashEnabled: true,
+  crashBet: 100,
+  crashMinEv: 1.05,
+  xpBudget: 0,
   model: 'claude-opus-5-5',
   openrouterModel: 'google/gemini-2.5-flash',
   effort: 'medium',
@@ -36,7 +42,9 @@ const field = (name) => document.querySelector(`[name="${name}"]`);
 for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = msg(el.dataset.i18n);
 document.documentElement.lang = locale;
 
-for (const bet of G.BET_LEVELS) field('gameBet').add(new Option(num.format(bet), String(bet)));
+for (const name of INT_SELECTS) {
+  for (const bet of G.BET_LEVELS) field(name).add(new Option(num.format(bet), String(bet)));
+}
 for (const key of G.ROULETTE_BETS) field('rouletteBet').add(new Option(msg(`roulette_${key}`), key));
 
 async function load() {
@@ -158,6 +166,7 @@ $('save').addEventListener('click', async () => {
   for (const name of INT_SELECTS) next[name] = Number(field(name).value);
   for (const name of TEXTS) next[name] = field(name).value.trim();
   for (const name of NUMBERS) next[name] = Math.max(0, Number(field(name).value) || 0);
+  next.crashMinEv = Math.max(1, next.crashMinEv);
   if (next.maxDelayMs < next.minDelayMs) next.maxDelayMs = next.minDelayMs;
   await chrome.storage.local.set({
     settings: next,

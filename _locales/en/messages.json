@@ -231,7 +231,7 @@
     "message": "Games"
   },
   "optionsGamesHint": {
-    "message": "The game bot plays through the casino API with your session, so the game screen does not animate and the credit balance on the page refreshes on your next click. Blackjack follows the table hint. Crash is not auto-played or tracked: it is one round a day and auto cash-outs are paid without a response. While work has energy, work goes first."
+    "message": "The game bot plays through the casino API with your session, so the game screen does not animate and the credit balance on the page refreshes on your next click. Blackjack uses an exact strategy solver for your table upgrades. While work has energy, work goes first."
   },
   "optionsGameBet": {
     "message": "Bet per round"
@@ -274,6 +274,87 @@
   },
   "optionsAutoClaim": {
     "message": "Claim the daily bonus automatically, and the bailout when broke"
+  },
+  "panelAuto": {
+    "message": "Auto"
+  },
+  "panelOn": {
+    "message": "on"
+  },
+  "panelOff": {
+    "message": "off"
+  },
+  "game_crash": {
+    "message": "Crash (Produkce padá)"
+  },
+  "crashHold": {
+    "message": "the planned outage"
+  },
+  "statusRepay": {
+    "message": "Repaying $P1$ of debt...",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusLoanTrick": {
+    "message": "Taking and repaying a 500 loan within the free hour (+500 achievement)..."
+  },
+  "statusLeaderboard": {
+    "message": "Checking leaderboards for the podium achievement..."
+  },
+  "statusCrashBet": {
+    "message": "Crash: bet $P1$, cash out at $P2$, expected $P3$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "statusGrinding": {
+    "message": "Grinding XP on $P1$, lost $P2$ of $P3$ today",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "optionsAutoHeading": {
+    "message": "Auto mode"
+  },
+  "optionsAutoHint": {
+    "message": "Auto runs everything in order of value: claims the daily bonus and bailout, repays debt (8 % an hour, then 50 % of every payout), takes the one-time +500 clean-loan achievement, checks the leaderboards for the podium achievement, bets on crash only when the round history gives an expected return above the threshold, works every ticket, and gambles only for XP within the daily budget below. Every other game loses on average, so the budget defaults to 0."
+  },
+  "optionsRepayDebt": {
+    "message": "Repay debt with spare credits"
+  },
+  "optionsLoanTrick": {
+    "message": "Take the one-time +500 clean-loan achievement"
+  },
+  "optionsCrashEnabled": {
+    "message": "Bet on crash when the history says it pays"
+  },
+  "optionsCrashBet": {
+    "message": "Crash stake"
+  },
+  "optionsCrashMinEv": {
+    "message": "Minimum crash expected return (1.05 = +5 %)"
+  },
+  "optionsXpBudget": {
+    "message": "Daily loss budget for XP grinding (0 = off)"
   },
   "optionsTitle": {
     "message": "Botter settings"
