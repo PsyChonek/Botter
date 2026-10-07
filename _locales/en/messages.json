@@ -260,6 +260,21 @@
   "optionsProfitEmpty": {
     "message": "Nothing played yet."
   },
+  "statusClaimDaily": {
+    "message": "Claiming the daily bonus..."
+  },
+  "statusClaimBailout": {
+    "message": "Claiming the bailout..."
+  },
+  "free_daily": {
+    "message": "Daily bonus"
+  },
+  "free_bailout": {
+    "message": "Bailout"
+  },
+  "optionsAutoClaim": {
+    "message": "Claim the daily bonus automatically, and the bailout when broke"
+  },
   "optionsTitle": {
     "message": "Botter settings"
   },

@@ -260,6 +260,21 @@
   "optionsProfitEmpty": {
     "message": "Zatím nic odehráno."
   },
+  "statusClaimDaily": {
+    "message": "Vybírám denní bonus..."
+  },
+  "statusClaimBailout": {
+    "message": "Beru záchranný balíček..."
+  },
+  "free_daily": {
+    "message": "Denní bonus"
+  },
+  "free_bailout": {
+    "message": "Záchranný balíček"
+  },
+  "optionsAutoClaim": {
+    "message": "Automaticky vybírat denní bonus a při nule záchranný balíček"
+  },
   "optionsTitle": {
     "message": "Nastavení Botteru"
   },

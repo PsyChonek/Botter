@@ -24,6 +24,7 @@
     takeProfit: 0,
     reserve: 0,
     gameDelayMs: 800,
+    autoClaim: true,
     logLevel: 'info',
   };
   const EMPTY_STATS = {
@@ -36,7 +37,10 @@
     spend: { usd: 0, calls: 0 },
     games: {},
     work: { tickets: 0, net: 0, xp: 0 },
+    free: { daily: 0, bailout: 0 },
   };
+  const FREE_PATHS = { '/api/bonus/daily': 'daily', '/api/bonus/bailout': 'bailout' };
+  const CLAIM_RETRY_MS = 10 * 60_000;
   const TICK_MS = 700;
   const API_TIMEOUT_MS = 30_000;
 
@@ -52,6 +56,7 @@
   let lastType = null;
   let bjStake = 0; // stake of the open blackjack hand, to book doubles
   let sessionBase = 0; // total game net when the game bot was started
+  const claimTried = {}; // kind -> last attempt, so a refused claim is not spammed
   let busy = false;
   let status = { key: 'statusIdle' };
   let ui = null;
@@ -136,6 +141,9 @@
       log.debug('task_started', { id: task.id, type: task.type });
     } else if (path === '/api/work/submit' && data.result) {
       onResult(request?.id, data, before);
+    } else if (FREE_PATHS[path] && typeof before === 'number' && data.player) {
+      stats.free[FREE_PATHS[path]] += data.player.credits - before;
+      saveStats();
     } else {
       const delta = G.gameDelta(path, request, data, before, bjStake);
       if (delta) {
@@ -350,7 +358,23 @@
 
   // ---------- loop ----------
 
+  // Free credits: the daily bonus, and the once-a-day bailout when broke.
+  async function claimFreebies() {
+    if (!player || !settings.autoClaim) return false;
+    const due = (kind) => Date.now() - (claimTried[kind] ?? 0) > CLAIM_RETRY_MS;
+    let kind = null;
+    if (player.daily?.available && due('daily')) kind = 'daily';
+    else if (player.bailout?.available && player.credits < G.BET_LEVELS[0] && due('bailout')) kind = 'bailout';
+    if (!kind) return false;
+    claimTried[kind] = Date.now();
+    setStatus(kind === 'daily' ? 'statusClaimDaily' : 'statusClaimBailout');
+    const res = await api(`/api/bonus/${kind}`, {});
+    if (!res.ok) log.warn('claim_failed', { kind, status: res.status, error: res.data?.error });
+    return true;
+  }
+
   async function step() {
+    if (await claimFreebies()) return;
     if (settings.enabled && workAvailable()) return workStep();
     if (settings.gamesEnabled) return gameStep();
     if (settings.enabled) return workStep();
@@ -508,6 +532,9 @@
         { text: signed.format(stats.work.net), tone: tone(stats.work.net) },
         '-',
       ]);
+    }
+    for (const [kind, amount] of Object.entries(stats.free)) {
+      if (amount) rows.push([msg(`free_${kind}`), '-', { text: signed.format(amount), tone: tone(amount) }, '-']);
     }
     ui.body.replaceChildren(
       ...rows.map((values) => {

@@ -1,6 +1,6 @@
 const msg = (key, subs) => chrome.i18n.getMessage(key, subs) || key;
 
-const CHECKBOXES = ['guessUnknown', 'stopAtNorm'];
+const CHECKBOXES = ['guessUnknown', 'stopAtNorm', 'autoClaim'];
 const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet'];
 const INT_SELECTS = ['gameBet'];
 const TEXTS = ['openrouterModel'];
@@ -9,6 +9,7 @@ const DEFAULTS = {
   aiSolver: 'local',
   guessUnknown: true,
   stopAtNorm: false,
+  autoClaim: true,
   model: 'claude-opus-5-5',
   openrouterModel: 'google/gemini-2.5-flash',
   effort: 'medium',
@@ -96,8 +97,14 @@ function showProfit(stats = {}) {
       }),
     );
   }
+  const free = stats.free ?? {};
+  for (const [kind, amount] of Object.entries(free)) {
+    if (!amount) continue;
+    rows.push(profitRow(msg(`free_${kind}`), { rounds: 0, wagered: 0, returned: 0, net: amount, rtp: null, perRound: null, xp: 0 }));
+  }
   $('profitBody').replaceChildren(...rows);
-  const total = G.totalNet(stats.games ?? {}) + (work?.net ?? 0);
+  const total =
+    G.totalNet(stats.games ?? {}) + (work?.net ?? 0) + Object.values(free).reduce((sum, amount) => sum + amount, 0);
   const foot = document.createElement('tr');
   foot.append(cell(msg('colTotal')), ...Array(3).fill().map(() => cell('')), cell(signed.format(total), tone(total)));
   $('profitFoot').replaceChildren(...(rows.length ? [foot] : []));
