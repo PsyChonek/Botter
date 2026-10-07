@@ -777,7 +777,7 @@
     "message": "Switch to another saved account when this one runs out of energy"
   },
   "optionsRotateHint": {
-    "message": "An account not visited today goes first, so its daily bonus and checks run. Otherwise the account with the most energy, at least 5. Each switch reloads the casino tab."
+    "message": "An account not visited today goes first, so its daily bonus and checks run. Otherwise the account with the most energy, above 15, or, in auto mode, the richest one that can still grind XP once this one cannot. After that it returns to the home account: the one picked in the panel or the one auto mode was started on. Each switch reloads the casino tab."
   },
   "optionsAccountsHeading": {
     "message": "Accounts"
@@ -910,5 +910,27 @@
   },
   "xpState_skipped": {
     "message": "skipped"
+  },
+  "statusWaitEnergy": {
+    "message": "Waiting for more than $P1$ energy before working ($P2$ now).",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "panelAccountOptionHome": {
+    "message": "$P1$ ($P2$ energy, home)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
   }
 }

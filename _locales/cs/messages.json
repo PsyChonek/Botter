@@ -777,7 +777,7 @@
     "message": "Přepnout na jiný uložený účet, když tomuhle dojde energie"
   },
   "optionsRotateHint": {
-    "message": "Přednost má účet, který dnes ještě nebyl otevřený, aby si vybral denní bonus a proběhly kontroly. Jinak účet s nejvíc energií, aspoň 5. Každé přepnutí znovu načte záložku kasina."
+    "message": "Přednost má účet, který dnes ještě nebyl otevřený, aby si vybral denní bonus a proběhly kontroly. Jinak účet s nejvíc energií, víc než 15, nebo v auto režimu nejbohatší účet, který ještě může grindovat XP, když tento už nemůže. Potom se vrátí na hlavní účet: ten vybraný v panelu, nebo ten, na kterém byl auto režim zapnutý. Každé přepnutí znovu načte záložku kasina."
   },
   "optionsAccountsHeading": {
     "message": "Účty"
@@ -910,5 +910,27 @@
   },
   "xpState_skipped": {
     "message": "přeskočeno"
+  },
+  "statusWaitEnergy": {
+    "message": "Čekám na víc než $P1$ energie, pak začnu pracovat (teď $P2$).",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "panelAccountOptionHome": {
+    "message": "$P1$ (energie $P2$, hlavní)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
   }
 }

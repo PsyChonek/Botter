@@ -185,13 +185,35 @@ test('pickAccount visits an account not seen today first', () => {
 test('pickAccount takes the most energy, only above the minimum and before the norm', () => {
   const today = '2026-10-07';
   const accounts = [
-    { id: 'a', seenAt: 1, seenDay: today, energy: 8, normDone: false },
-    { id: 'b', seenAt: 2, seenDay: today, energy: 15, normDone: true },
-    { id: 'c', seenAt: 3, seenDay: today, energy: 4, normDone: false },
+    { id: 'a', seenAt: 1, seenDay: today, energy: 16, normDone: false },
+    { id: 'b', seenAt: 2, seenDay: today, energy: 20, normDone: true },
+    { id: 'c', seenAt: 3, seenDay: today, energy: 15, normDone: false },
   ];
-  assert.equal(A.pickAccount(accounts, today, 5), 'a');
-  assert.equal(A.pickAccount(accounts, today, 10), null);
-  assert.equal(A.pickAccount([], today, 5), null);
+  assert.equal(A.pickAccount(accounts, today, 15), 'a');
+  assert.equal(A.pickAccount(accounts, today, 16), null);
+  assert.equal(A.pickAccount([], today, 15), null);
+});
+
+test('pickAccount returns home from another account, even with nothing to do there', () => {
+  const today = '2026-10-07';
+  const accounts = [
+    { id: 'home', seenAt: 1, seenDay: today, energy: 0, normDone: false },
+    { id: 'b', seenAt: 2, seenDay: today, energy: 20, normDone: false },
+  ];
+  assert.equal(A.pickAccount(accounts, today, 15, 'home'), 'home');
+  // A home without a saved login is not a candidate, so rotation carries on.
+  assert.equal(A.pickAccount(accounts.slice(1), today, 15, 'home'), 'b');
+});
+
+test('pickAccount moves to the richest account that can grind when none has energy', () => {
+  const today = '2026-10-07';
+  const accounts = [
+    { id: 'a', seenAt: 1, seenDay: today, energy: 3, credits: 900, canGrind: true },
+    { id: 'b', seenAt: 2, seenDay: today, energy: 2, credits: 5000, canGrind: false },
+    { id: 'c', seenAt: 3, seenDay: today, energy: 1, credits: 2000, canGrind: true },
+  ];
+  assert.equal(A.pickAccount(accounts, today, 15), 'c');
+  assert.equal(A.pickAccount(accounts.map((a) => ({ ...a, canGrind: false })), today, 15), null);
 });
 
 test('grindReport shows XP per bet and where each level stands on the ladder', () => {

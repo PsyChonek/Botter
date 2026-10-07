@@ -187,15 +187,20 @@
   }
 
   // Account to switch to once the current one has nothing left to do. Each
-  // candidate is { id, seenAt, seenDay, energy, normDone }. One not visited
-  // today goes first (its daily bonus and checks are waiting), otherwise the one
-  // with the most refilled energy, if it has at least minEnergy.
-  function pickAccount(candidates, today, minEnergy) {
+  // candidate is { id, seenAt, seenDay, energy, normDone, credits, canGrind }.
+  // One not visited today goes first (its daily bonus and checks are waiting).
+  // Away from the home account, the next stop is home. From home, the one with
+  // the most refilled energy above minEnergy, else the richest one that can
+  // still grind XP, so betting carries on when home has run out of credits.
+  function pickAccount(candidates, today, minEnergy, home = null) {
     const fresh = candidates.filter((a) => a.seenDay !== today);
     if (fresh.length) return fresh.reduce((a, b) => (b.seenAt < a.seenAt ? b : a)).id;
-    const ready = candidates.filter((a) => !a.normDone && a.energy >= minEnergy);
-    if (!ready.length) return null;
-    return ready.reduce((a, b) => (b.energy > a.energy ? b : a)).id;
+    if (home && candidates.some((a) => a.id === home)) return home;
+    const ready = candidates.filter((a) => !a.normDone && a.energy > minEnergy);
+    if (ready.length) return ready.reduce((a, b) => (b.energy > a.energy ? b : a)).id;
+    const funded = candidates.filter((a) => a.canGrind);
+    if (funded.length) return funded.reduce((a, b) => (b.credits > a.credits ? b : a)).id;
+    return null;
   }
 
   // Local calendar day, used to reset daily budgets and checks.

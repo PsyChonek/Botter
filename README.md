@@ -106,8 +106,14 @@ progress shows at `chrome://on-device-internals`.
   - **Rotate accounts** (settings, Auto tab, on by default): when the current
     account is out of energy and has nothing else to do, auto mode (or the work bot
     alone) switches to an account not visited today, otherwise to the one with the
-    most projected energy (at least 5), so every account's energy gets used. It stays
-    at least a minute on each account. With one saved account it does nothing.
+    most projected energy (more than 15), so every account's energy gets used. In
+    auto mode, once the current account can no longer grind XP (out of credits or
+    budget), it also switches to the richest account that still can and bets there.
+    When that account is done it returns to the **home** account: the one picked in
+    the dropdown, or the one auto mode was started on (marked in the dropdown). It
+    stays at least a minute on each account. With one saved account it does nothing.
+  - Work starts only once energy is above 5 and then works it down to zero, so single
+    refilled points do not keep interrupting the grinder.
   - Use one casino tab per account. Two tabs on the same origin share one supabase
     session, so a second tab can write its old session back. To run two accounts at
     once, open the second in an incognito window with Botter allowed in incognito;

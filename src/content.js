@@ -46,6 +46,7 @@
     logLevel: 'info',
     panelHidden: false,
     rotateAccounts: true,
+    homeAccount: '', // user id rotation returns to; the account picked in the panel
   };
   const EMPTY_STATS = {
     bank: { correct: 0, wrong: 0 },
@@ -82,7 +83,11 @@
   const SWITCH_KEY = 'botter-switch'; // sessionStorage: { from, to } of a switch in progress
   const ACCOUNT_SAVE_MS = 30_000;
   const ROTATE_DWELL_MS = 60_000;
-  const ROTATE_MIN_ENERGY = 5;
+  // Another account is worth a switch (a page reload) only above this much energy.
+  const ROTATE_MIN_ENERGY = 15;
+  // A work run starts only above this much energy and then drains it, so single
+  // refilled points do not keep interrupting the grinder.
+  const WORK_MIN_ENERGY = 5;
   const LOGGED_OUT_WAIT_MS = 10_000;
 
   let settings = { ...DEFAULT_SETTINGS };
@@ -106,6 +111,7 @@
   let taskOpenedAt = 0; // local time the current task was started
   let submitTries = 0; // submits of the current task the server rejected
   let lastType = null;
+  let workRun = false; // energy went above WORK_MIN_ENERGY and is being worked down
   let bjStake = 0; // stake of the open blackjack hand, to book doubles
   let bjBet = 0; // opening bet of that hand, to book its XP per bet level
   let sessionBase = 0; // total game net when the game bot was started
@@ -387,11 +393,13 @@
     answeredTaskId = null;
     pending = null;
     lastType = null;
+    workRun = false;
     bjStake = 0;
     crashPolledAt = 0;
     grindPausedUntil = 0;
     for (const kind of Object.keys(claimTried)) delete claimTried[kind];
     if (readSwitch()?.to === id) sessionStorage.removeItem(SWITCH_KEY);
+    if (!settings.homeAccount) saveSettings({ homeAccount: id });
     log.info('account', { id });
   }
 
@@ -478,8 +486,18 @@
     if (accounts[marker.from]?.session) await switchAccount(marker.from);
   }
 
+  // Whether a saved account could still place the smallest XP grinding bet,
+  // judged from its last snapshot and today's grind loss in its stats.
+  function canGrind(id, saved, today) {
+    const unlock = settings.grindGame === 'auto' ? Math.min(...Object.values(GRIND_UNLOCKS)) : GRIND_UNLOCKS[settings.grindGame];
+    if (!settings.autoMode || !(saved.level >= unlock)) return false;
+    const grind = statsCache[id]?.grind;
+    const lost = Math.max(0, -(grind?.day === today ? grind.net : 0));
+    return A.grindBets(settings, saved.credits ?? 0, lost, [G.BET_LEVELS[0]]).length > 0;
+  }
+
   // An account with nothing left to do hands over to another saved account
-  // instead of idling while its energy refills.
+  // instead of idling while its energy refills, and returns home afterwards.
   async function rotateStep() {
     if (!settings.rotateAccounts || !player || Date.now() - accountSince < ROTATE_DWELL_MS) return false;
     const now = Date.now();
@@ -492,10 +510,18 @@
         seenDay: saved.seenDay,
         energy: G.energyNow(saved.work, now),
         normDone: settings.stopAtNorm && saved.seenDay === today && saved.work?.paidToday >= saved.work?.norm,
+        credits: saved.credits ?? 0,
+        canGrind: canGrind(id, saved, today),
       }));
-    const id = A.pickAccount(candidates, today, ROTATE_MIN_ENERGY);
+    const home = settings.homeAccount && settings.homeAccount !== accountId ? settings.homeAccount : null;
+    const id = A.pickAccount(candidates, today, ROTATE_MIN_ENERGY, home);
     if (!id) return false;
-    log.info('account_rotate', { to: accounts[id].login, energy: G.energyNow(accounts[id].work, now) });
+    log.info('account_rotate', {
+      to: accounts[id].login,
+      home: id === settings.homeAccount,
+      energy: G.energyNow(accounts[id].work, now),
+      credits: accounts[id].credits,
+    });
     await switchAccount(id);
     return true;
   }
@@ -602,7 +628,11 @@
   function workAvailable() {
     if (document.querySelector('.work-screen section.task')) return true;
     if (!player) return true;
-    return !normDone() && G.energyNow(player.work, Date.now()) >= 1;
+    if (normDone()) return false;
+    const energy = G.energyNow(player.work, Date.now());
+    if (energy > WORK_MIN_ENERGY) workRun = true;
+    else if (energy < 1) workRun = false;
+    return workRun;
   }
 
   async function workStep() {
@@ -636,6 +666,10 @@
     if (!pick) return;
     if (normDone()) {
       stopWork('statusNormDone');
+      return;
+    }
+    if (!workAvailable()) {
+      setStatus('statusWaitEnergy', [String(WORK_MIN_ENERGY), String(G.energyNow(player.work, Date.now()))]);
       return;
     }
     const type = C.nextType(settings.taskType, lastType);
@@ -1073,11 +1107,15 @@
     for (const option of ui.type.options) option.textContent = msg(`type_${option.value}`);
     for (const game of G.GAME_KEYS) ui.game.add(new Option(msg(`game_${game}`), game));
     ui.autoToggle.addEventListener('click', () => {
-      saveSettings({ autoMode: !settings.autoMode });
+      // The account auto mode is started on is the one rotation returns to.
+      saveSettings({ autoMode: !settings.autoMode, ...(accountId && !settings.autoMode ? { homeAccount: accountId } : {}) });
       setStatus(settings.autoMode ? 'statusIdle' : 'statusStarting');
     });
     ui.hide.addEventListener('click', () => setPanelHidden(true));
-    ui.account.addEventListener('change', () => switchAccount(ui.account.value));
+    ui.account.addEventListener('change', () => {
+      saveSettings({ homeAccount: ui.account.value });
+      switchAccount(ui.account.value);
+    });
     ui.addAccount.addEventListener('click', addAccount);
     ui.show.addEventListener('click', () => setPanelHidden(false));
     ui.workToggle.addEventListener('click', () => (settings.enabled ? stopWork() : startWork()));
@@ -1195,7 +1233,10 @@
     list.sort((a, b) => a.login.localeCompare(b.login));
     const options = list.map((a) => ({
       value: a.id,
-      text: msg('panelAccountOption', [a.login, String(G.energyNow(a.work, now))]),
+      text: msg(a.id === settings.homeAccount ? 'panelAccountOptionHome' : 'panelAccountOption', [
+        a.login,
+        String(G.energyNow(a.work, now)),
+      ]),
       disabled: a.id !== accountId && !a.session,
     }));
     if (!accountId) options.unshift({ value: '', text: msg('panelNoAccount'), disabled: true });
