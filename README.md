@@ -39,8 +39,24 @@ device** to **Enabled BypassPerfRequirement** and **Prompt API for Gemini Nano**
 progress shows at `chrome://on-device-internals`.
   3. **Guess** (optional): a random valid choice. A wrong answer costs energy
      but teaches the bank.
-- A small panel in the bottom-left corner of the page has Start/Stop, the
-  ticket type (alternate, bug hunt, output) and accuracy per answer source.
+- **Game bot** (`src/games.js`, game loop in `src/content.js`): plays Blaze 20 Wild,
+  Skeleton Slots, Slotingi, Roulette (one outside bet, red by default) and Blackjack
+  (follows the table's own hint) through the casino API. The page hook performs the
+  calls with the session the app already holds (supabase session in localStorage,
+  falling back to the last Authorization header the app sent), so the token never
+  leaves the page. The game screen does not animate and the credit balance on the
+  page refreshes on the next app request. Guardrails: stop-loss and take-profit per
+  session, a credit reserve, and the game's unlock level. With both bots on, work
+  goes first and games fill the time while energy refills.
+- **Profit tracking**: every game response (bot or manual play) is booked per game
+  from the credit balance before and after, plus anything the debt collector took
+  from the win. The panel shows rounds, net and return rate per game; the settings
+  page shows wagered, returned, net, return rate, net per round and XP, plus credits
+  earned per work ticket. Crash is neither auto-played nor tracked: it is one round a
+  day and its auto cash-out is paid without a response.
+- A small panel in the bottom-left corner of the page has Start/Stop for work and
+  for games, the ticket type, the game, accuracy per answer source, AI cost and
+  the profit table.
 
 ## Install
 

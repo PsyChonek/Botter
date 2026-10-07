@@ -1,9 +1,10 @@
 const msg = (key, subs) => chrome.i18n.getMessage(key, subs) || key;
 
 const CHECKBOXES = ['guessUnknown', 'stopAtNorm'];
-const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel'];
+const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet'];
+const INT_SELECTS = ['gameBet'];
 const TEXTS = ['openrouterModel'];
-const NUMBERS = ['minDelayMs', 'maxDelayMs'];
+const NUMBERS = ['minDelayMs', 'maxDelayMs', 'stopLoss', 'takeProfit', 'reserve', 'gameDelayMs'];
 const DEFAULTS = {
   aiSolver: 'local',
   guessUnknown: true,
@@ -14,29 +15,98 @@ const DEFAULTS = {
   logLevel: 'info',
   minDelayMs: 1500,
   maxDelayMs: 4000,
+  gameBet: 20,
+  rouletteBet: 'red',
+  stopLoss: 1000,
+  takeProfit: 0,
+  reserve: 0,
+  gameDelayMs: 800,
 };
+
+const G = globalThis.BotterGames;
+const locale = chrome.i18n.getUILanguage();
+const num = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
+const signed = new Intl.NumberFormat(locale, { maximumFractionDigits: 1, signDisplay: 'exceptZero' });
+const pct = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 });
 
 const $ = (id) => document.getElementById(id);
 const field = (name) => document.querySelector(`[name="${name}"]`);
 
 for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = msg(el.dataset.i18n);
-document.documentElement.lang = chrome.i18n.getUILanguage();
+document.documentElement.lang = locale;
+
+for (const bet of G.BET_LEVELS) field('gameBet').add(new Option(num.format(bet), String(bet)));
+for (const key of G.ROULETTE_BETS) field('rouletteBet').add(new Option(msg(`roulette_${key}`), key));
 
 async function load() {
-  const { settings = {}, apiKey = '', openrouterKey = '', bank = {} } = await chrome.storage.local.get([
+  const { settings = {}, apiKey = '', openrouterKey = '', bank = {}, stats } = await chrome.storage.local.get([
     'settings',
     'apiKey',
     'openrouterKey',
     'bank',
+    'stats',
   ]);
   const values = { ...DEFAULTS, ...settings };
   for (const name of CHECKBOXES) field(name).checked = values[name];
-  for (const name of [...SELECTS, ...TEXTS, ...NUMBERS]) field(name).value = values[name];
+  for (const name of [...SELECTS, ...INT_SELECTS, ...TEXTS, ...NUMBERS]) field(name).value = values[name];
   $('apiKey').value = apiKey;
   $('openrouterKey').value = openrouterKey;
   showBankSize(bank);
   showLocalStatus();
+  showProfit(stats);
 }
+
+function cell(text, tone) {
+  const td = document.createElement('td');
+  td.textContent = text;
+  if (tone) td.className = tone;
+  return td;
+}
+
+const tone = (n) => (n > 0 ? 'pos' : n < 0 ? 'neg' : '');
+
+function profitRow(label, row) {
+  const tr = document.createElement('tr');
+  tr.append(
+    cell(label),
+    cell(num.format(row.rounds)),
+    cell(row.wagered ? num.format(row.wagered) : '-'),
+    cell(row.wagered ? num.format(row.returned) : '-'),
+    cell(signed.format(row.net), tone(row.net)),
+    cell(row.rtp === null ? '-' : pct.format(row.rtp)),
+    cell(row.perRound === null ? '-' : signed.format(row.perRound), tone(row.perRound)),
+    cell(num.format(row.xp)),
+  );
+  return tr;
+}
+
+function showProfit(stats = {}) {
+  const rows = G.profitRows(stats.games ?? {}).map((row) => profitRow(msg(`game_${row.game}`), row));
+  const work = stats.work;
+  if (work?.tickets > 0) {
+    rows.push(
+      profitRow(msg('panelWork'), {
+        rounds: work.tickets,
+        wagered: 0,
+        returned: 0,
+        net: work.net,
+        rtp: null,
+        perRound: work.net / work.tickets,
+        xp: work.xp,
+      }),
+    );
+  }
+  $('profitBody').replaceChildren(...rows);
+  const total = G.totalNet(stats.games ?? {}) + (work?.net ?? 0);
+  const foot = document.createElement('tr');
+  foot.append(cell(msg('colTotal')), ...Array(3).fill().map(() => cell('')), cell(signed.format(total), tone(total)));
+  $('profitFoot').replaceChildren(...(rows.length ? [foot] : []));
+  $('profitEmpty').hidden = rows.length > 0;
+}
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.stats) showProfit(changes.stats.newValue);
+});
 
 async function showLocalStatus(state) {
   state ??= await BotterLocal.availability().catch(() => 'unavailable');
@@ -78,6 +148,7 @@ $('save').addEventListener('click', async () => {
   const next = { ...settings };
   for (const name of CHECKBOXES) next[name] = field(name).checked;
   for (const name of SELECTS) next[name] = field(name).value;
+  for (const name of INT_SELECTS) next[name] = Number(field(name).value);
   for (const name of TEXTS) next[name] = field(name).value.trim();
   for (const name of NUMBERS) next[name] = Math.max(0, Number(field(name).value) || 0);
   if (next.maxDelayMs < next.minDelayMs) next.maxDelayMs = next.minDelayMs;
@@ -124,6 +195,7 @@ $('clear').addEventListener('click', async () => {
   if (!confirm(msg('optionsClearConfirm'))) return;
   await chrome.storage.local.set({ bank: {}, stats: {} });
   showBankSize({});
+  showProfit({});
   flash(msg('optionsCleared'));
 });
 

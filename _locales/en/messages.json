@@ -103,6 +103,163 @@
       }
     }
   },
+  "panelWork": {
+    "message": "Work"
+  },
+  "panelGames": {
+    "message": "Games"
+  },
+  "panelProfit": {
+    "message": "Profit"
+  },
+  "game_blaze": {
+    "message": "Blaze 20 Wild"
+  },
+  "game_skeleton": {
+    "message": "Skeleton Slots"
+  },
+  "game_slotingi": {
+    "message": "Slotingi"
+  },
+  "game_blackjack": {
+    "message": "Blackjack"
+  },
+  "game_roulette": {
+    "message": "Roulette"
+  },
+  "roulette_red": {
+    "message": "Red"
+  },
+  "roulette_black": {
+    "message": "Black"
+  },
+  "roulette_even": {
+    "message": "Even"
+  },
+  "roulette_odd": {
+    "message": "Odd"
+  },
+  "roulette_low": {
+    "message": "1 to 18"
+  },
+  "roulette_high": {
+    "message": "19 to 36"
+  },
+  "colGame": {
+    "message": "Game"
+  },
+  "colRounds": {
+    "message": "Rounds"
+  },
+  "colWagered": {
+    "message": "Wagered"
+  },
+  "colReturned": {
+    "message": "Returned"
+  },
+  "colNet": {
+    "message": "Net"
+  },
+  "colRtp": {
+    "message": "Return"
+  },
+  "colPerRound": {
+    "message": "Per round"
+  },
+  "colXp": {
+    "message": "XP"
+  },
+  "colTotal": {
+    "message": "Total"
+  },
+  "statusLoading": {
+    "message": "Loading the profile..."
+  },
+  "statusPlaying": {
+    "message": "Playing $P1$, bet $P2$, session $P3$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "statusGameLocked": {
+    "message": "$P1$ unlocks at level $P2$, games stopped.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "statusStopLoss": {
+    "message": "Stop-loss hit (down $P1$), games stopped.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusTakeProfit": {
+    "message": "Take-profit hit (up $P1$), games stopped.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusReserve": {
+    "message": "Not enough credits for the bet above the reserve, games stopped."
+  },
+  "statusGameError": {
+    "message": "Game error: $P1$. Games stopped.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsGamesHeading": {
+    "message": "Games"
+  },
+  "optionsGamesHint": {
+    "message": "The game bot plays through the casino API with your session, so the game screen does not animate and the credit balance on the page refreshes on your next click. Blackjack follows the table hint. Crash is not auto-played or tracked: it is one round a day and auto cash-outs are paid without a response. While work has energy, work goes first."
+  },
+  "optionsGameBet": {
+    "message": "Bet per round"
+  },
+  "optionsRouletteBet": {
+    "message": "Roulette bet"
+  },
+  "optionsStopLoss": {
+    "message": "Stop-loss per session (0 = off)"
+  },
+  "optionsTakeProfit": {
+    "message": "Take-profit per session (0 = off)"
+  },
+  "optionsReserve": {
+    "message": "Keep at least this many credits"
+  },
+  "optionsGameDelay": {
+    "message": "Delay between rounds (ms)"
+  },
+  "optionsProfitHeading": {
+    "message": "Profit per game"
+  },
+  "optionsProfitHint": {
+    "message": "Counted from your credit balance around every round, manual play included. Credits the debt collector takes from a win count as winnings, because they pay down the loan. Work counts credits earned per ticket."
+  },
+  "optionsProfitEmpty": {
+    "message": "Nothing played yet."
+  },
   "optionsTitle": {
     "message": "Botter settings"
   },

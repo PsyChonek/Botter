@@ -80,6 +80,37 @@
         </select>
       </section>
 
+      <section aria-labelledby="games-heading">
+        <h2 id="games-heading" data-i18n="optionsGamesHeading"></h2>
+        <p class="hint" data-i18n="optionsGamesHint"></p>
+        <div class="pair">
+          <div>
+            <label for="gameBet" data-i18n="optionsGameBet"></label>
+            <select id="gameBet" name="gameBet"></select>
+          </div>
+          <div>
+            <label for="rouletteBet" data-i18n="optionsRouletteBet"></label>
+            <select id="rouletteBet" name="rouletteBet"></select>
+          </div>
+          <div>
+            <label for="stopLoss" data-i18n="optionsStopLoss"></label>
+            <input id="stopLoss" name="stopLoss" type="number" min="0" step="10" />
+          </div>
+          <div>
+            <label for="takeProfit" data-i18n="optionsTakeProfit"></label>
+            <input id="takeProfit" name="takeProfit" type="number" min="0" step="10" />
+          </div>
+          <div>
+            <label for="reserve" data-i18n="optionsReserve"></label>
+            <input id="reserve" name="reserve" type="number" min="0" step="10" />
+          </div>
+          <div>
+            <label for="gameDelayMs" data-i18n="optionsGameDelay"></label>
+            <input id="gameDelayMs" name="gameDelayMs" type="number" min="0" step="100" />
+          </div>
+        </div>
+      </section>
+
       <div class="actions">
         <button id="save" type="button" class="primary" data-i18n="optionsSave"></button>
         <span id="saved" role="status" aria-live="polite"></span>
@@ -95,8 +126,33 @@
           <button id="clear" type="button" data-i18n="optionsClear"></button>
         </div>
       </section>
+
+      <section aria-labelledby="profit-heading">
+        <h2 id="profit-heading" data-i18n="optionsProfitHeading"></h2>
+        <p class="hint" data-i18n="optionsProfitHint"></p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col" data-i18n="colGame"></th>
+                <th scope="col" data-i18n="colRounds"></th>
+                <th scope="col" data-i18n="colWagered"></th>
+                <th scope="col" data-i18n="colReturned"></th>
+                <th scope="col" data-i18n="colNet"></th>
+                <th scope="col" data-i18n="colRtp"></th>
+                <th scope="col" data-i18n="colPerRound"></th>
+                <th scope="col" data-i18n="colXp"></th>
+              </tr>
+            </thead>
+            <tbody id="profitBody"></tbody>
+            <tfoot id="profitFoot"></tfoot>
+          </table>
+        </div>
+        <p id="profitEmpty" class="hint" data-i18n="optionsProfitEmpty"></p>
+      </section>
     </main>
     <script src="core.js"></script>
+    <script src="games.js"></script>
     <script src="local-model.js"></script>
     <script src="options.js"></script>
   </body>

@@ -103,6 +103,163 @@
       }
     }
   },
+  "panelWork": {
+    "message": "Práce"
+  },
+  "panelGames": {
+    "message": "Hry"
+  },
+  "panelProfit": {
+    "message": "Zisk"
+  },
+  "game_blaze": {
+    "message": "Blaze 20 Wild"
+  },
+  "game_skeleton": {
+    "message": "Skeleton Slots"
+  },
+  "game_slotingi": {
+    "message": "Slotingi"
+  },
+  "game_blackjack": {
+    "message": "Blackjack"
+  },
+  "game_roulette": {
+    "message": "Ruleta"
+  },
+  "roulette_red": {
+    "message": "Červená"
+  },
+  "roulette_black": {
+    "message": "Černá"
+  },
+  "roulette_even": {
+    "message": "Sudá"
+  },
+  "roulette_odd": {
+    "message": "Lichá"
+  },
+  "roulette_low": {
+    "message": "1 až 18"
+  },
+  "roulette_high": {
+    "message": "19 až 36"
+  },
+  "colGame": {
+    "message": "Hra"
+  },
+  "colRounds": {
+    "message": "Kol"
+  },
+  "colWagered": {
+    "message": "Vsazeno"
+  },
+  "colReturned": {
+    "message": "Vráceno"
+  },
+  "colNet": {
+    "message": "Zisk"
+  },
+  "colRtp": {
+    "message": "Návratnost"
+  },
+  "colPerRound": {
+    "message": "Na kolo"
+  },
+  "colXp": {
+    "message": "XP"
+  },
+  "colTotal": {
+    "message": "Celkem"
+  },
+  "statusLoading": {
+    "message": "Načítám profil..."
+  },
+  "statusPlaying": {
+    "message": "Hraju $P1$, sázka $P2$, relace $P3$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "statusGameLocked": {
+    "message": "$P1$ se odemkne na levelu $P2$, hry zastaveny.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "statusStopLoss": {
+    "message": "Stop-loss (ztráta $P1$), hry zastaveny.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusTakeProfit": {
+    "message": "Cíl zisku splněn (+$P1$), hry zastaveny.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusReserve": {
+    "message": "Na sázku nad rezervou nejsou kredity, hry zastaveny."
+  },
+  "statusGameError": {
+    "message": "Chyba hry: $P1$. Hry zastaveny.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsGamesHeading": {
+    "message": "Hry"
+  },
+  "optionsGamesHint": {
+    "message": "Herní bot hraje přes API kasina s tvým přihlášením, takže se hra na obrazovce neanimuje a kredit na stránce se obnoví při dalším kliknutí. Blackjack se řídí taháky stolu. Crash se nehraje ani nesleduje: je to jedno kolo denně a automatický výběr se vyplácí bez odpovědi. Dokud je energie na práci, má práce přednost."
+  },
+  "optionsGameBet": {
+    "message": "Sázka na kolo"
+  },
+  "optionsRouletteBet": {
+    "message": "Sázka v ruletě"
+  },
+  "optionsStopLoss": {
+    "message": "Stop-loss za relaci (0 = vypnuto)"
+  },
+  "optionsTakeProfit": {
+    "message": "Cíl zisku za relaci (0 = vypnuto)"
+  },
+  "optionsReserve": {
+    "message": "Nechat aspoň tolik kreditů"
+  },
+  "optionsGameDelay": {
+    "message": "Prodleva mezi koly (ms)"
+  },
+  "optionsProfitHeading": {
+    "message": "Zisk podle hry"
+  },
+  "optionsProfitHint": {
+    "message": "Počítá se ze stavu kreditu kolem každého kola, včetně ruční hry. Kredity, které si z výhry vezme exekutor, se počítají jako výhra, protože splácí dluh. U práce se počítá výdělek za ticket."
+  },
+  "optionsProfitEmpty": {
+    "message": "Zatím nic odehráno."
+  },
   "optionsTitle": {
     "message": "Nastavení Botteru"
   },

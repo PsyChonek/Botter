@@ -4,6 +4,7 @@
   --muted: #4d5c3a;
   --accent: #4f7a12;
   --border: #b9c9a0;
+  --neg: #b3261e;
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
@@ -13,6 +14,7 @@
     --muted: #b5c99a;
     --accent: #a6d64a;
     --border: #3d5420;
+    --neg: #ff8f7a;
   }
 }
 body {
@@ -49,6 +51,13 @@ button.primary { background: var(--accent); color: var(--bg); border-color: var(
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 16px; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.9rem; }
+th, td { padding: 4px 6px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--border); }
+th:first-child, td:first-child { text-align: left; }
+tfoot td { font-weight: 700; }
+.pos { color: var(--accent); }
+.neg { color: var(--neg); }
 .hint, #saved { color: var(--muted); font-size: 0.9rem; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
