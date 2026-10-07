@@ -57,7 +57,7 @@
     free: { daily: 0, bailout: 0 },
     crashBooked: [],
     grind: { day: '', net: 0 },
-    flags: { cleanDone: false, boardsDay: '' },
+    flags: { cleanDone: false, cleanTaken: false, boardsDay: '' },
   };
   const CRASH_UNLOCK = 3;
   const CRASH_POLL_MS = 60_000;
@@ -495,20 +495,54 @@
   }
 
   // One-time +500 achievement for repaying a loan within its interest-free hour.
+  // The done flag is committed only once the loan is actually cleared, so a
+  // failed take or repay retries instead of burning the one-time reward.
   async function loanTrickStep() {
-    if (!settings.loanTrick || stats.flags.cleanDone || player.loan) return false;
-    stats.flags.cleanDone = true;
-    saveStats();
+    if (!settings.loanTrick || stats.flags.cleanDone) return false;
+    if (Date.now() - (claimTried.clean ?? 0) < CRASH_POLL_MS) return false;
+
+    // We already took the trick loan: keep repaying it in full until it clears,
+    // then record the achievement. Never touch a loan the bot did not take.
+    if (stats.flags.cleanTaken) {
+      const debt = player.loan?.debt ?? 0;
+      if (debt <= 0) {
+        stats.flags.cleanDone = true;
+        saveStats();
+        return false;
+      }
+      if (player.credits < debt) return false;
+      claimTried.clean = Date.now();
+      setStatus('statusLoanTrick');
+      const repay = await api('/api/loan/repay', { amount: debt });
+      if (repay.ok) {
+        stats.flags.cleanDone = true;
+        saveStats();
+      } else {
+        log.warn('loan_repay_failed', { status: repay.status, error: repay.data?.error });
+      }
+      return true;
+    }
+
+    // Do not interfere with a pre-existing real loan.
+    if (player.loan) return false;
+    claimTried.clean = Date.now();
     setStatus('statusLoanTrick');
     const take = await api('/api/loan/take', { amount: CLEAN_LOAN });
     if (!take.ok) {
       log.warn('loan_take_failed', { status: take.status, error: take.data?.error });
       return true;
     }
+    stats.flags.cleanTaken = true;
+    saveStats();
     const debt = take.data.player?.loan?.debt ?? CLEAN_LOAN;
     const repay = await api('/api/loan/repay', { amount: debt });
-    // A failed repay is retried by repayStep while the hour is still free.
-    if (!repay.ok) log.warn('loan_repay_failed', { status: repay.status, error: repay.data?.error });
+    if (repay.ok) {
+      stats.flags.cleanDone = true;
+      saveStats();
+    } else {
+      // Retried on the next tick while the free hour lasts.
+      log.warn('loan_repay_failed', { status: repay.status, error: repay.data?.error });
+    }
     return true;
   }
 
