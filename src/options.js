@@ -95,7 +95,24 @@ async function load() {
   showLocalStatus();
   showProfit(stats);
   showSpinCount();
+  showRelevant();
 }
+
+// data-when="name" shows an element while that checkbox is ticked or that
+// number is above 0; data-when="name:value" while that field equals value.
+function holds(condition) {
+  const [name, value] = condition.split(':');
+  const el = field(name);
+  if (el.type === 'checkbox') return el.checked;
+  if (value !== undefined) return el.value === value;
+  return Number(el.value) > 0;
+}
+
+function showRelevant() {
+  for (const el of document.querySelectorAll('[data-when]')) el.hidden = !holds(el.dataset.when);
+}
+
+document.querySelector('main').addEventListener('input', showRelevant);
 
 const Z = globalThis.BotterBlaze;
 const pct2 = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 });

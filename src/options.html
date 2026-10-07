@@ -20,41 +20,47 @@
           <option value="off" data-i18n="solver_off"></option>
         </select>
 
-        <h3 data-i18n="optionsLocalHeading"></h3>
-        <p class="hint" data-i18n="optionsLocalHint"></p>
-        <p id="localStatus" role="status" aria-live="polite"></p>
-        <button id="prepareLocal" type="button" data-i18n="optionsLocalPrepare"></button>
-        <p id="localFlags" class="hint" data-i18n="optionsLocalFlags" hidden></p>
+        <div data-when="aiSolver:local">
+          <h3 data-i18n="optionsLocalHeading"></h3>
+          <p class="hint" data-i18n="optionsLocalHint"></p>
+          <p id="localStatus" role="status" aria-live="polite"></p>
+          <button id="prepareLocal" type="button" data-i18n="optionsLocalPrepare"></button>
+          <p id="localFlags" class="hint" data-i18n="optionsLocalFlags" hidden></p>
+        </div>
 
-        <h3 data-i18n="optionsClaudeHeading"></h3>
-        <label for="apiKey" data-i18n="optionsApiKey"></label>
-        <input id="apiKey" type="password" autocomplete="off" spellcheck="false" />
-        <p class="hint" data-i18n="optionsApiKeyHint"></p>
-        <label for="model" data-i18n="optionsModel"></label>
-        <select id="model" name="model">
-          <option value="claude-opus-5-5">Claude Opus 5.5</option>
-          <option value="claude-sonnet-5-5">Claude Sonnet 5.5</option>
-          <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
-        </select>
-        <label for="effort" data-i18n="optionsEffort"></label>
-        <select id="effort" name="effort">
-          <option value="low">low</option>
-          <option value="medium">medium</option>
-          <option value="high">high</option>
-        </select>
+        <div data-when="aiSolver:claude">
+          <h3 data-i18n="optionsClaudeHeading"></h3>
+          <label for="apiKey" data-i18n="optionsApiKey"></label>
+          <input id="apiKey" type="password" autocomplete="off" spellcheck="false" />
+          <p class="hint" data-i18n="optionsApiKeyHint"></p>
+          <label for="model" data-i18n="optionsModel"></label>
+          <select id="model" name="model">
+            <option value="claude-opus-5-5">Claude Opus 5.5</option>
+            <option value="claude-sonnet-5-5">Claude Sonnet 5.5</option>
+            <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
+          </select>
+          <label for="effort" data-i18n="optionsEffort"></label>
+          <select id="effort" name="effort">
+            <option value="low">low</option>
+            <option value="medium">medium</option>
+            <option value="high">high</option>
+          </select>
+        </div>
 
-        <h3 data-i18n="optionsOpenRouterHeading"></h3>
-        <label for="openrouterKey" data-i18n="optionsOpenRouterKey"></label>
-        <input id="openrouterKey" type="password" autocomplete="off" spellcheck="false" />
-        <label for="openrouterModel" data-i18n="optionsOpenRouterModel"></label>
-        <input id="openrouterModel" name="openrouterModel" type="text" list="openrouterModels" spellcheck="false" />
-        <datalist id="openrouterModels">
-          <option value="google/gemini-2.5-flash"></option>
-          <option value="anthropic/claude-sonnet-4.5"></option>
-          <option value="openai/gpt-5-mini"></option>
-          <option value="deepseek/deepseek-chat-v3.1"></option>
-        </datalist>
-        <p class="hint" data-i18n="optionsOpenRouterHint"></p>
+        <div data-when="aiSolver:openrouter">
+          <h3 data-i18n="optionsOpenRouterHeading"></h3>
+          <label for="openrouterKey" data-i18n="optionsOpenRouterKey"></label>
+          <input id="openrouterKey" type="password" autocomplete="off" spellcheck="false" />
+          <label for="openrouterModel" data-i18n="optionsOpenRouterModel"></label>
+          <input id="openrouterModel" name="openrouterModel" type="text" list="openrouterModels" spellcheck="false" />
+          <datalist id="openrouterModels">
+            <option value="google/gemini-2.5-flash"></option>
+            <option value="anthropic/claude-sonnet-4.5"></option>
+            <option value="openai/gpt-5-mini"></option>
+            <option value="deepseek/deepseek-chat-v3.1"></option>
+          </datalist>
+          <p class="hint" data-i18n="optionsOpenRouterHint"></p>
+        </div>
       </section>
 
       <section aria-labelledby="bot-heading">
@@ -88,7 +94,7 @@
         <label class="check"><input type="checkbox" name="repayDebt" /> <span data-i18n="optionsRepayDebt"></span></label>
         <label class="check"><input type="checkbox" name="loanTrick" /> <span data-i18n="optionsLoanTrick"></span></label>
         <label class="check"><input type="checkbox" name="crashEnabled" /> <span data-i18n="optionsCrashEnabled"></span></label>
-        <div class="pair">
+        <div class="pair" data-when="crashEnabled">
           <div>
             <label for="crashBet" data-i18n="optionsCrashBet"></label>
             <select id="crashBet" name="crashBet"></select>
@@ -97,30 +103,34 @@
             <label for="crashMinEv" data-i18n="optionsCrashMinEv"></label>
             <input id="crashMinEv" name="crashMinEv" type="number" min="1" step="0.01" />
           </div>
-          <div>
-            <label for="xpBudget" data-i18n="optionsXpBudget"></label>
-            <input id="xpBudget" name="xpBudget" type="number" min="0" step="100" />
-          </div>
-          <div>
-            <label for="grindGame" data-i18n="optionsGrindGame"></label>
-            <select id="grindGame" name="grindGame"></select>
-          </div>
-          <div>
-            <label for="grindBet" data-i18n="optionsGrindBet"></label>
-            <select id="grindBet" name="grindBet"></select>
-          </div>
-          <div>
-            <label for="grindExploreRounds" data-i18n="optionsGrindExplore"></label>
-            <input id="grindExploreRounds" name="grindExploreRounds" type="number" min="0" step="10" />
-          </div>
         </div>
-        <p class="hint" data-i18n="optionsGrindHint"></p>
+        <label for="xpBudget" data-i18n="optionsXpBudget"></label>
+        <input id="xpBudget" name="xpBudget" type="number" min="0" step="100" />
+        <div data-when="xpBudget">
+          <div class="pair">
+            <div>
+              <label for="grindGame" data-i18n="optionsGrindGame"></label>
+              <select id="grindGame" name="grindGame"></select>
+            </div>
+            <div>
+              <label for="grindBet" data-i18n="optionsGrindBet"></label>
+              <select id="grindBet" name="grindBet"></select>
+            </div>
+            <div data-when="grindGame:auto">
+              <label for="grindExploreRounds" data-i18n="optionsGrindExplore"></label>
+              <input id="grindExploreRounds" name="grindExploreRounds" type="number" min="0" step="10" />
+            </div>
+          </div>
+          <p class="hint" data-i18n="optionsGrindHint"></p>
+        </div>
 
         <h3 data-i18n="optionsShopHeading"></h3>
         <label class="check"><input type="checkbox" name="buyUpgrades" /> <span data-i18n="optionsBuyUpgrades"></span></label>
-        <label for="upgradePlan" data-i18n="optionsUpgradePlan"></label>
-        <textarea id="upgradePlan" name="upgradePlan" rows="3" spellcheck="false"></textarea>
-        <p class="hint" data-i18n="optionsUpgradeHint"></p>
+        <div data-when="buyUpgrades">
+          <label for="upgradePlan" data-i18n="optionsUpgradePlan"></label>
+          <textarea id="upgradePlan" name="upgradePlan" rows="3" spellcheck="false"></textarea>
+          <p class="hint" data-i18n="optionsUpgradeHint"></p>
+        </div>
       </section>
 
       <section aria-labelledby="games-heading">

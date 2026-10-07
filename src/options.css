@@ -17,6 +17,8 @@
     --neg: #ff8f7a;
   }
 }
+/* .pair and label.check set display, which would otherwise override hidden. */
+[hidden] { display: none !important; }
 body {
   margin: 0;
   background: var(--bg);
