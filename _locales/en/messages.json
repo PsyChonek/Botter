@@ -92,6 +92,17 @@
       }
     }
   },
+  "panelCost": {
+    "message": "AI cost: $P1$ ($P2$ per call)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
   "optionsTitle": {
     "message": "Botter settings"
   },
@@ -236,7 +247,7 @@
     "message": "Import"
   },
   "optionsClear": {
-    "message": "Clear bank and stats"
+    "message": "Clear bank, stats and cost"
   },
   "optionsClearConfirm": {
     "message": "Delete every learned answer and the stats?"

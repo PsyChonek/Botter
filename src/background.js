@@ -4,7 +4,7 @@
 import './core.js';
 import './local-model.js';
 
-const { buildPrompt, parseAnswer, ANSWER_SCHEMA, SYSTEM_PROMPT, createLogger } = globalThis.BotterCore;
+const { buildPrompt, parseAnswer, ANSWER_SCHEMA, SYSTEM_PROMPT, claudeCost, createLogger } = globalThis.BotterCore;
 const local = globalThis.BotterLocal;
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
@@ -31,11 +31,11 @@ async function ensureOffscreen() {
 // The Prompt API may not be exposed to the service worker; fall back to the
 // offscreen document, which is a regular window context.
 async function solveLocal(task) {
-  if (local.supported()) return local.solve(task);
+  if (local.supported()) return { index: await local.solve(task), cost: 0 };
   await ensureOffscreen();
   const res = await chrome.runtime.sendMessage({ kind: 'solve-local', task });
   if (!res?.ok) throw new Error(res?.error ?? 'offscreen_no_response');
-  return res.index;
+  return { index: res.index, cost: 0 };
 }
 
 async function solveClaude(task, settings, log) {
@@ -80,15 +80,17 @@ async function solveClaude(task, settings, log) {
   const text = data.content?.find((block) => block.type === 'text')?.text;
   if (!text) throw new Error(`no_text (stop_reason: ${data.stop_reason})`);
   const index = parseAnswer(text);
+  const cost = claudeCost(data.model ?? model, data.usage);
   log.info('ai_answer', {
     model: data.model,
     type: task.type,
     index,
+    cost,
     ms: Date.now() - started,
     inputTokens: data.usage?.input_tokens,
     outputTokens: data.usage?.output_tokens,
   });
-  return index;
+  return { index, cost };
 }
 
 // OpenAI-compatible endpoint. json_schema is honoured by models that support it and
@@ -116,6 +118,7 @@ async function solveOpenRouter(task, settings, log) {
         type: 'json_schema',
         json_schema: { name: 'answer', strict: true, schema: ANSWER_SCHEMA },
       },
+      usage: { include: true },
     }),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
@@ -125,15 +128,17 @@ async function solveOpenRouter(task, settings, log) {
   const text = data.choices?.[0]?.message?.content;
   if (!text) throw new Error(`no_text (finish_reason: ${data.choices?.[0]?.finish_reason})`);
   const index = parseAnswer(text);
+  const cost = typeof data.usage?.cost === 'number' ? data.usage.cost : null;
   log.info('ai_answer', {
     model: data.model,
     type: task.type,
     index,
+    cost,
     ms: Date.now() - started,
     inputTokens: data.usage?.prompt_tokens,
     outputTokens: data.usage?.completion_tokens,
   });
-  return index;
+  return { index, cost };
 }
 
 const SOLVERS = { local: solveLocal, claude: solveClaude, openrouter: solveOpenRouter };
@@ -142,15 +147,15 @@ async function solve(task) {
   const { settings = {} } = await chrome.storage.local.get('settings');
   const log = createLogger(settings.logLevel);
   const started = Date.now();
-  const index = await (SOLVERS[settings.aiSolver] ?? solveLocal)(task, settings, log);
-  log.debug('ai_solved', { solver: settings.aiSolver, type: task.type, index, ms: Date.now() - started });
-  return index;
+  const answer = await (SOLVERS[settings.aiSolver] ?? solveLocal)(task, settings, log);
+  log.debug('ai_solved', { solver: settings.aiSolver, type: task.type, ...answer, ms: Date.now() - started });
+  return answer;
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.kind !== 'solve') return false;
   solve(message.task).then(
-    (index) => sendResponse({ ok: true, index }),
+    ({ index, cost }) => sendResponse({ ok: true, index, cost }),
     (err) => sendResponse({ ok: false, error: err.message }),
   );
   return true;

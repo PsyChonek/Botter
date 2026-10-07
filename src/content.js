@@ -22,6 +22,7 @@
     openrouter: { correct: 0, wrong: 0 },
     guess: { correct: 0, wrong: 0 },
     manual: { correct: 0, wrong: 0 },
+    spend: { usd: 0, calls: 0 },
   };
   const TICK_MS = 700;
 
@@ -38,6 +39,13 @@
   let busy = false;
   let status = { key: 'statusIdle' };
   let ui = null;
+
+  const usd = new Intl.NumberFormat(chrome.i18n.getUILanguage(), {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  });
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
   const humanDelay = () => C.delayBetween(settings.minDelayMs, settings.maxDelayMs);
@@ -91,6 +99,14 @@
     log.info('task_result', { ticket: C.ticketLabel(task.id), type: task.type, source, correct: result.correct });
   }
 
+  // Every AI call is billed, even when its answer turns out unusable.
+  function recordSpend(cost) {
+    if (typeof cost !== 'number') return;
+    stats.spend.usd += cost;
+    stats.spend.calls += 1;
+    chrome.storage.local.set({ stats });
+  }
+
   // ---------- page actions ----------
 
   function pressKey(key) {
@@ -125,6 +141,7 @@
         ok: false,
         error: String(err),
       }));
+      if (res?.ok) recordSpend(res.cost);
       if (res?.ok && C.isValidAnswer(current, res.index)) return { index: res.index, source };
       if (res?.error !== 'no_api_key') log.warn('ai_failed', { error: res?.error ?? 'invalid_index' });
     }
@@ -266,6 +283,7 @@
         </div>
         <div class="status" role="status" aria-live="polite"></div>
         <div class="stats muted"></div>
+        <div class="cost muted"></div>
       </div>`;
     const $ = (sel) => shadow.querySelector(sel);
     ui = {
@@ -276,6 +294,7 @@
       type: $('#type'),
       status: $('.status'),
       stats: $('.stats'),
+      cost: $('.cost'),
     };
     ui.panel.setAttribute('aria-label', msg('extName'));
     ui.title.textContent = msg('extName');
@@ -301,6 +320,8 @@
       sum(stats[settings.aiSolver] ?? stats.local),
       sum(stats.guess),
     ]);
+    const { usd: spent, calls } = stats.spend;
+    ui.cost.textContent = msg('panelCost', [usd.format(spent), usd.format(calls ? spent / calls : 0)]);
   }
 
   // ---------- boot ----------

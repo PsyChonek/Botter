@@ -117,6 +117,21 @@
     return lastType === 'bughunt' ? 'output' : 'bughunt';
   }
 
+  // Anthropic list prices in USD per million tokens (input, output).
+  // Thinking tokens are billed as output and already included in output_tokens.
+  const CLAUDE_PRICES = {
+    'claude-opus-5-5': [4, 20],
+    'claude-sonnet-5-5': [2, 10],
+    'claude-haiku-4-5': [1, 5],
+  };
+
+  function claudeCost(model, usage) {
+    const key = Object.keys(CLAUDE_PRICES).find((id) => model?.startsWith(id));
+    if (!key || !usage) return null;
+    const [input, output] = CLAUDE_PRICES[key];
+    return ((usage.input_tokens ?? 0) * input + (usage.output_tokens ?? 0) * output) / 1e6;
+  }
+
   // Same label the app renders in the task header, used to match DOM to data.
   function ticketLabel(id) {
     return `JIRA-${(parseInt(id.slice(0, 4), 16) % 9000) + 1000}`;
@@ -150,6 +165,7 @@
     parseAnswer,
     delayBetween,
     nextType,
+    claudeCost,
     ticketLabel,
     createLogger,
   };

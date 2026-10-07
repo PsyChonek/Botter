@@ -92,6 +92,17 @@
       }
     }
   },
+  "panelCost": {
+    "message": "Cena AI: $P1$ ($P2$ za dotaz)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
   "optionsTitle": {
     "message": "Nastavení Botteru"
   },
@@ -236,7 +247,7 @@
     "message": "Importovat"
   },
   "optionsClear": {
-    "message": "Smazat banku a statistiky"
+    "message": "Smazat banku, statistiky a cenu"
   },
   "optionsClearConfirm": {
     "message": "Smazat všechny naučené odpovědi a statistiky?"

@@ -71,6 +71,14 @@ test('ticketLabel matches the app header format', () => {
   assert.equal(C.ticketLabel('ffff0000'), `JIRA-${(0xffff % 9000) + 1000}`);
 });
 
+test('claudeCost prices input and output tokens per model', () => {
+  const usage = { input_tokens: 1_000_000, output_tokens: 100_000 };
+  assert.equal(C.claudeCost('claude-opus-5-5', usage), 4 + 2);
+  assert.equal(C.claudeCost('claude-haiku-4-5', usage), 1 + 0.5);
+  assert.equal(C.claudeCost('some-other-model', usage), null);
+  assert.equal(C.claudeCost('claude-sonnet-5-5', undefined), null);
+});
+
 test('delayBetween stays within bounds', () => {
   assert.equal(C.delayBetween(100, 200, () => 0), 100);
   assert.equal(C.delayBetween(100, 200, () => 0.999999), 200);
