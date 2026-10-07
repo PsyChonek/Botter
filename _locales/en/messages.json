@@ -351,7 +351,7 @@
     "message": "Auto mode"
   },
   "optionsAutoHint": {
-    "message": "Auto runs everything in order of value: claims the daily bonus and bailout, repays debt (8 % an hour, then 50 % of every payout), takes the one-time +500 clean-loan achievement, checks the leaderboards for the podium achievement, bets on crash only when the round history gives an expected return above the threshold, works every ticket, and gambles only for XP within the daily budget below. Every other game loses on average, so the budget defaults to 0."
+    "message": "Auto runs everything in order of value: claims the daily bonus and bailout, repays debt (8 % an hour, then 50 % of every payout), takes the one-time +500 clean-loan achievement, checks the leaderboards for the podium achievement, bets on crash only when the round history gives an expected return above the threshold, works every ticket, and gambles only for XP within the limit below: a daily loss budget, or a minimum account balance it never bets below. Every other game loses on average, so the limit defaults to 0 (off)."
   },
   "optionsRepayDebt": {
     "message": "Repay debt with spare credits"
@@ -373,6 +373,32 @@
   },
   "optionsXpBudget": {
     "message": "Daily loss budget for XP grinding (0 = off)"
+  },
+  "optionsGrindLimit": {
+    "message": "XP grinding limit"
+  },
+  "grindLimit_daily": {
+    "message": "Daily loss budget"
+  },
+  "grindLimit_balance": {
+    "message": "Minimum account balance"
+  },
+  "optionsGrindMinBalance": {
+    "message": "Stop grinding below this balance (0 = off)"
+  },
+  "statusGrindingFloor": {
+    "message": "Grinding XP on $P1$, balance $P2$, stops at $P3$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
   },
   "grind_auto": {
     "message": "Cheapest per XP (auto)"

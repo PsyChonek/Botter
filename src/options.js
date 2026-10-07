@@ -12,7 +12,7 @@ const CHECKBOXES = [
   'captureDebug',
   'panelHidden',
 ];
-const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet', 'grindGame'];
+const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet', 'grindLimit', 'grindGame'];
 const INT_SELECTS = ['gameBet', 'crashBet', 'grindBet'];
 const TEXTS = ['openrouterModel', 'upgradePlan'];
 const NUMBERS = [
@@ -25,6 +25,7 @@ const NUMBERS = [
   'crashMinEv',
   'crashKelly',
   'xpBudget',
+  'grindMinBalance',
   'grindExploreRounds',
 ];
 const DEFAULTS = {
@@ -38,7 +39,9 @@ const DEFAULTS = {
   crashBet: 100,
   crashMinEv: 1.05,
   crashKelly: 0.5,
+  grindLimit: 'daily',
   xpBudget: 0,
+  grindMinBalance: 0,
   grindGame: 'auto',
   grindBet: 20,
   grindExploreRounds: 30,
@@ -110,6 +113,7 @@ function fill(values) {
 
 // data-when="name" shows an element while that checkbox is ticked or that
 // number is above 0; data-when="name:value" while that field equals value.
+// Space-separated conditions must all hold; "|" separates alternatives.
 function holds(condition) {
   const [name, value] = condition.split(':');
   const el = field(name);
@@ -118,8 +122,10 @@ function holds(condition) {
   return Number(el.value) > 0;
 }
 
+const shown = (when) => when.split('|').some((all) => all.trim().split(/\s+/).every(holds));
+
 function showRelevant() {
-  for (const el of document.querySelectorAll('[data-when]')) el.hidden = !holds(el.dataset.when);
+  for (const el of document.querySelectorAll('[data-when]')) el.hidden = !shown(el.dataset.when);
 }
 
 // ---------- tabs ----------

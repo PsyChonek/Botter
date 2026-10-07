@@ -79,3 +79,23 @@ test('grindGame explores first, then picks the lowest loss per XP', () => {
 test('dayKey is a local calendar date', () => {
   assert.match(A.dayKey(Date.UTC(2026, 9, 7, 12)), /^2026-10-0[78]$/);
 });
+
+test('grindAllowed stops at the daily loss budget', () => {
+  const settings = { grindLimit: 'daily', xpBudget: 500, grindMinBalance: 0, reserve: 0 };
+  assert.equal(A.grindAllowed(settings, 1000, 499, 20), true);
+  assert.equal(A.grindAllowed(settings, 1000, 500, 20), false);
+  assert.equal(A.grindAllowed({ ...settings, xpBudget: 0 }, 1000, 0, 20), false);
+});
+
+test('grindAllowed never bets below the minimum balance', () => {
+  const settings = { grindLimit: 'balance', xpBudget: 0, grindMinBalance: 1000, reserve: 0 };
+  assert.equal(A.grindAllowed(settings, 1020, 5000, 20), true);
+  assert.equal(A.grindAllowed(settings, 1019, 0, 20), false);
+  assert.equal(A.grindAllowed({ ...settings, grindMinBalance: 0 }, 5000, 0, 20), false);
+});
+
+test('grindAllowed keeps the reserve under either limit', () => {
+  const daily = { grindLimit: 'daily', xpBudget: 500, grindMinBalance: 0, reserve: 300 };
+  assert.equal(A.grindAllowed(daily, 310, 0, 20), false);
+  assert.equal(A.grindAllowed({ ...daily, grindLimit: 'balance', grindMinBalance: 100 }, 310, 0, 20), false);
+});

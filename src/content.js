@@ -33,7 +33,9 @@
     crashBet: 100,
     crashMinEv: 1.05,
     crashKelly: 0.5,
+    grindLimit: 'daily',
     xpBudget: 0,
+    grindMinBalance: 0,
     grindGame: 'auto',
     grindBet: 20,
     grindExploreRounds: 30,
@@ -636,18 +638,24 @@
     return true;
   }
 
-  // Every game loses on average, so gambling only buys XP, within a daily budget.
+  // Every game loses on average, so gambling only buys XP, within a daily loss
+  // budget or down to a minimum account balance.
   async function grindStep() {
-    if (settings.xpBudget <= 0 || Date.now() < grindPausedUntil) return false;
+    if (Date.now() < grindPausedUntil) return false;
     const today = A.dayKey();
     if (stats.grind.day !== today) stats.grind = { day: today, net: 0 };
-    if (-stats.grind.net >= settings.xpBudget) return false;
+    const lost = Math.max(0, -stats.grind.net);
+    const bet = G.betFor(settings.grindBet, player.maxBet);
+    if (!A.grindAllowed(settings, player.credits, lost, bet)) return false;
     const unlocks = Object.fromEntries(G.GAME_KEYS.map((game) => [game, G.GAMES[game].unlock]));
     const candidates = settings.grindGame === 'auto' ? G.GAME_KEYS : [settings.grindGame];
     const game = A.grindGame(candidates, player.level, stats.games, unlocks, settings.grindExploreRounds);
-    const bet = G.betFor(settings.grindBet, player.maxBet);
-    if (!game || player.credits - bet < settings.reserve) return false;
-    setStatus('statusGrinding', [msg(`game_${game}`), credits(Math.max(0, -stats.grind.net)), credits(settings.xpBudget)]);
+    if (!game) return false;
+    if (settings.grindLimit === 'balance') {
+      setStatus('statusGrindingFloor', [msg(`game_${game}`), credits(player.credits), credits(settings.grindMinBalance)]);
+    } else {
+      setStatus('statusGrinding', [msg(`game_${game}`), credits(lost), credits(settings.xpBudget)]);
+    }
     const res = await playRound(game, bet);
     if (!res.ok) {
       log.warn('grind_failed', { game, status: res.status, error: res.data?.error });

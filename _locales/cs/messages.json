@@ -351,7 +351,7 @@
     "message": "Automatický režim"
   },
   "optionsAutoHint": {
-    "message": "Auto dělá vše podle hodnoty: vybere denní bonus a záchranný balíček, splácí dluh (8 % za hodinu, pak 50 % z každé výplaty), jednou vezme achievement +500 za čistou půjčku, kontroluje žebříčky kvůli achievementu za stupně vítězů, sází na crash jen když historie kol dává očekávaný výnos nad prahem, dělá každý ticket a hraje ostatní hry jen kvůli XP v denním rozpočtu níže. Ostatní hry v průměru prodělávají, proto je rozpočet výchozí 0."
+    "message": "Auto dělá vše podle hodnoty: vybere denní bonus a záchranný balíček, splácí dluh (8 % za hodinu, pak 50 % z každé výplaty), jednou vezme achievement +500 za čistou půjčku, kontroluje žebříčky kvůli achievementu za stupně vítězů, sází na crash jen když historie kol dává očekávaný výnos nad prahem, dělá každý ticket a hraje ostatní hry jen kvůli XP v limitu níže: buď denní rozpočet ztráty, nebo minimální zůstatek účtu, pod který nikdy nevsadí. Ostatní hry v průměru prodělávají, proto je limit výchozí 0 (vypnuto)."
   },
   "optionsRepayDebt": {
     "message": "Splácet dluh z volných kreditů"
@@ -373,6 +373,32 @@
   },
   "optionsXpBudget": {
     "message": "Denní rozpočet ztráty na farmění XP (0 = vypnuto)"
+  },
+  "optionsGrindLimit": {
+    "message": "Limit farmění XP"
+  },
+  "grindLimit_daily": {
+    "message": "Denní rozpočet ztráty"
+  },
+  "grindLimit_balance": {
+    "message": "Minimální zůstatek účtu"
+  },
+  "optionsGrindMinBalance": {
+    "message": "Nefarmit pod tento zůstatek (0 = vypnuto)"
+  },
+  "statusGrindingFloor": {
+    "message": "Farmím XP na $P1$, zůstatek $P2$, konec na $P3$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
   },
   "grind_auto": {
     "message": "Nejlevnější za XP (auto)"

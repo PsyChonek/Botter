@@ -85,13 +85,23 @@
     return unlocked.reduce((a, b) => (lossPerXp(b) < lossPerXp(a) ? b : a));
   }
 
+  // Whether XP grinding may place another bet. The limit is either a daily loss
+  // budget or a minimum account balance, 0 turns the chosen one off, and the
+  // reserve applies on top of both.
+  function grindAllowed(settings, credits, lostToday, bet) {
+    const after = credits - bet;
+    if (after < settings.reserve) return false;
+    if (settings.grindLimit === 'balance') return settings.grindMinBalance > 0 && after >= settings.grindMinBalance;
+    return settings.xpBudget > 0 && lostToday < settings.xpBudget;
+  }
+
   // Local calendar day, used to reset daily budgets and checks.
   function dayKey(now = Date.now()) {
     const d = new Date(now);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
-  const api = { CRASH_PLANNED_MULT, crashMult, bestCrashTarget, crashStake, repayAmount, grindGame, dayKey };
+  const api = { CRASH_PLANNED_MULT, crashMult, bestCrashTarget, crashStake, repayAmount, grindGame, grindAllowed, dayKey };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BotterAuto = api;
 })(globalThis);

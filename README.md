@@ -61,7 +61,8 @@ progress shows at `chrome://on-device-internals`.
   leaderboard once a day (the podium achievement pays +1000 for top 3 on any board,
   debtors included), bet on crash only when the round history gives an expected
   return above the threshold, work every ticket, and gamble other games only to grind
-  XP within a daily loss budget (default 0). Measured house edges: blackjack -12.4 %
+  XP within a daily loss budget or down to a minimum account balance (off by
+  default). Measured house edges: blackjack -12.4 %
   base to -2.9 % fully upgraded (exact solver in `src/blackjack.js`), roulette -7.7 %
   to -2.7 %, Blaze about 66 % RTP by simulation. Grinding explores each unlocked game
   for 30 rounds, then sticks to the lowest measured loss per XP.

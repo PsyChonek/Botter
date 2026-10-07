@@ -132,9 +132,24 @@
               <input id="crashKelly" name="crashKelly" type="number" min="0" max="1" step="0.05" />
             </div>
           </div>
-          <label for="xpBudget" data-i18n="optionsXpBudget"></label>
-          <input id="xpBudget" name="xpBudget" type="number" min="0" step="100" />
-          <div data-when="xpBudget">
+          <div class="grid">
+            <div>
+              <label for="grindLimit" data-i18n="optionsGrindLimit"></label>
+              <select id="grindLimit" name="grindLimit">
+                <option value="daily" data-i18n="grindLimit_daily"></option>
+                <option value="balance" data-i18n="grindLimit_balance"></option>
+              </select>
+            </div>
+            <div data-when="grindLimit:daily">
+              <label for="xpBudget" data-i18n="optionsXpBudget"></label>
+              <input id="xpBudget" name="xpBudget" type="number" min="0" step="100" />
+            </div>
+            <div data-when="grindLimit:balance">
+              <label for="grindMinBalance" data-i18n="optionsGrindMinBalance"></label>
+              <input id="grindMinBalance" name="grindMinBalance" type="number" min="0" step="100" />
+            </div>
+          </div>
+          <div data-when="grindLimit:daily xpBudget | grindLimit:balance grindMinBalance">
             <div class="grid">
               <div>
                 <label for="grindGame" data-i18n="optionsGrindGame"></label>
