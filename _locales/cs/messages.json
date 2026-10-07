@@ -284,6 +284,18 @@
   "panelOff": {
     "message": "vypnuto"
   },
+  "panelHide": {
+    "message": "Skrýt"
+  },
+  "panelHideLabel": {
+    "message": "Skrýt panel Botter"
+  },
+  "panelShowLabel": {
+    "message": "Zobrazit panel Botter"
+  },
+  "optionsHidePanel": {
+    "message": "Skrýt panel na stránce kasina (zpět ho vrátí malé tlačítko v rohu)"
+  },
   "game_crash": {
     "message": "Crash (Produkce padá)"
   },

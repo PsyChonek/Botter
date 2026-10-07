@@ -73,7 +73,9 @@ progress shows at `chrome://on-device-internals`.
   earned per work ticket. Crash bets are booked when they settle, from the round's bet list.
 - A small panel in the bottom-left corner of the page has Start/Stop for work and
   for games, the ticket type, the game, accuracy per answer source, AI cost and
-  the profit table.
+  the profit table. **Hide** collapses it to a small Botter button in the same corner
+  (highlighted while a bot runs); click it to bring the panel back. The same switch is
+  on the settings page.
 
 ## Install
 

@@ -41,6 +41,7 @@
     recordSpins: true,
     captureDebug: false,
     logLevel: 'info',
+    panelHidden: false,
   };
   const EMPTY_STATS = {
     bank: { correct: 0, wrong: 0 },
@@ -627,6 +628,7 @@
     shadow.innerHTML = `
       <style>
         :host { all: initial; }
+        [hidden] { display: none !important; }
         .panel { position: fixed; left: 12px; bottom: 12px; z-index: 2147483647; width: 290px;
           max-height: calc(100vh - 24px); overflow: auto; box-sizing: border-box;
           font: 12px/1.4 system-ui, sans-serif; color: #e8f5c8; background: #101a08f2;
@@ -638,6 +640,8 @@
           border-radius: 6px; padding: 4px 8px; cursor: pointer; }
         button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid #d4ff6a; outline-offset: 1px; }
         button.on { background: #7aa02c; color: #101a08; }
+        .show { position: fixed; left: 12px; bottom: 12px; z-index: 2147483647; font-weight: 700;
+          background: #101a08f2; box-shadow: 0 4px 16px #0008; }
         .status { min-height: 1.4em; margin-bottom: 4px; }
         .muted { color: #b5c99a; }
         details { margin-top: 6px; }
@@ -653,6 +657,7 @@
         <div class="row">
           <span class="title"></span>
           <button type="button" class="auto-toggle"></button>
+          <button type="button" class="hide"></button>
         </div>
         <div class="row">
           <label class="muted grow" for="type"></label>
@@ -678,7 +683,8 @@
             <tbody></tbody>
           </table>
         </details>
-      </div>`;
+      </div>
+      <button type="button" class="show"></button>`;
     const $ = (sel) => shadow.querySelector(sel);
     ui = {
       panel: $('.panel'),
@@ -686,6 +692,8 @@
       typeLabel: $('label[for="type"]'),
       type: $('#type'),
       autoToggle: $('.auto-toggle'),
+      hide: $('.hide'),
+      show: $('.show'),
       workToggle: $('.work-toggle'),
       gameLabel: $('label[for="game"]'),
       game: $('#game'),
@@ -699,6 +707,10 @@
     };
     ui.panel.setAttribute('aria-label', msg('extName'));
     ui.title.textContent = msg('extName');
+    ui.hide.textContent = msg('panelHide');
+    ui.hide.setAttribute('aria-label', msg('panelHideLabel'));
+    ui.show.textContent = msg('extName');
+    ui.show.setAttribute('aria-label', msg('panelShowLabel'));
     ui.typeLabel.textContent = msg('panelWork');
     ui.gameLabel.textContent = msg('panelGames');
     ui.summary.textContent = msg('panelProfit');
@@ -709,12 +721,22 @@
       saveSettings({ autoMode: !settings.autoMode });
       setStatus(settings.autoMode ? 'statusIdle' : 'statusStarting');
     });
+    ui.hide.addEventListener('click', () => setPanelHidden(true));
+    ui.show.addEventListener('click', () => setPanelHidden(false));
     ui.workToggle.addEventListener('click', () => (settings.enabled ? stopWork() : startWork()));
     ui.gamesToggle.addEventListener('click', () => (settings.gamesEnabled ? stopGames() : startGames()));
     ui.type.addEventListener('change', () => saveSettings({ taskType: ui.type.value }));
     ui.game.addEventListener('change', () => saveSettings({ game: ui.game.value }));
     document.documentElement.appendChild(host);
     render();
+  }
+
+  // Applied locally right away so focus can move to the button that stays visible.
+  function setPanelHidden(hidden) {
+    saveSettings({ panelHidden: hidden });
+    settings.panelHidden = hidden;
+    render();
+    (hidden ? ui.show : ui.hide).focus();
   }
 
   function cell(text, className) {
@@ -761,6 +783,9 @@
 
   function render() {
     if (!ui) return;
+    ui.panel.hidden = settings.panelHidden;
+    ui.show.hidden = !settings.panelHidden;
+    ui.show.classList.toggle('on', workOn() || gamesOn());
     setToggle(ui.autoToggle, settings.autoMode);
     ui.autoToggle.textContent = `${msg('panelAuto')}: ${msg(settings.autoMode ? 'panelOn' : 'panelOff')}`;
     setToggle(ui.workToggle, settings.enabled);

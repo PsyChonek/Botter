@@ -284,6 +284,18 @@
   "panelOff": {
     "message": "off"
   },
+  "panelHide": {
+    "message": "Hide"
+  },
+  "panelHideLabel": {
+    "message": "Hide the Botter panel"
+  },
+  "panelShowLabel": {
+    "message": "Show the Botter panel"
+  },
+  "optionsHidePanel": {
+    "message": "Hide the panel on the casino page (a small button in the corner brings it back)"
+  },
   "game_crash": {
     "message": "Crash (Produkce padá)"
   },

@@ -10,6 +10,7 @@ const CHECKBOXES = [
   'buyUpgrades',
   'recordSpins',
   'captureDebug',
+  'panelHidden',
 ];
 const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet', 'grindGame'];
 const INT_SELECTS = ['gameBet', 'crashBet', 'grindBet'];
@@ -43,6 +44,7 @@ const DEFAULTS = {
   upgradePlan: 'crash:sla, blaze:star, blaze:lucky, blaze:wild',
   recordSpins: true,
   captureDebug: false,
+  panelHidden: false,
   model: 'claude-opus-5-5',
   openrouterModel: 'google/gemini-2.5-flash',
   effort: 'medium',
