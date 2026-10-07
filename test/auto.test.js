@@ -240,3 +240,32 @@ test('grindReport shows XP per bet and where each level stands on the ladder', (
   assert.equal(roulette.edge, null);
   assert.equal(roulette.bets[0].state, 'next');
 });
+
+test('grindPlan uses modelled edges over measured ones and skips edge exploration', () => {
+  const unlocks = { skeleton: 5, roulette: 15 };
+  const games = Object.keys(unlocks);
+  // Skeleton ran lucky (measured edge 0), the model knows better.
+  const stats = { skeleton: { rounds: 40, wagered: 800, net: 50, xp: 40 }, roulette: { rounds: 40, wagered: 800, net: -60, xp: 40 } };
+  const flat = xpCells(() => 1, [20, 40]);
+  const betXp = { skeleton: flat, roulette: flat };
+  assert.deepEqual(A.grindPlan(games, [20, 40], 15, stats, betXp, unlocks), { game: 'skeleton', bet: 20 });
+  const edges = { skeleton: 0.29, roulette: 0.077 };
+  assert.deepEqual(A.grindPlan(games, [20, 40], 15, stats, betXp, unlocks, edges), { game: 'roulette', bet: 20 });
+  assert.deepEqual(A.grindPlan(games, [20, 40], 15, stats, betXp, unlocks, { skeleton: 0.05, roulette: 0.077 }), {
+    game: 'skeleton',
+    bet: 20,
+  });
+  // A game with a model is not held back for the measured-edge exploration rounds.
+  assert.deepEqual(A.grindPlan(games, [20, 40], 15, { skeleton: stats.skeleton }, { skeleton: flat }, unlocks, edges), {
+    game: 'roulette',
+    bet: 20,
+  });
+});
+
+test('grindReport shows the modelled and the measured edge', () => {
+  const stats = { skeleton: { rounds: 40, wagered: 800, net: -80, xp: 40 } };
+  const [row] = A.grindReport(['skeleton'], [20], 5, stats, { skeleton: xpCells(() => 2, [20]) }, { skeleton: 5 }, { skeleton: 0.3 });
+  assert.equal(row.modelEdge, 0.3);
+  assert.equal(row.measuredEdge, 0.1);
+  assert.equal(row.bets[0].cost, 3);
+});

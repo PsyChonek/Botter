@@ -858,7 +858,7 @@
     "message": "Stav"
   },
   "xpGame": {
-    "message": "$GAME$: $ROUNDS$ kol, výhoda kasina $EDGE$, $XP$ XP/kolo",
+    "message": "$GAME$: $ROUNDS$ kol, výhoda kasina $EDGE$ (model s tvými upgrady), naměřeno $MEASURED$, $XP$ XP/kolo",
     "placeholders": {
       "game": {
         "content": "$1"
@@ -869,8 +869,11 @@
       "edge": {
         "content": "$3"
       },
-      "xp": {
+      "measured": {
         "content": "$4"
+      },
+      "xp": {
+        "content": "$5"
       }
     }
   },

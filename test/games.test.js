@@ -80,3 +80,15 @@ test('parsePlan and nextPurchase follow the plan order and level gates', () => {
   assert.equal(G.nextPurchase(plan, { level: 3, upgrades: { crash: { sla: 1 } } }).key, 'star');
   assert.equal(G.nextPurchase([], { level: 50, upgrades: {} }), null);
 });
+
+test('syncBetXp drops a game\'s XP samples when its upgrades change', () => {
+  const table = { skeleton: { 20: { rounds: 10, xp: 10 } }, blaze: { 20: { rounds: 10, xp: 5 } } };
+  const seen = {};
+  G.syncBetXp(table, seen, 'skeleton', { skeleton: { team: 1 } });
+  assert.ok(table.skeleton, 'samples from before keys were kept are adopted');
+  G.syncBetXp(table, seen, 'skeleton', { skeleton: { team: 1 } });
+  assert.ok(table.skeleton);
+  G.syncBetXp(table, seen, 'skeleton', { skeleton: { team: 2 } });
+  assert.equal(table.skeleton, undefined);
+  assert.ok(table.blaze);
+});

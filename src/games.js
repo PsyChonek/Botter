@@ -138,6 +138,17 @@
     return table;
   }
 
+  // Upgrades change XP per round, so a game's XP samples are dropped when its
+  // upgrades differ from the ones they were taken with. seen is { game: key }.
+  // Samples from before keys were kept are adopted as they are.
+  function syncBetXp(table, seen, game, upgrades) {
+    const own = upgrades?.[game] ?? {};
+    const key = JSON.stringify(Object.keys(own).sort().map((name) => [name, own[name]]));
+    if (seen[game] !== undefined && seen[game] !== key) delete table[game];
+    seen[game] = key;
+    return table;
+  }
+
   function totalNet(games) {
     return Object.values(games).reduce((sum, row) => sum + row.net, 0);
   }
@@ -172,6 +183,7 @@
     gameDelta,
     addDelta,
     addBetXp,
+    syncBetXp,
     totalNet,
     profitRows,
   };

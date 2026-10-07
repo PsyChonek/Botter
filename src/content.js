@@ -7,6 +7,8 @@
   const G = globalThis.BotterGames;
   const BJ = globalThis.BotterBlackjack;
   const A = globalThis.BotterAuto;
+  const O = globalThis.BotterOdds;
+  const Z = globalThis.BotterBlaze;
   const msg = (key, subs) => chrome.i18n.getMessage(key, subs) || key;
 
   const DEFAULT_SETTINGS = {
@@ -62,6 +64,7 @@
     crashBooked: [],
     grind: { day: '', net: 0 },
     betXp: {}, // game -> bet -> { rounds, xp }, to find the cheapest bet per XP
+    betXpUpgrades: {}, // game -> upgrades the betXp samples were taken with
     flags: { cleanDone: false, cleanTaken: false, boardsDay: '' },
     dwell: {}, // task type -> least ms open before a submit the server accepts
   };
@@ -265,7 +268,10 @@
         G.addDelta(stats.games, delta);
         if (path === '/api/blackjack/deal') bjBet = request?.bet ?? delta.wagered;
         const bet = path === '/api/blackjack/action' ? bjBet : (request?.bet ?? delta.wagered);
-        if (bet > 0) G.addBetXp(stats.betXp, delta.game, bet, delta.rounds, delta.xp);
+        if (bet > 0) {
+          G.syncBetXp(stats.betXp, stats.betXpUpgrades, delta.game, data.player.upgrades);
+          G.addBetXp(stats.betXp, delta.game, bet, delta.rounds, delta.xp);
+        }
         if (stats.grind.day === A.dayKey()) stats.grind.net += delta.net;
         saveStats();
         log.debug('game_round', delta);
@@ -879,7 +885,17 @@
   // budget or down to a minimum account balance.
   const GRIND_UNLOCKS = Object.fromEntries(G.GAME_KEYS.map((game) => [game, G.GAMES[game].unlock]));
 
-  // Games and bet levels the grinder may pick from right now, and its pick.
+  // Scatter rule of the Blaze model, from the recorded spins, rechecked when a
+  // new spin is recorded.
+  let blazeCheck = { last: undefined, mode: 'reels' };
+  function blazeMode() {
+    const last = spins.at(-1);
+    if (blazeCheck.last !== last) blazeCheck = { last, mode: O.blazeMode(Z.checkSpins(spins)) };
+    return blazeCheck.mode;
+  }
+
+  // Games and bet levels the grinder may pick from right now, the modelled house
+  // edges at the current upgrades, and its pick.
   function grindChoice() {
     const lost = Math.max(0, -(stats.grind.day === A.dayKey() ? stats.grind.net : 0));
     const levels = G.BET_LEVELS.filter((bet) => bet <= player.maxBet);
@@ -890,8 +906,9 @@
             A.grindAllowed(settings, player.credits, lost, bet),
           );
     const candidates = settings.grindGame === 'auto' ? G.GAME_KEYS : [settings.grindGame];
-    const plan = A.grindPlan(candidates, bets, player.level, stats.games, stats.betXp, GRIND_UNLOCKS, settings.grindExploreRounds);
-    return { lost, levels, candidates, plan };
+    const edges = O.edges(candidates, player.upgrades, blazeMode());
+    const plan = A.grindPlan(candidates, bets, player.level, stats.games, stats.betXp, GRIND_UNLOCKS, edges, settings.grindExploreRounds);
+    return { lost, levels, candidates, edges, plan };
   }
 
   async function grindStep() {
@@ -1176,8 +1193,8 @@
       ui.xpBody.replaceChildren();
       return;
     }
-    const { levels, candidates, plan } = grindChoice();
-    const report = A.grindReport(candidates, levels, player.level, stats.games, stats.betXp, GRIND_UNLOCKS);
+    const { levels, candidates, edges, plan } = grindChoice();
+    const report = A.grindReport(candidates, levels, player.level, stats.games, stats.betXp, GRIND_UNLOCKS, edges);
     const rows = [];
     for (const game of report) {
       const head = document.createElement('tr');
@@ -1188,7 +1205,8 @@
           : msg('xpGame', [
               msg(`game_${game.game}`),
               num.format(game.rounds),
-              game.edge === null ? '-' : pct.format(game.edge),
+              game.modelEdge === null ? '-' : pct.format(game.modelEdge),
+              game.measuredEdge === null ? '-' : pct.format(game.measuredEdge),
               game.perRound === null ? '-' : decimal.format(game.perRound),
             ]),
       );
@@ -1196,7 +1214,7 @@
       head.append(td);
       rows.push(head);
       if (game.locked) continue;
-      if (game.rounds < settings.grindExploreRounds) {
+      if (game.modelEdge === null && game.rounds < settings.grindExploreRounds) {
         const tr = document.createElement('tr');
         const note = cell(msg('xpExploring', [num.format(game.rounds), num.format(settings.grindExploreRounds)]), 'muted');
         note.colSpan = 5;

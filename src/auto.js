@@ -99,20 +99,25 @@
   // House edge of a game measured from its tracked rounds (0 when it is ahead).
   const gameEdge = (row) => (row?.wagered > 0 ? Math.max(0, -row.net) / row.wagered : null);
 
+  // House edge the grinder plans with: the model at the current upgrades
+  // (edges, from BotterOdds) when the game has one, since a few dozen rounds of
+  // a slot say little about its edge, otherwise the measured one.
+  const planEdge = (game, stats, edges) => edges?.[game] ?? gameEdge(stats[game]);
+
   // Cheapest game and bet per XP point. The loss per XP of a bet is the game's
-  // house edge times bet / XP per round: the edge is measured per game (it does
-  // not depend on the bet), XP per round per bet level, since the server's XP
-  // formula is unknown. Games with fewer than minRounds tracked rounds are
-  // explored first at the smallest bet. Then the leading game climbs its bet
-  // ladder while XP per credit wagered keeps up, so a flat XP per round costs
-  // only one sample at the next level. bets are the levels allowed right now;
-  // betXp is { game: { bet: { rounds, xp } } }.
-  function grindPlan(games, bets, level, stats, betXp, unlocks, minRounds = 30) {
+  // house edge times bet / XP per round: the edge does not depend on the bet,
+  // XP per round is measured per bet level, since the server's XP formula is
+  // unknown. Games without a modelled edge and fewer than minRounds tracked
+  // rounds are explored first at the smallest bet. Then the leading game climbs
+  // its bet ladder while XP per credit wagered keeps up, so a flat XP per round
+  // costs only one sample at the next level. bets are the levels allowed right
+  // now; betXp is { game: { bet: { rounds, xp } } }.
+  function grindPlan(games, bets, level, stats, betXp, unlocks, edges = {}, minRounds = 30) {
     const unlocked = games.filter((game) => level >= unlocks[game]);
     const levels = [...bets].sort((a, b) => a - b);
     if (!unlocked.length || !levels.length) return null;
     const rounds = (game) => stats[game]?.rounds ?? 0;
-    const unexplored = unlocked.filter((game) => rounds(game) < minRounds);
+    const unexplored = unlocked.filter((game) => edges?.[game] === undefined && rounds(game) < minRounds);
     if (unexplored.length) {
       return { game: unexplored.reduce((a, b) => (rounds(b) < rounds(a) ? b : a)), bet: levels[0] };
     }
@@ -122,7 +127,7 @@
     if (unsampled) return { game: unsampled.game, bet: unsampled.next };
 
     const cost = ({ game, best }) => {
-      const edge = gameEdge(stats[game]) ?? 0;
+      const edge = planEdge(game, stats, edges) ?? 0;
       return best.perRound > 0 ? (edge * best.bet) / best.perRound : Infinity;
     };
     const better = (a, b) => cost(b) < cost(a) || (cost(b) === cost(a) && b.best.perRound > a.best.perRound);
@@ -130,16 +135,17 @@
     return { game: lead.game, bet: lead.next ?? lead.best.bet };
   }
 
-  // What the XP grinder has measured, per game, for the panel: the edge, the
-  // average XP per round and, per bet level, the sampled rounds, XP per round,
-  // credits lost per XP point and where the level stands on the bet ladder:
-  // 'best', 'next' (being sampled), 'worse' (XP per credit dropped off there),
+  // What the XP grinder has measured, per game, for the panel: the measured
+  // and the modelled edge, the average XP per round and, per bet level, the
+  // sampled rounds, XP per round, credits lost per XP point (from the edge the
+  // grinder plans with) and where the level stands on the bet ladder: 'best',
+  // 'next' (being sampled), 'worse' (XP per credit dropped off there),
   // 'skipped' (above that, never tried) or null.
-  function grindReport(games, levels, level, stats, betXp, unlocks) {
+  function grindReport(games, levels, level, stats, betXp, unlocks, edges = {}) {
     const sorted = [...levels].sort((a, b) => a - b);
     return games.map((game) => {
       const row = stats[game];
-      const edge = gameEdge(row);
+      const edge = planEdge(game, stats, edges);
       const ladder = betLadder(betXp?.[game], sorted);
       const bets = sorted.map((bet) => {
         const cell = betXp?.[game]?.[bet];
@@ -160,6 +166,8 @@
         unlock: unlocks[game],
         rounds,
         edge,
+        measuredEdge: gameEdge(row),
+        modelEdge: edges?.[game] ?? null,
         perRound: rounds > 0 ? row.xp / rounds : null,
         bets,
       };

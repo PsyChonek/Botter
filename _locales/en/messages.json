@@ -858,7 +858,7 @@
     "message": "State"
   },
   "xpGame": {
-    "message": "$GAME$: $ROUNDS$ rounds, edge $EDGE$, $XP$ XP/round",
+    "message": "$GAME$: $ROUNDS$ rounds, house edge $EDGE$ (model at your upgrades), measured $MEASURED$, $XP$ XP/round",
     "placeholders": {
       "game": {
         "content": "$1"
@@ -869,8 +869,11 @@
       "edge": {
         "content": "$3"
       },
-      "xp": {
+      "measured": {
         "content": "$4"
+      },
+      "xp": {
+        "content": "$5"
       }
     }
   },
