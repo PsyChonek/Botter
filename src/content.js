@@ -63,7 +63,7 @@
     free: { daily: 0, bailout: 0 },
     crashBooked: [],
     grind: { day: '', net: 0 },
-    betXp: {}, // game -> bet -> { rounds, xp }, to find the cheapest bet per XP
+    betXp: {}, // game -> bet -> { rounds, xp, at }, to find the cheapest bet per XP
     betXpUpgrades: {}, // game -> upgrades the betXp samples were taken with
     flags: { cleanDone: false, cleanTaken: false, boardsDay: '' },
     dwell: {}, // task type -> least ms open before a submit the server accepts
@@ -929,6 +929,7 @@
   // edges at the current upgrades, and its pick.
   function grindChoice() {
     const lost = Math.max(0, -(stats.grind.day === A.dayKey() ? stats.grind.net : 0));
+    G.expireBetXp(stats.betXp);
     const levels = G.BET_LEVELS.filter((bet) => bet <= player.maxBet);
     const bets =
       settings.grindBet === 'auto'

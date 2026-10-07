@@ -146,10 +146,26 @@
 
   // XP per bet level, so the grinder can find which stake buys XP cheapest.
   // A blackjack action adds its XP to the hand's opening bet with no round.
-  function addBetXp(table, game, bet, rounds, xp) {
-    const cell = ((table[game] ??= {})[bet] ??= { rounds: 0, xp: 0 });
+  function addBetXp(table, game, bet, rounds, xp, now = Date.now()) {
+    const cell = ((table[game] ??= {})[bet] ??= { rounds: 0, xp: 0, at: now });
     cell.rounds += rounds;
     cell.xp += xp;
+    return table;
+  }
+
+  // XP samples expire, so the grinder measures every game and bet level again,
+  // the ones it ruled out included: the server's XP per round can change, and
+  // a level ruled out on 10 noisy rounds deserves another try.
+  const BET_XP_TTL_MS = 3 * 24 * 60 * 60 * 1000;
+
+  // Drops XP samples older than ttl, and undated ones from before samples expired.
+  function expireBetXp(table, now = Date.now(), ttl = BET_XP_TTL_MS) {
+    for (const [game, cells] of Object.entries(table)) {
+      for (const [bet, cell] of Object.entries(cells)) {
+        if (cell.at === undefined || now - cell.at >= ttl) delete cells[bet];
+      }
+      if (!Object.keys(cells).length) delete table[game];
+    }
     return table;
   }
 
@@ -199,6 +215,7 @@
     gameDelta,
     addDelta,
     addBetXp,
+    expireBetXp,
     syncBetXp,
     totalNet,
     profitRows,

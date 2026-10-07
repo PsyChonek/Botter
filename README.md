@@ -75,7 +75,8 @@ progress shows at `chrome://on-device-internals`.
   are explored for 30 rounds and use the measured edge. Loss per XP is the edge times
   bet / XP per round; XP per round is measured per bet level (10 rounds each), and a
   game's samples are dropped when its upgrades change, because upgrades lower XP per
-  round. The auto bet only moves to the next level while XP per credit wagered keeps
+  round, and every sample expires after 3 days, so games and bet levels that were
+  ruled out get measured again. The auto bet only moves to the next level while XP per credit wagered keeps
   up, so it settles on the bet with the lowest loss per XP; under a daily budget it
   never bets more than what is left of it.
 - **Settings for the rest** (settings, Auto tab): XP grinding game (cheapest
