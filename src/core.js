@@ -266,6 +266,8 @@
     buildPrompt,
     parseAnswer,
     delayBetween,
+    minDwellMs,
+    slowerDwell,
     nextType,
     claudeCost,
     ticketLabel,
@@ -275,5 +277,3 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BotterCore = api;
 })(globalThis);
-    minDwellMs,
-    slowerDwell,
