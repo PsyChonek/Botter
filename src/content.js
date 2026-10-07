@@ -5,6 +5,7 @@
 (() => {
   const C = globalThis.BotterCore;
   const G = globalThis.BotterGames;
+  const BJ = globalThis.BotterBlackjack;
   const msg = (key, subs) => chrome.i18n.getMessage(key, subs) || key;
 
   const DEFAULT_SETTINGS = {
@@ -304,7 +305,8 @@
     let res = open ? { ok: true, data: { hand: open, player } } : await api('/api/blackjack/deal', { bet });
     while (res.ok && res.data.hand && !res.data.hand.done && settings.gamesEnabled) {
       await sleep(settings.gameDelayMs / 2);
-      const action = G.blackjackAction(res.data.hand, res.data.player?.credits ?? player.credits);
+      const rules = BJ.rulesFromUpgrades(player.upgrades?.blackjack);
+      const action = BJ.decide(res.data.hand, rules, res.data.player?.credits ?? player.credits);
       res = await api('/api/blackjack/action', { action });
     }
     return res;

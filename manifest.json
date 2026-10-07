@@ -19,7 +19,7 @@
     },
     {
       "matches": ["https://skeleton-casino.vercel.app/*"],
-      "js": ["src/core.js", "src/games.js", "src/content.js"],
+      "js": ["src/core.js", "src/games.js", "src/blackjack.js", "src/content.js"],
       "run_at": "document_start"
     }
   ],

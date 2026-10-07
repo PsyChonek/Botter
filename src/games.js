@@ -43,33 +43,6 @@
     return Math.min(maxEnergy, energy + Math.max(0, gained));
   }
 
-  function handTotal(cards) {
-    let total = 0;
-    let aces = 0;
-    for (const { rank } of cards) {
-      if (rank === 'A') {
-        aces += 1;
-        total += 11;
-      } else if (['K', 'Q', 'J', 'T', '10'].includes(rank)) {
-        total += 10;
-      } else {
-        total += Number(rank);
-      }
-    }
-    while (total > 21 && aces > 0) {
-      total -= 10;
-      aces -= 1;
-    }
-    return total;
-  }
-
-  // The server sends a strategy hint with every open hand; follow it.
-  function blackjackAction(hand, credits) {
-    let action = hand.hint ?? (handTotal(hand.player) < 17 ? 'hit' : 'stand');
-    if (action === 'double' && (!hand.canDouble || credits < hand.bet)) action = 'hit';
-    return action;
-  }
-
   // Profit of one game API response. Net is the credit change plus whatever the
   // debt collector took from the win, because that still paid down the loan.
   function gameDelta(path, request, data, creditsBefore, prevStake = 0) {
@@ -134,8 +107,6 @@
     PATH_GAME,
     betFor,
     energyNow,
-    handTotal,
-    blackjackAction,
     gameDelta,
     addDelta,
     totalNet,

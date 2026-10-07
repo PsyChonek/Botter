@@ -20,21 +20,6 @@ test('energyNow refills one point every two minutes up to the cap', () => {
   assert.equal(G.energyNow(null, now), 0);
 });
 
-test('handTotal counts soft aces', () => {
-  assert.equal(G.handTotal([{ rank: 'A' }, { rank: 'K' }]), 21);
-  assert.equal(G.handTotal([{ rank: 'A' }, { rank: '9' }, { rank: '5' }]), 15);
-  assert.equal(G.handTotal([{ rank: '10' }, { rank: '6' }]), 16);
-});
-
-test('blackjackAction follows the hint and never doubles without the means', () => {
-  const hand = { hint: 'double', canDouble: true, bet: 100, player: [{ rank: '6' }, { rank: '5' }] };
-  assert.equal(G.blackjackAction(hand, 500), 'double');
-  assert.equal(G.blackjackAction(hand, 50), 'hit');
-  assert.equal(G.blackjackAction({ ...hand, canDouble: false }, 500), 'hit');
-  assert.equal(G.blackjackAction({ player: [{ rank: '10' }, { rank: '7' }] }, 0), 'stand');
-  assert.equal(G.blackjackAction({ player: [{ rank: '10' }, { rank: '2' }] }, 0), 'hit');
-});
-
 test('gameDelta books spins, roulette and garnished winnings', () => {
   const spin = G.gameDelta('/api/slot/spin', { bet: 40 }, { player: { credits: 1060 }, xpGain: 2 }, 1000);
   assert.deepEqual(spin, { game: 'blaze', rounds: 1, wagered: 40, net: 60, xp: 2, stake: 0 });
