@@ -81,7 +81,15 @@ progress shows at `chrome://on-device-internals`.
 - **Settings for the rest** (settings, Auto tab): XP grinding game (cheapest
   per XP or a fixed game), bet (cheapest per XP or a fixed level) and exploration rounds; automatic shop purchases from
   a priority plan (`game:key` list, off by default) using the client's price and
-  level formulas; a Blaze model check (`src/blaze.js`) that records every Blaze spin
+  level formulas. A plan entry is skipped when it is not worth its price
+  (`upgradeVerdict` in `src/auto.js`): it adds less than 0.5 % return per 10,000
+  credits (blackjack hint, double and soft 17, Slotingi mint), the grinder would not
+  pick the game even fully upgraded, or spending the price on plain grinding gives
+  more XP than grinding the rest at the cheaper cost (volume: 14 days of the daily
+  budget, or the credits above the minimum balance; judged for the next levels alone
+  and for the game's useful upgrades maxed together). `global:bets` is bought only
+  while the grinder's bet is at the max bet, `crash:sla` only while crash betting is
+  on. Skips are logged as `upgrades_skipped`; a Blaze model check (`src/blaze.js`) that records every Blaze spin
   with its board and the server win, reports which scatter rule reproduces the
   server and simulates the payout rate for current and maxed upgrades; and a debug
   capture of raw loan, crash, shop, leaderboard and bonus responses for export.

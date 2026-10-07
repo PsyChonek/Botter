@@ -42,7 +42,7 @@
     grindBet: 'auto',
     grindExploreRounds: 30,
     buyUpgrades: false,
-    upgradePlan: 'crash:sla, blaze:star, blaze:lucky, blaze:wild',
+    upgradePlan: 'blaze:star, skeleton:team, blaze:lucky, blaze:wild, skeleton:wild, slotingi:gulas, skeleton:deploy, slotingi:crown, roulette:zeros, blackjack:ties, blackjack:bjpay, crash:sla, global:bets',
     recordSpins: true,
     captureDebug: false,
     logLevel: 'info',
@@ -824,10 +824,41 @@
     return true;
   }
 
-  // Buys the next upgrade in the plan as soon as it is affordable above the reserve.
+  // Why an upgrade from the plan is skipped (see BotterAuto.upgradeVerdict), or null.
+  function upgradeSkip(offer) {
+    const { levels, candidates, plan } = grindChoice();
+    const mode = blazeMode();
+    return A.upgradeVerdict(offer, {
+      games: candidates.filter((game) => player.level >= GRIND_UNLOCKS[game]),
+      upgrades: player.upgrades,
+      betXp: stats.betXp,
+      levels,
+      edge: (game, upgrades) => O.edges([game], upgrades, mode)[game] ?? null,
+      rest: (keys, upTo) => G.upgradeRest(player.upgrades, offer.game, keys, upTo),
+      maxLevels: Object.fromEntries(Object.entries(G.SHOP[offer.game]).map(([key, [max]]) => [key, max])),
+      volume: A.grindVolume(settings, player.credits),
+      betCapped: Boolean(plan) && plan.bet >= player.maxBet,
+      crashOn: settings.crashEnabled,
+    });
+  }
+
+  // Logged when the set of skipped upgrades changes, not on every tick.
+  let skippedUpgrades = '';
+
+  // Buys the next upgrade in the plan that is worth its price as soon as it is
+  // affordable above the reserve.
   async function buyStep() {
     if (!settings.buyUpgrades || Date.now() - (claimTried.buy ?? 0) < CRASH_POLL_MS) return false;
-    const offer = G.nextPurchase(G.parsePlan(settings.upgradePlan), player);
+    const skipped = [];
+    const offer = G.nextPurchase(G.parsePlan(settings.upgradePlan), player, (o) => {
+      const reason = upgradeSkip(o);
+      if (reason) skipped.push(`${o.game}:${o.key} ${reason}`);
+      return reason;
+    });
+    if (skipped.join() !== skippedUpgrades) {
+      skippedUpgrades = skipped.join();
+      if (skipped.length) log.info('upgrades_skipped', { skipped });
+    }
     if (!offer || player.credits - offer.price < settings.reserve) return false;
     claimTried.buy = Date.now();
     setStatus('statusBuying', [`${offer.game}:${offer.key}`, String(offer.next), credits(offer.price)]);

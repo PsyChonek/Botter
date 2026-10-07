@@ -448,13 +448,13 @@
     "message": "Shop upgrades"
   },
   "optionsBuyUpgrades": {
-    "message": "Buy upgrades automatically, in the order below"
+    "message": "Buy upgrades automatically, in the order below, when they are worth it"
   },
   "optionsUpgradePlan": {
     "message": "Upgrade plan (game:key, in priority order)"
   },
   "optionsUpgradeHint": {
-    "message": "Auto buys the next level of the first entry that is not maxed and allowed at your level, as soon as it fits above the reserve; later entries wait. Keys: crash:sla, blaze:lucky/wild/star, skeleton:team/wild/deploy, slotingi:crown/gulas/mint, blackjack:ties/bjpay/soft17/double/hint, roulette:zeros, global:bets. Only crash:sla raises the expected return of a game the bot actually plays; Blaze pays off only if the model check below says so. Maxing any game also pays a one-time 5000 achievement; crash is the cheapest to max (about 32,000)."
+    "message": "Auto buys the next level of the first entry that is worth its price, is not maxed and is allowed at your level, as soon as it fits above the reserve; later entries wait. Skipped as not worth it: upgrades that add less than 0.5 % return per 10,000 credits (blackjack:hint/double/soft17, slotingi:mint), upgrades of a game the XP grinder would not pick even fully upgraded, a game's upgrades when spending the price on plain XP grinding gives more XP (over 14 days of the daily budget, or down to the minimum balance), global:bets while the grinder's bet is below your max bet, and crash:sla while crash betting is off. Keys: crash:sla, blaze:lucky/wild/star, skeleton:team/wild/deploy, slotingi:crown/gulas/mint, blackjack:ties/bjpay/soft17/double/hint, roulette:zeros, global:bets. Maxing any game also pays a one-time 5000 achievement, which the check does not count."
   },
   "optionsModelHeading": {
     "message": "Blaze model check"

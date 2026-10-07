@@ -47,7 +47,7 @@ const DEFAULTS = {
   grindBet: 'auto',
   grindExploreRounds: 30,
   buyUpgrades: false,
-  upgradePlan: 'crash:sla, blaze:star, blaze:lucky, blaze:wild',
+  upgradePlan: 'blaze:star, skeleton:team, blaze:lucky, blaze:wild, skeleton:wild, slotingi:gulas, skeleton:deploy, slotingi:crown, roulette:zeros, blackjack:ties, blackjack:bjpay, crash:sla, global:bets',
   recordSpins: true,
   captureDebug: false,
   panelHidden: false,

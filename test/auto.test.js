@@ -269,3 +269,79 @@ test('grindReport shows the modelled and the measured edge', () => {
   assert.equal(row.measuredEdge, 0.1);
   assert.equal(row.bets[0].cost, 3);
 });
+
+// Upgrade verdict context with a toy edge model: each level of a key cuts the
+// edge by perLevel[key], each level costs 1000.
+function verdictCtx(overrides = {}) {
+  const perLevel = { team: 0.03, wild: 0.03, hint: 0 };
+  const base = { skeleton: 0.3, roulette: 0.077 };
+  const edge = (game, upgrades) => {
+    if (!(game in base)) return null;
+    const own = upgrades?.[game] ?? {};
+    return base[game] - Object.entries(own).reduce((sum, [key, l]) => sum + (perLevel[key] ?? 0) * l, 0);
+  };
+  const upgrades = {};
+  return {
+    games: ['skeleton'],
+    upgrades,
+    betXp: {},
+    levels: [20],
+    edge,
+    rest: (keys, upTo = 4) => {
+      const own = Object.fromEntries(keys.map((key) => [key, Math.min(4, upTo)]));
+      return { price: keys.length * Math.min(4, upTo) * 1000, upgrades: { skeleton: own } };
+    },
+    maxLevels: { team: 4, wild: 4, hint: 1 },
+    volume: 1_000_000,
+    betCapped: false,
+    crashOn: true,
+    ...overrides,
+  };
+}
+const offer = (game, key) => ({ game, key, next: 1, price: 1000 });
+
+test('upgradeVerdict buys an upgrade that pays back in XP', () => {
+  assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), verdictCtx()), null);
+});
+
+test('upgradeVerdict skips upgrades that barely change the odds', () => {
+  assert.equal(A.upgradeVerdict(offer('skeleton', 'hint'), verdictCtx()), 'tooSmall');
+});
+
+test('upgradeVerdict skips a game the grinder would not pick even maxed', () => {
+  const ctx = verdictCtx({ games: ['skeleton', 'roulette'] });
+  // Skeleton maxed (team and wild) gets to 0.06 edge, roulette is at 0.077: worth it.
+  assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), ctx), null);
+  // With roulette paying four times the XP per credit, Skeleton never catches up.
+  const xp = (perRound) => ({ 20: { rounds: 10, xp: perRound * 10 } });
+  const betXp = { skeleton: xp(1), roulette: xp(4) };
+  assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), { ...ctx, betXp }), 'neverBest');
+  assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), { ...ctx, games: ['roulette'] }), 'notGrinded');
+});
+
+test('upgradeVerdict prefers plain XP grinding when the volume is too small to pay back', () => {
+  // Spending 8000 of 9000 credits on upgrades leaves too little to grind.
+  assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), verdictCtx({ volume: 9000 })), 'xpFarmingBetter');
+  assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), verdictCtx({ volume: 0 })), 'xpFarmingBetter');
+});
+
+test('upgradeVerdict judges bets and crash upgrades by their own use', () => {
+  assert.equal(A.upgradeVerdict(offer('global', 'bets'), verdictCtx()), 'betNotCapped');
+  assert.equal(A.upgradeVerdict(offer('global', 'bets'), verdictCtx({ betCapped: true })), null);
+  assert.equal(A.upgradeVerdict(offer('crash', 'sla'), verdictCtx()), null);
+  assert.equal(A.upgradeVerdict(offer('crash', 'sla'), verdictCtx({ crashOn: false })), 'crashOff');
+});
+
+test('grindVolume is the budget over the horizon or what is above the floor', () => {
+  assert.equal(A.grindVolume({ grindLimit: 'daily', xpBudget: 1000 }, 50_000), 14_000);
+  assert.equal(A.grindVolume({ grindLimit: 'balance', grindMinBalance: 20_000 }, 50_000), 30_000);
+  assert.equal(A.grindVolume({ grindLimit: 'balance', grindMinBalance: 60_000 }, 50_000), 0);
+});
+
+test('upgradeVerdict buys a cheap first level that pays back on its own', () => {
+  // Maxing team and wild (8000) does not pay back on 20,000 credits, but the
+  // first two levels of team (2000, edge 0.3 -> 0.24) do.
+  const ctx = verdictCtx({ volume: 20_000 });
+  assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), ctx), null);
+  assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), verdictCtx({ volume: 5000 })), 'xpFarmingBetter');
+});

@@ -65,12 +65,27 @@
       .map(([game, key]) => ({ game, key }));
   }
 
-  // First upgrade in plan order that is not maxed and is allowed at this level.
+  // Price of buying the given upgrades of one game up to level upTo (default
+  // their max), and the upgrades after that.
+  function upgradeRest(upgrades, game, keys, upTo = Infinity) {
+    const own = { ...upgrades?.[game] };
+    let price = 0;
+    for (const key of keys) {
+      for (let offer = upgradeOffer({ [game]: own }, game, key); offer && offer.next <= upTo; offer = upgradeOffer({ [game]: own }, game, key)) {
+        price += offer.price;
+        own[key] = offer.next;
+      }
+    }
+    return { price, upgrades: { ...upgrades, [game]: own } };
+  }
+
+  // First upgrade in plan order that is not maxed, is allowed at this level and
+  // is not skipped (skip returns why an offer is not worth buying, or null).
   // Later entries wait until it is bought, so the order is the priority.
-  function nextPurchase(plan, player) {
+  function nextPurchase(plan, player, skip = () => null) {
     for (const { game, key } of plan) {
       const offer = upgradeOffer(player?.upgrades, game, key);
-      if (offer && player.level >= offer.minLevel) return offer;
+      if (offer && player.level >= offer.minLevel && !skip(offer)) return offer;
     }
     return null;
   }
@@ -177,6 +192,7 @@
     SHOP,
     upgradeOffer,
     parsePlan,
+    upgradeRest,
     nextPurchase,
     betFor,
     energyNow,

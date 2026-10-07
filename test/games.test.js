@@ -92,3 +92,19 @@ test('syncBetXp drops a game\'s XP samples when its upgrades change', () => {
   assert.equal(table.skeleton, undefined);
   assert.ok(table.blaze);
 });
+
+test('nextPurchase skips offers the skip check rejects', () => {
+  const plan = G.parsePlan('blackjack:hint, blackjack:ties');
+  const player = { level: 20, upgrades: {} };
+  assert.equal(G.nextPurchase(plan, player).key, 'hint');
+  assert.equal(G.nextPurchase(plan, player, (o) => (o.key === 'hint' ? 'tooSmall' : null)).key, 'ties');
+  assert.equal(G.nextPurchase(plan, player, () => 'tooSmall'), null);
+});
+
+test('upgradeRest prices every remaining level', () => {
+  const rest = G.upgradeRest({ skeleton: { team: 2 } }, 'skeleton', ['team', 'deploy']);
+  // team 3 and 4, deploy 1 to 3
+  assert.equal(rest.price, 13000 + 23300 + 6000 + 12000 + 24000);
+  assert.deepEqual(rest.upgrades.skeleton, { team: 4, deploy: 3 });
+  assert.deepEqual(G.upgradeRest({}, 'skeleton', []).price, 0);
+});

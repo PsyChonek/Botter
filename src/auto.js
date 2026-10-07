@@ -174,6 +174,71 @@
     });
   }
 
+  // An upgrade has to raise its game's return by at least this much per credit
+  // of its remaining levels: 0.5 percentage points per 10,000 credits. Below
+  // that sit blackjack's hint (the bot already plays perfectly), its
+  // double-anything and soft 17, and Slotingi's coin minting.
+  const UPGRADE_MIN_GAIN = 0.005 / 10_000;
+  // Grinding volume an upgrade must pay back over, under a daily loss budget.
+  const UPGRADE_HORIZON_DAYS = 14;
+
+  // Credits the grinder expects to lose while an upgrade has to pay off: the
+  // daily budget over the horizon, or what is above the minimum balance.
+  function grindVolume(settings, credits) {
+    if (settings.grindLimit === 'balance') return Math.max(0, credits - settings.grindMinBalance);
+    return Math.max(0, settings.xpBudget) * UPGRADE_HORIZON_DAYS;
+  }
+
+  // Why an upgrade from the shop plan is not worth its price, or null when it is.
+  // ctx: games (unlocked games the grinder may pick), upgrades, betXp, levels
+  // (bet levels allowed now), edge(game, upgrades) (modelled house edge or null),
+  // rest(keys, upTo) ({ price, upgrades } after buying those upgrades of the
+  // offer's game up to level upTo, default max), maxLevels ({ key: max } of the
+  // game), volume (see grindVolume), betCapped (the grinder's bet is the biggest
+  // allowed) and crashOn (crash betting is on).
+  // Credits spent on upgrades are not there to grind with, so they are bought
+  // only if the XP from the remaining volume at the cheaper cost beats the XP
+  // from the whole volume at today's best cost. That is checked for the next
+  // levels of this upgrade alone (a cheap first level can pay back on its own)
+  // and for every worthwhile upgrade of the game maxed together.
+  function upgradeVerdict(offer, ctx) {
+    const { game } = offer;
+    if (game === 'global') return ctx.betCapped ? null : 'betNotCapped';
+    if (game === 'crash') return ctx.crashOn ? null : 'crashOff';
+    const now = (g) => ctx.edge(g, ctx.upgrades);
+    if (now(game) === null) return null;
+    if (!ctx.games.includes(game)) return 'notGrinded';
+
+    const gainPerCredit = (keys) => {
+      const rest = ctx.rest(keys);
+      return rest.price > 0 ? (now(game) - ctx.edge(game, rest.upgrades)) / rest.price : 0;
+    };
+    if (gainPerCredit([offer.key]) < UPGRADE_MIN_GAIN) return 'tooSmall';
+    const keys = Object.keys(ctx.maxLevels);
+
+    // XP per credit wagered of each game's best measured bet. Until every game
+    // has one, costs compare by edge alone (same XP per credit everywhere).
+    const rates = Object.fromEntries(
+      ctx.games.map((g) => {
+        const best = betLadder(ctx.betXp?.[g], ctx.levels).best;
+        return [g, best && best.perRound > 0 ? best.perRound / best.bet : null];
+      }),
+    );
+    const useRates = Object.values(rates).every((r) => r !== null);
+    const cost = (g, edge) => (useRates ? edge / rates[g] : edge);
+    const before = Math.min(...ctx.games.map((g) => (now(g) === null ? Infinity : cost(g, now(g)))));
+    const maxed = ctx.rest(keys.filter((key) => gainPerCredit([key]) >= UPGRADE_MIN_GAIN));
+    if (cost(game, ctx.edge(game, maxed.upgrades)) >= before) return 'neverBest';
+    const pays = (rest) => {
+      const after = Math.min(before, cost(game, ctx.edge(game, rest.upgrades)));
+      if (after <= 0) return true; // the player is ahead: it pays for itself
+      return (ctx.volume - rest.price) / after > ctx.volume / before;
+    };
+    const steps = [];
+    for (let upTo = offer.next; upTo <= ctx.maxLevels[offer.key]; upTo++) steps.push(ctx.rest([offer.key], upTo));
+    return [...steps, maxed].some(pays) ? null : 'xpFarmingBetter';
+  }
+
   // Bet levels XP grinding may use now: allowed by the limits, and under a daily
   // budget no bigger than what is left of it, so one lost round cannot overshoot.
   function grindBets(settings, credits, lostToday, levels) {
@@ -227,6 +292,8 @@
     grindReport,
     grindBets,
     grindAllowed,
+    grindVolume,
+    upgradeVerdict,
     pickAccount,
     dayKey,
   };
