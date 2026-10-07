@@ -627,11 +627,37 @@
   "optionsLogLevel": {
     "message": "Console log level"
   },
-  "optionsSave": {
-    "message": "Save"
-  },
   "optionsSaved": {
     "message": "Saved."
+  },
+  "optionsTabsLabel": {
+    "message": "Settings sections"
+  },
+  "tabBot": {
+    "message": "Bot"
+  },
+  "tabAi": {
+    "message": "AI"
+  },
+  "tabAuto": {
+    "message": "Auto"
+  },
+  "tabGames": {
+    "message": "Games"
+  },
+  "tabProfit": {
+    "message": "Profit"
+  },
+  "tabData": {
+    "message": "Data"
+  },
+  "optionsSaveFailed": {
+    "message": "Not saved: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
   },
   "optionsBankHeading": {
     "message": "Answer bank"

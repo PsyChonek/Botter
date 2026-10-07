@@ -71,6 +71,7 @@ const $ = (id) => document.getElementById(id);
 const field = (name) => document.querySelector(`[name="${name}"]`);
 
 for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = msg(el.dataset.i18n);
+for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', msg(el.dataset.i18nLabel));
 document.documentElement.lang = locale;
 
 for (const name of INT_SELECTS) {
@@ -88,15 +89,22 @@ async function load() {
     'bank',
     'stats',
   ]);
-  const values = { ...DEFAULTS, ...settings };
-  for (const name of CHECKBOXES) field(name).checked = values[name];
-  for (const name of [...SELECTS, ...INT_SELECTS, ...TEXTS, ...NUMBERS]) field(name).value = values[name];
+  fill({ ...DEFAULTS, ...settings });
   $('apiKey').value = apiKey;
   $('openrouterKey').value = openrouterKey;
   showBankSize(bank);
   showLocalStatus();
   showProfit(stats);
   showSpinCount();
+}
+
+// Skips the field being edited, so a save or a change made from the in-page
+// panel never yanks text out from under the cursor.
+function fill(values) {
+  for (const name of CHECKBOXES) field(name).checked = values[name];
+  for (const name of [...SELECTS, ...INT_SELECTS, ...TEXTS, ...NUMBERS]) {
+    if (field(name) !== document.activeElement) field(name).value = values[name];
+  }
   showRelevant();
 }
 
@@ -114,7 +122,102 @@ function showRelevant() {
   for (const el of document.querySelectorAll('[data-when]')) el.hidden = !holds(el.dataset.when);
 }
 
-document.querySelector('main').addEventListener('input', showRelevant);
+// ---------- tabs ----------
+
+const tabs = [...document.querySelectorAll('[role="tab"]')];
+
+function selectTab(tab, focus = false) {
+  for (const t of tabs) {
+    const selected = t === tab;
+    t.setAttribute('aria-selected', String(selected));
+    t.tabIndex = selected ? 0 : -1;
+    $(t.getAttribute('aria-controls')).hidden = !selected;
+  }
+  if (focus) tab.focus();
+  try {
+    localStorage.setItem('tab', tab.id);
+  } catch {}
+}
+
+for (const tab of tabs) {
+  tab.addEventListener('click', () => selectTab(tab));
+  tab.addEventListener('keydown', (event) => {
+    const i = tabs.indexOf(tab);
+    const next = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[event.key];
+    if (next === undefined) return;
+    event.preventDefault();
+    selectTab(tabs[(next + tabs.length) % tabs.length], true);
+  });
+}
+
+let lastTab = null;
+try {
+  lastTab = $(localStorage.getItem('tab'));
+} catch {}
+selectTab(tabs.includes(lastTab) ? lastTab : tabs[0]);
+
+// ---------- autosave ----------
+
+const SETTING_NAMES = new Set([...CHECKBOXES, ...SELECTS, ...INT_SELECTS, ...TEXTS, ...NUMBERS]);
+const KEY_IDS = ['apiKey', 'openrouterKey'];
+const isSetting = (el) => SETTING_NAMES.has(el.name) || KEY_IDS.includes(el.id);
+
+function readFields() {
+  const next = {};
+  for (const name of CHECKBOXES) next[name] = field(name).checked;
+  for (const name of SELECTS) next[name] = field(name).value;
+  for (const name of INT_SELECTS) next[name] = Number(field(name).value);
+  for (const name of TEXTS) next[name] = field(name).value.trim();
+  for (const name of NUMBERS) next[name] = Math.max(0, Number(field(name).value) || 0);
+  next.crashMinEv = Math.max(1, next.crashMinEv);
+  next.crashKelly = Math.max(0, Math.min(1, next.crashKelly));
+  if (next.maxDelayMs < next.minDelayMs) next.maxDelayMs = next.minDelayMs;
+  return next;
+}
+
+let saveTimer = null;
+
+// Merges into the stored settings so keys owned by the in-page panel
+// (enabled, autoMode, game, taskType) survive.
+async function save() {
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  try {
+    const { settings = {} } = await chrome.storage.local.get('settings');
+    await chrome.storage.local.set({
+      settings: { ...settings, ...readFields() },
+      apiKey: $('apiKey').value.trim(),
+      openrouterKey: $('openrouterKey').value.trim(),
+    });
+    flash(msg('optionsSaved'));
+  } catch (err) {
+    flash(msg('optionsSaveFailed', [err.message]));
+  }
+}
+
+// Toggles and dropdowns save at once; typing waits for a pause.
+document.querySelector('main').addEventListener('input', (event) => {
+  showRelevant();
+  if (!isSetting(event.target)) return;
+  const typing = event.target.matches('input:not([type="checkbox"]), textarea');
+  clearTimeout(saveTimer);
+  saveTimer = typing ? setTimeout(save, 600) : null;
+  if (!typing) save();
+});
+
+// Leaving a field saves right away and shows the value that was actually
+// stored, for example a max delay raised to match the min delay.
+document.querySelector('main').addEventListener('change', async (event) => {
+  if (!isSetting(event.target) || event.target.type === 'checkbox' || event.target.tagName === 'SELECT') return;
+  await save();
+  const values = readFields();
+  for (const name of [...TEXTS, ...NUMBERS]) field(name).value = values[name];
+});
+
+// Closing the side panel mid-debounce must not drop the last edit.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && saveTimer) save();
+});
 
 const Z = globalThis.BotterBlaze;
 const pct2 = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 });
@@ -228,7 +331,10 @@ function showProfit(stats = {}) {
 }
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.stats) showProfit(changes.stats.newValue);
+  if (area !== 'local') return;
+  if (changes.stats) showProfit(changes.stats.newValue);
+  if (changes.bank) showBankSize(changes.bank.newValue ?? {});
+  if (changes.settings && !saveTimer) fill({ ...DEFAULTS, ...changes.settings.newValue });
 });
 
 async function showLocalStatus(state) {
@@ -261,39 +367,20 @@ function showBankSize(bank) {
   $('bankSize').textContent = msg('optionsBankSize', [String(Object.keys(bank).length)]);
 }
 
-function flash(text) {
-  $('saved').textContent = text;
-  setTimeout(() => ($('saved').textContent = ''), 2500);
-}
+let flashTimer = null;
 
-$('save').addEventListener('click', async () => {
-  const { settings = {} } = await chrome.storage.local.get('settings');
-  const next = { ...settings };
-  for (const name of CHECKBOXES) next[name] = field(name).checked;
-  for (const name of SELECTS) next[name] = field(name).value;
-  for (const name of INT_SELECTS) next[name] = Number(field(name).value);
-  for (const name of TEXTS) next[name] = field(name).value.trim();
-  for (const name of NUMBERS) next[name] = Math.max(0, Number(field(name).value) || 0);
-  next.crashMinEv = Math.max(1, next.crashMinEv);
-  next.crashKelly = Math.max(0, Math.min(1, next.crashKelly));
-  if (next.maxDelayMs < next.minDelayMs) next.maxDelayMs = next.minDelayMs;
-  await chrome.storage.local.set({
-    settings: next,
-    apiKey: $('apiKey').value.trim(),
-    openrouterKey: $('openrouterKey').value.trim(),
-  });
-  flash(msg('optionsSaved'));
-});
+function flash(text) {
+  clearTimeout(flashTimer);
+  $('saved').textContent = text;
+  flashTimer = setTimeout(() => ($('saved').textContent = ''), 2500);
+}
 
 $('export').addEventListener('click', async () => {
   const { bank = {} } = await chrome.storage.local.get('bank');
-  const blob = new Blob([JSON.stringify(bank, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'botter-bank.json';
-  a.click();
-  URL.revokeObjectURL(a.href);
+  download('botter-bank.json', bank);
 });
+
+$('importButton').addEventListener('click', () => $('import').click());
 
 $('import').addEventListener('change', async (event) => {
   const file = event.target.files?.[0];

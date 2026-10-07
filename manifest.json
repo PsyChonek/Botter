@@ -4,7 +4,7 @@
   "description": "__MSG_extDescription__",
   "version": "0.1.0",
   "default_locale": "en",
-  "permissions": ["storage", "offscreen"],
+  "permissions": ["storage", "offscreen", "sidePanel"],
   "host_permissions": ["https://skeleton-casino.vercel.app/*", "https://api.anthropic.com/*", "https://openrouter.ai/*"],
   "background": {
     "service_worker": "src/background.js",
@@ -23,7 +23,9 @@
       "run_at": "document_start"
     }
   ],
-  "options_page": "src/options.html",
+  "side_panel": {
+    "default_path": "src/options.html"
+  },
   "action": {
     "default_title": "__MSG_extName__"
   }

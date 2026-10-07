@@ -7,48 +7,96 @@
     <link rel="stylesheet" href="options.css" />
   </head>
   <body>
+    <header class="bar">
+      <div class="title-row">
+        <h1 data-i18n="optionsTitle"></h1>
+        <span id="saved" role="status" aria-live="polite"></span>
+      </div>
+      <div class="tabs" role="tablist" data-i18n-label="optionsTabsLabel">
+        <button type="button" role="tab" id="tab-bot" aria-controls="panel-bot" data-i18n="tabBot"></button>
+        <button type="button" role="tab" id="tab-ai" aria-controls="panel-ai" data-i18n="tabAi"></button>
+        <button type="button" role="tab" id="tab-auto" aria-controls="panel-auto" data-i18n="tabAuto"></button>
+        <button type="button" role="tab" id="tab-games" aria-controls="panel-games" data-i18n="tabGames"></button>
+        <button type="button" role="tab" id="tab-profit" aria-controls="panel-profit" data-i18n="tabProfit"></button>
+        <button type="button" role="tab" id="tab-data" aria-controls="panel-data" data-i18n="tabData"></button>
+      </div>
+    </header>
+
     <main>
-      <h1 data-i18n="optionsTitle"></h1>
+      <div role="tabpanel" id="panel-bot" aria-labelledby="tab-bot" tabindex="0">
+        <section class="card" aria-labelledby="bot-heading">
+          <h2 id="bot-heading" data-i18n="optionsBotHeading"></h2>
+          <label class="check"><span data-i18n="optionsGuess"></span><input type="checkbox" role="switch" name="guessUnknown" /></label>
+          <label class="check"><span data-i18n="optionsStopAtNorm"></span><input type="checkbox" role="switch" name="stopAtNorm" /></label>
+          <label class="check"><span data-i18n="optionsAutoClaim"></span><input type="checkbox" role="switch" name="autoClaim" /></label>
+          <label class="check"><span data-i18n="optionsHidePanel"></span><input type="checkbox" role="switch" name="panelHidden" /></label>
+          <div class="grid">
+            <div>
+              <label for="minDelayMs" data-i18n="optionsMinDelay"></label>
+              <input id="minDelayMs" name="minDelayMs" type="number" min="0" step="100" />
+            </div>
+            <div>
+              <label for="maxDelayMs" data-i18n="optionsMaxDelay"></label>
+              <input id="maxDelayMs" name="maxDelayMs" type="number" min="0" step="100" />
+            </div>
+          </div>
+          <label for="logLevel" data-i18n="optionsLogLevel"></label>
+          <select id="logLevel" name="logLevel">
+            <option value="debug">debug</option>
+            <option value="info">info</option>
+            <option value="warn">warn</option>
+            <option value="error">error</option>
+          </select>
+        </section>
+      </div>
 
-      <section aria-labelledby="ai-heading">
-        <h2 id="ai-heading" data-i18n="optionsAiHeading"></h2>
-        <label for="aiSolver" data-i18n="optionsSolver"></label>
-        <select id="aiSolver" name="aiSolver">
-          <option value="local" data-i18n="solver_local"></option>
-          <option value="claude" data-i18n="solver_claude"></option>
-          <option value="openrouter" data-i18n="solver_openrouter"></option>
-          <option value="off" data-i18n="solver_off"></option>
-        </select>
+      <div role="tabpanel" id="panel-ai" aria-labelledby="tab-ai" tabindex="0" hidden>
+        <section class="card" aria-labelledby="ai-heading">
+          <h2 id="ai-heading" data-i18n="optionsAiHeading"></h2>
+          <label for="aiSolver" data-i18n="optionsSolver"></label>
+          <select id="aiSolver" name="aiSolver">
+            <option value="local" data-i18n="solver_local"></option>
+            <option value="claude" data-i18n="solver_claude"></option>
+            <option value="openrouter" data-i18n="solver_openrouter"></option>
+            <option value="off" data-i18n="solver_off"></option>
+          </select>
+        </section>
 
-        <div data-when="aiSolver:local">
-          <h3 data-i18n="optionsLocalHeading"></h3>
+        <section class="card" data-when="aiSolver:local" aria-labelledby="local-heading">
+          <h2 id="local-heading" data-i18n="optionsLocalHeading"></h2>
           <p class="hint" data-i18n="optionsLocalHint"></p>
           <p id="localStatus" role="status" aria-live="polite"></p>
-          <button id="prepareLocal" type="button" data-i18n="optionsLocalPrepare"></button>
+          <button id="prepareLocal" type="button" class="primary" data-i18n="optionsLocalPrepare"></button>
           <p id="localFlags" class="hint" data-i18n="optionsLocalFlags" hidden></p>
-        </div>
+        </section>
 
-        <div data-when="aiSolver:claude">
-          <h3 data-i18n="optionsClaudeHeading"></h3>
+        <section class="card" data-when="aiSolver:claude" aria-labelledby="claude-heading">
+          <h2 id="claude-heading" data-i18n="optionsClaudeHeading"></h2>
           <label for="apiKey" data-i18n="optionsApiKey"></label>
           <input id="apiKey" type="password" autocomplete="off" spellcheck="false" />
           <p class="hint" data-i18n="optionsApiKeyHint"></p>
-          <label for="model" data-i18n="optionsModel"></label>
-          <select id="model" name="model">
-            <option value="claude-opus-5-5">Claude Opus 5.5</option>
-            <option value="claude-sonnet-5-5">Claude Sonnet 5.5</option>
-            <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
-          </select>
-          <label for="effort" data-i18n="optionsEffort"></label>
-          <select id="effort" name="effort">
-            <option value="low">low</option>
-            <option value="medium">medium</option>
-            <option value="high">high</option>
-          </select>
-        </div>
+          <div class="grid">
+            <div>
+              <label for="model" data-i18n="optionsModel"></label>
+              <select id="model" name="model">
+                <option value="claude-opus-5-5">Claude Opus 5.5</option>
+                <option value="claude-sonnet-5-5">Claude Sonnet 5.5</option>
+                <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
+              </select>
+            </div>
+            <div>
+              <label for="effort" data-i18n="optionsEffort"></label>
+              <select id="effort" name="effort">
+                <option value="low">low</option>
+                <option value="medium">medium</option>
+                <option value="high">high</option>
+              </select>
+            </div>
+          </div>
+        </section>
 
-        <div data-when="aiSolver:openrouter">
-          <h3 data-i18n="optionsOpenRouterHeading"></h3>
+        <section class="card" data-when="aiSolver:openrouter" aria-labelledby="openrouter-heading">
+          <h2 id="openrouter-heading" data-i18n="optionsOpenRouterHeading"></h2>
           <label for="openrouterKey" data-i18n="optionsOpenRouterKey"></label>
           <input id="openrouterKey" type="password" autocomplete="off" spellcheck="false" />
           <label for="openrouterModel" data-i18n="optionsOpenRouterModel"></label>
@@ -60,175 +108,155 @@
             <option value="deepseek/deepseek-chat-v3.1"></option>
           </datalist>
           <p class="hint" data-i18n="optionsOpenRouterHint"></p>
-        </div>
-      </section>
-
-      <section aria-labelledby="bot-heading">
-        <h2 id="bot-heading" data-i18n="optionsBotHeading"></h2>
-        <label class="check"><input type="checkbox" name="guessUnknown" /> <span data-i18n="optionsGuess"></span></label>
-        <label class="check"><input type="checkbox" name="stopAtNorm" /> <span data-i18n="optionsStopAtNorm"></span></label>
-        <label class="check"><input type="checkbox" name="autoClaim" /> <span data-i18n="optionsAutoClaim"></span></label>
-        <label class="check"><input type="checkbox" name="panelHidden" /> <span data-i18n="optionsHidePanel"></span></label>
-        <div class="pair">
-          <div>
-            <label for="minDelayMs" data-i18n="optionsMinDelay"></label>
-            <input id="minDelayMs" name="minDelayMs" type="number" min="0" step="100" />
-          </div>
-          <div>
-            <label for="maxDelayMs" data-i18n="optionsMaxDelay"></label>
-            <input id="maxDelayMs" name="maxDelayMs" type="number" min="0" step="100" />
-          </div>
-        </div>
-        <label for="logLevel" data-i18n="optionsLogLevel"></label>
-        <select id="logLevel" name="logLevel">
-          <option value="debug">debug</option>
-          <option value="info">info</option>
-          <option value="warn">warn</option>
-          <option value="error">error</option>
-        </select>
-      </section>
-
-      <section aria-labelledby="auto-heading">
-        <h2 id="auto-heading" data-i18n="optionsAutoHeading"></h2>
-        <p class="hint" data-i18n="optionsAutoHint"></p>
-        <label class="check"><input type="checkbox" name="repayDebt" /> <span data-i18n="optionsRepayDebt"></span></label>
-        <label class="check"><input type="checkbox" name="loanTrick" /> <span data-i18n="optionsLoanTrick"></span></label>
-        <label class="check"><input type="checkbox" name="crashEnabled" /> <span data-i18n="optionsCrashEnabled"></span></label>
-        <div class="pair" data-when="crashEnabled">
-          <div>
-            <label for="crashBet" data-i18n="optionsCrashBet"></label>
-            <select id="crashBet" name="crashBet"></select>
-          </div>
-          <div>
-            <label for="crashMinEv" data-i18n="optionsCrashMinEv"></label>
-            <input id="crashMinEv" name="crashMinEv" type="number" min="1" step="0.01" />
-          </div>
-          <div>
-            <label for="crashKelly" data-i18n="optionsCrashKelly"></label>
-            <input id="crashKelly" name="crashKelly" type="number" min="0" max="1" step="0.05" />
-          </div>
-        </div>
-        <label for="xpBudget" data-i18n="optionsXpBudget"></label>
-        <input id="xpBudget" name="xpBudget" type="number" min="0" step="100" />
-        <div data-when="xpBudget">
-          <div class="pair">
-            <div>
-              <label for="grindGame" data-i18n="optionsGrindGame"></label>
-              <select id="grindGame" name="grindGame"></select>
-            </div>
-            <div>
-              <label for="grindBet" data-i18n="optionsGrindBet"></label>
-              <select id="grindBet" name="grindBet"></select>
-            </div>
-            <div data-when="grindGame:auto">
-              <label for="grindExploreRounds" data-i18n="optionsGrindExplore"></label>
-              <input id="grindExploreRounds" name="grindExploreRounds" type="number" min="0" step="10" />
-            </div>
-          </div>
-          <p class="hint" data-i18n="optionsGrindHint"></p>
-        </div>
-
-        <h3 data-i18n="optionsShopHeading"></h3>
-        <label class="check"><input type="checkbox" name="buyUpgrades" /> <span data-i18n="optionsBuyUpgrades"></span></label>
-        <div data-when="buyUpgrades">
-          <label for="upgradePlan" data-i18n="optionsUpgradePlan"></label>
-          <textarea id="upgradePlan" name="upgradePlan" rows="3" spellcheck="false"></textarea>
-          <p class="hint" data-i18n="optionsUpgradeHint"></p>
-        </div>
-      </section>
-
-      <section aria-labelledby="games-heading">
-        <h2 id="games-heading" data-i18n="optionsGamesHeading"></h2>
-        <p class="hint" data-i18n="optionsGamesHint"></p>
-        <div class="pair">
-          <div>
-            <label for="gameBet" data-i18n="optionsGameBet"></label>
-            <select id="gameBet" name="gameBet"></select>
-          </div>
-          <div>
-            <label for="rouletteBet" data-i18n="optionsRouletteBet"></label>
-            <select id="rouletteBet" name="rouletteBet"></select>
-          </div>
-          <div>
-            <label for="stopLoss" data-i18n="optionsStopLoss"></label>
-            <input id="stopLoss" name="stopLoss" type="number" min="0" step="10" />
-          </div>
-          <div>
-            <label for="takeProfit" data-i18n="optionsTakeProfit"></label>
-            <input id="takeProfit" name="takeProfit" type="number" min="0" step="10" />
-          </div>
-          <div>
-            <label for="reserve" data-i18n="optionsReserve"></label>
-            <input id="reserve" name="reserve" type="number" min="0" step="10" />
-          </div>
-          <div>
-            <label for="gameDelayMs" data-i18n="optionsGameDelay"></label>
-            <input id="gameDelayMs" name="gameDelayMs" type="number" min="0" step="100" />
-          </div>
-        </div>
-      </section>
-
-      <div class="actions">
-        <button id="save" type="button" class="primary" data-i18n="optionsSave"></button>
-        <span id="saved" role="status" aria-live="polite"></span>
+        </section>
       </div>
 
-      <section aria-labelledby="bank-heading">
-        <h2 id="bank-heading" data-i18n="optionsBankHeading"></h2>
-        <p id="bankSize"></p>
-        <div class="actions">
-          <button id="export" type="button" data-i18n="optionsExport"></button>
-          <label class="button" for="import" data-i18n="optionsImport"></label>
-          <input id="import" type="file" accept="application/json" hidden />
-          <button id="clear" type="button" data-i18n="optionsClear"></button>
-        </div>
-      </section>
+      <div role="tabpanel" id="panel-auto" aria-labelledby="tab-auto" tabindex="0" hidden>
+        <section class="card" aria-labelledby="auto-heading">
+          <h2 id="auto-heading" data-i18n="optionsAutoHeading"></h2>
+          <p class="hint" data-i18n="optionsAutoHint"></p>
+          <label class="check"><span data-i18n="optionsRepayDebt"></span><input type="checkbox" role="switch" name="repayDebt" /></label>
+          <label class="check"><span data-i18n="optionsLoanTrick"></span><input type="checkbox" role="switch" name="loanTrick" /></label>
+          <label class="check"><span data-i18n="optionsCrashEnabled"></span><input type="checkbox" role="switch" name="crashEnabled" /></label>
+          <div class="grid" data-when="crashEnabled">
+            <div>
+              <label for="crashBet" data-i18n="optionsCrashBet"></label>
+              <select id="crashBet" name="crashBet"></select>
+            </div>
+            <div>
+              <label for="crashMinEv" data-i18n="optionsCrashMinEv"></label>
+              <input id="crashMinEv" name="crashMinEv" type="number" min="1" step="0.01" />
+            </div>
+            <div>
+              <label for="crashKelly" data-i18n="optionsCrashKelly"></label>
+              <input id="crashKelly" name="crashKelly" type="number" min="0" max="1" step="0.05" />
+            </div>
+          </div>
+          <label for="xpBudget" data-i18n="optionsXpBudget"></label>
+          <input id="xpBudget" name="xpBudget" type="number" min="0" step="100" />
+          <div data-when="xpBudget">
+            <div class="grid">
+              <div>
+                <label for="grindGame" data-i18n="optionsGrindGame"></label>
+                <select id="grindGame" name="grindGame"></select>
+              </div>
+              <div>
+                <label for="grindBet" data-i18n="optionsGrindBet"></label>
+                <select id="grindBet" name="grindBet"></select>
+              </div>
+              <div data-when="grindGame:auto">
+                <label for="grindExploreRounds" data-i18n="optionsGrindExplore"></label>
+                <input id="grindExploreRounds" name="grindExploreRounds" type="number" min="0" step="10" />
+              </div>
+            </div>
+            <p class="hint" data-i18n="optionsGrindHint"></p>
+          </div>
+        </section>
 
-      <section aria-labelledby="model-heading">
-        <h2 id="model-heading" data-i18n="optionsModelHeading"></h2>
-        <p class="hint" data-i18n="optionsModelHint"></p>
-        <label class="check"><input type="checkbox" name="recordSpins" /> <span data-i18n="optionsRecordSpins"></span></label>
-        <p id="spinCount"></p>
-        <div class="actions">
-          <button id="checkModel" type="button" data-i18n="optionsCheckModel"></button>
-          <button id="exportSpins" type="button" data-i18n="optionsExportSpins"></button>
-          <button id="clearSpins" type="button" data-i18n="optionsClearSpins"></button>
-        </div>
-        <pre id="modelResult" role="status" aria-live="polite"></pre>
-      </section>
+        <section class="card" aria-labelledby="shop-heading">
+          <h2 id="shop-heading" data-i18n="optionsShopHeading"></h2>
+          <label class="check"><span data-i18n="optionsBuyUpgrades"></span><input type="checkbox" role="switch" name="buyUpgrades" /></label>
+          <div data-when="buyUpgrades">
+            <label for="upgradePlan" data-i18n="optionsUpgradePlan"></label>
+            <textarea id="upgradePlan" name="upgradePlan" rows="3" spellcheck="false"></textarea>
+            <p class="hint" data-i18n="optionsUpgradeHint"></p>
+          </div>
+        </section>
+      </div>
 
-      <section aria-labelledby="debug-heading">
-        <h2 id="debug-heading" data-i18n="optionsDebugHeading"></h2>
-        <label class="check"><input type="checkbox" name="captureDebug" /> <span data-i18n="optionsCaptureDebug"></span></label>
-        <p class="hint" data-i18n="optionsCaptureHint"></p>
-        <div class="actions">
-          <button id="exportCapture" type="button" data-i18n="optionsExportCapture"></button>
-        </div>
-      </section>
+      <div role="tabpanel" id="panel-games" aria-labelledby="tab-games" tabindex="0" hidden>
+        <section class="card" aria-labelledby="games-heading">
+          <h2 id="games-heading" data-i18n="optionsGamesHeading"></h2>
+          <p class="hint" data-i18n="optionsGamesHint"></p>
+          <div class="grid">
+            <div>
+              <label for="gameBet" data-i18n="optionsGameBet"></label>
+              <select id="gameBet" name="gameBet"></select>
+            </div>
+            <div>
+              <label for="rouletteBet" data-i18n="optionsRouletteBet"></label>
+              <select id="rouletteBet" name="rouletteBet"></select>
+            </div>
+            <div>
+              <label for="stopLoss" data-i18n="optionsStopLoss"></label>
+              <input id="stopLoss" name="stopLoss" type="number" min="0" step="10" />
+            </div>
+            <div>
+              <label for="takeProfit" data-i18n="optionsTakeProfit"></label>
+              <input id="takeProfit" name="takeProfit" type="number" min="0" step="10" />
+            </div>
+            <div>
+              <label for="reserve" data-i18n="optionsReserve"></label>
+              <input id="reserve" name="reserve" type="number" min="0" step="10" />
+            </div>
+            <div>
+              <label for="gameDelayMs" data-i18n="optionsGameDelay"></label>
+              <input id="gameDelayMs" name="gameDelayMs" type="number" min="0" step="100" />
+            </div>
+          </div>
+        </section>
+      </div>
 
-      <section aria-labelledby="profit-heading">
-        <h2 id="profit-heading" data-i18n="optionsProfitHeading"></h2>
-        <p class="hint" data-i18n="optionsProfitHint"></p>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col" data-i18n="colGame"></th>
-                <th scope="col" data-i18n="colRounds"></th>
-                <th scope="col" data-i18n="colWagered"></th>
-                <th scope="col" data-i18n="colReturned"></th>
-                <th scope="col" data-i18n="colNet"></th>
-                <th scope="col" data-i18n="colRtp"></th>
-                <th scope="col" data-i18n="colPerRound"></th>
-                <th scope="col" data-i18n="colXp"></th>
-              </tr>
-            </thead>
-            <tbody id="profitBody"></tbody>
-            <tfoot id="profitFoot"></tfoot>
-          </table>
-        </div>
-        <p id="profitEmpty" class="hint" data-i18n="optionsProfitEmpty"></p>
-      </section>
+      <div role="tabpanel" id="panel-profit" aria-labelledby="tab-profit" tabindex="0" hidden>
+        <section class="card" aria-labelledby="profit-heading">
+          <h2 id="profit-heading" data-i18n="optionsProfitHeading"></h2>
+          <p class="hint" data-i18n="optionsProfitHint"></p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col" data-i18n="colGame"></th>
+                  <th scope="col" data-i18n="colRounds"></th>
+                  <th scope="col" data-i18n="colWagered"></th>
+                  <th scope="col" data-i18n="colReturned"></th>
+                  <th scope="col" data-i18n="colNet"></th>
+                  <th scope="col" data-i18n="colRtp"></th>
+                  <th scope="col" data-i18n="colPerRound"></th>
+                  <th scope="col" data-i18n="colXp"></th>
+                </tr>
+              </thead>
+              <tbody id="profitBody"></tbody>
+              <tfoot id="profitFoot"></tfoot>
+            </table>
+          </div>
+          <p id="profitEmpty" class="hint" data-i18n="optionsProfitEmpty"></p>
+        </section>
+      </div>
+
+      <div role="tabpanel" id="panel-data" aria-labelledby="tab-data" tabindex="0" hidden>
+        <section class="card" aria-labelledby="bank-heading">
+          <h2 id="bank-heading" data-i18n="optionsBankHeading"></h2>
+          <p id="bankSize"></p>
+          <div class="actions">
+            <button id="export" type="button" data-i18n="optionsExport"></button>
+            <button id="importButton" type="button" data-i18n="optionsImport"></button>
+            <input id="import" type="file" accept="application/json" hidden />
+            <button id="clear" type="button" class="danger" data-i18n="optionsClear"></button>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="model-heading">
+          <h2 id="model-heading" data-i18n="optionsModelHeading"></h2>
+          <p class="hint" data-i18n="optionsModelHint"></p>
+          <label class="check"><span data-i18n="optionsRecordSpins"></span><input type="checkbox" role="switch" name="recordSpins" /></label>
+          <p id="spinCount"></p>
+          <div class="actions">
+            <button id="checkModel" type="button" data-i18n="optionsCheckModel"></button>
+            <button id="exportSpins" type="button" data-i18n="optionsExportSpins"></button>
+            <button id="clearSpins" type="button" class="danger" data-i18n="optionsClearSpins"></button>
+          </div>
+          <pre id="modelResult" role="status" aria-live="polite"></pre>
+        </section>
+
+        <section class="card" aria-labelledby="debug-heading">
+          <h2 id="debug-heading" data-i18n="optionsDebugHeading"></h2>
+          <label class="check"><span data-i18n="optionsCaptureDebug"></span><input type="checkbox" role="switch" name="captureDebug" /></label>
+          <p class="hint" data-i18n="optionsCaptureHint"></p>
+          <div class="actions">
+            <button id="exportCapture" type="button" data-i18n="optionsExportCapture"></button>
+          </div>
+        </section>
+      </div>
     </main>
     <script src="core.js"></script>
     <script src="games.js"></script>

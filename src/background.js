@@ -161,4 +161,5 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true;
 });
 
-chrome.action.onClicked.addListener(() => chrome.runtime.openOptionsPage());
+// The toolbar icon opens the settings in the side panel, next to the casino tab.
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err) => createLogger('warn').warn('side_panel_failed', { error: err.message }));

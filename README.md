@@ -28,7 +28,7 @@ Chrome extension (Manifest V3) that solves the work tickets ("Práce") in
        It runs in the service worker if Chrome exposes `LanguageModel` there, otherwise
        in an offscreen document (`src/offscreen.html`). Requires Chrome 138+, about 22 GB
        free disk and a GPU with more than 4 GB VRAM or 16 GB RAM. The first download
-       needs a click, so use **Download the model** on the settings page once.
+       needs a click, so use **Download the model** in the settings (AI tab) once.
        It is a small model: expect noticeably more misses than Claude on tricky
        "what does it print" puzzles.
      - **Claude API**: `src/background.js` calls the Messages API with structured
@@ -49,8 +49,9 @@ progress shows at `chrome://on-device-internals`.
   (follows the table's own hint) through the casino API. The page hook performs the
   calls with the session the app already holds (supabase session in localStorage,
   falling back to the last Authorization header the app sent), so the token never
-  leaves the page. The game screen does not animate and the credit balance on the
-  page refreshes on the next app request. Guardrails: stop-loss and take-profit per
+  leaves the page. The game screen does not animate, but after every bot round the
+  hook hands the fresh player snapshot to the app's own state, so the credits, XP
+  bar and level in the top bar update live. Guardrails: stop-loss and take-profit per
   session, a credit reserve, and the game's unlock level. With both bots on, work
   goes first and games fill the time while energy refills.
 - **Auto mode** (`src/auto.js`, one toggle in the panel) runs everything in order of
@@ -64,7 +65,7 @@ progress shows at `chrome://on-device-internals`.
   base to -2.9 % fully upgraded (exact solver in `src/blackjack.js`), roulette -7.7 %
   to -2.7 %, Blaze about 66 % RTP by simulation. Grinding explores each unlocked game
   for 30 rounds, then sticks to the lowest measured loss per XP.
-- **Settings for the rest** (settings page, Auto section): XP grinding game (cheapest
+- **Settings for the rest** (settings, Auto tab): XP grinding game (cheapest
   per XP or a fixed game), bet and exploration rounds; automatic shop purchases from
   a priority plan (`game:key` list, off by default) using the client's price and
   level formulas; a Blaze model check (`src/blaze.js`) that records every Blaze spin
@@ -74,24 +75,25 @@ progress shows at `chrome://on-device-internals`.
 - **Profit tracking**: every game response (bot or manual play) is booked per game
   from the credit balance before and after, plus anything the debt collector took
   from the win. The panel shows rounds, net and return rate per game; the settings
-  page shows wagered, returned, net, return rate, net per round and XP, plus credits
+  Profit tab shows wagered, returned, net, return rate, net per round and XP, plus credits
   earned per work ticket. Crash bets are booked when they settle, from the round's bet list.
 - A small panel in the bottom-left corner of the page has Start/Stop for work and
   for games, the ticket type, the game, accuracy per answer source, AI cost and
   the profit table. **Hide** collapses it to a small Botter button in the same corner
   (highlighted while a bot runs); click it to bring the panel back. The same switch is
-  on the settings page.
+  in the settings (Bot tab).
 
 ## Install
 
 1. `chrome://extensions` > enable Developer mode > Load unpacked > pick this folder.
-2. Click the extension icon to open the settings. For the default on-device solver,
+2. Click the extension icon to open the settings in Chrome's side panel, next to
+   the casino tab. Every change saves as you make it; there is no Save button. For the default on-device solver,
    press **Download the model** once. For Claude, switch the solver and paste an
    Anthropic API key; it is stored only in `chrome.storage.local` of that browser
    profile and is sent only to `api.anthropic.com`.
 3. Open the casino, log in, and press **Start** in the panel.
 
-The bank can be exported and imported as JSON from the settings page, so a
+The bank can be exported and imported as JSON from the settings (Data tab), so a
 bank learned on one machine can be reused on another.
 
 ## Development

@@ -627,11 +627,37 @@
   "optionsLogLevel": {
     "message": "Úroveň logování"
   },
-  "optionsSave": {
-    "message": "Uložit"
-  },
   "optionsSaved": {
     "message": "Uloženo."
+  },
+  "optionsTabsLabel": {
+    "message": "Sekce nastavení"
+  },
+  "tabBot": {
+    "message": "Bot"
+  },
+  "tabAi": {
+    "message": "AI"
+  },
+  "tabAuto": {
+    "message": "Auto"
+  },
+  "tabGames": {
+    "message": "Hry"
+  },
+  "tabProfit": {
+    "message": "Zisk"
+  },
+  "tabData": {
+    "message": "Data"
+  },
+  "optionsSaveFailed": {
+    "message": "Neuloženo: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
   },
   "optionsBankHeading": {
     "message": "Banka odpovědí"
