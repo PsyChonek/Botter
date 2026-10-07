@@ -32,6 +32,7 @@
     crashEnabled: true,
     crashBet: 100,
     crashMinEv: 1.05,
+    crashKelly: 0.5,
     xpBudget: 0,
     grindGame: 'auto',
     grindBet: 20,
@@ -550,7 +551,12 @@
       log.info('crash_skip', { entry, rate: crash.rate, history: crash.history?.length ?? 0, ev: plan?.ev ?? null });
       return true;
     }
-    const stake = G.betFor(settings.crashBet, player.maxBet);
+    // Size by fractional Kelly on the plan's edge, capped by the user's max
+    // crash bet, the table max, and the reserve. A fatter edge bets more.
+    const bankroll = Math.max(0, player.credits - settings.reserve);
+    const wanted = A.crashStake(plan, bankroll, settings.crashKelly);
+    const cap = Math.min(settings.crashBet, player.maxBet);
+    const stake = G.betFor(wanted, cap);
     if (player.credits - stake < settings.reserve) return true;
     setStatus('statusCrashBet', [
       credits(stake),
@@ -559,7 +565,7 @@
     ]);
     const bet = await api('/api/crash/bet', { stake, auto: plan.target });
     if (!bet.ok) log.warn('crash_bet_failed', { status: bet.status, error: bet.data?.error });
-    else log.info('crash_bet', { stake, entry, target: plan.target, ev: plan.ev });
+    else log.info('crash_bet', { stake, entry, target: plan.target, ev: plan.ev, kelly: settings.crashKelly });
     return true;
   }
 

@@ -363,10 +363,13 @@
     "message": "Sázet na crash, když se to podle historie vyplatí"
   },
   "optionsCrashBet": {
-    "message": "Sázka na crash"
+    "message": "Maximální sázka na crash"
   },
   "optionsCrashMinEv": {
     "message": "Minimální očekávaný výnos crashe (1,05 = +5 %)"
+  },
+  "optionsCrashKelly": {
+    "message": "Velikost sázky na crash (0,5 = půl Kelly, 0 = vždy maximum)"
   },
   "optionsXpBudget": {
     "message": "Denní rozpočet ztráty na farmění XP (0 = vypnuto)"

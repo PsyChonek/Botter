@@ -26,8 +26,12 @@
     const survives = (production) => outcomes.filter((mult) => mult >= production).length / n;
     const plannedPayout = (rate * CRASH_PLANNED_MULT) / entry;
 
+    // Each option is a two-outcome bet: win prob p paying `payout` per credit
+    // staked, else the stake is lost. ev = p * payout; p and payout are kept so
+    // the caller can size the stake by Kelly.
     // Holding with no target only pays on a planned outage.
-    let best = { target: null, ev: plannedPayout * survives(Infinity) };
+    const holdP = survives(Infinity);
+    let best = { target: null, p: holdP, payout: plannedPayout, ev: plannedPayout * holdP };
     const candidates = new Set([1.5, 2, 3, 5, 10]);
     for (const mult of outcomes) {
       // Cash out just below each observed crash point.
@@ -37,13 +41,24 @@
       const target = Math.min(CRASH_TARGET_MAX, Math.max(CRASH_TARGET_MIN, raw));
       const production = (target * entry) / rate;
       // A target above the planned-outage level is paid at that level instead.
-      const ev =
-        production > CRASH_PLANNED_MULT
-          ? plannedPayout * survives(Infinity)
-          : target * survives(production);
-      if (ev > best.ev) best = { target, ev };
+      const [p, payout] =
+        production > CRASH_PLANNED_MULT ? [holdP, plannedPayout] : [survives(production), target];
+      const ev = p * payout;
+      if (ev > best.ev) best = { target, p, payout, ev };
     }
     return best;
+  }
+
+  // Fractional-Kelly stake in credits for a crash plan. A plan is an EV-positive
+  // two-outcome bet (win prob p, payout multiple), so the growth-optimal fraction
+  // of the bankroll is f = (ev - 1) / (payout - 1); fraction scales it down
+  // (0.5 = half Kelly) to trade growth for a smoother bankroll. Returns 0 when
+  // the edge is not positive, so a thin plan stakes nothing.
+  function crashStake(plan, bankroll, fraction = 0.5) {
+    if (!plan || !(bankroll > 0) || !(plan.payout > 1) || !(plan.ev > 1)) return 0;
+    const kelly = (plan.ev - 1) / (plan.payout - 1);
+    const clamped = Math.max(0, Math.min(1, kelly * fraction));
+    return Math.floor(clamped * bankroll);
   }
 
   // Credits to repay right now, keeping the reserve. Debt grows 8 %/h until it
@@ -76,7 +91,7 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
-  const api = { CRASH_PLANNED_MULT, crashMult, bestCrashTarget, repayAmount, grindGame, dayKey };
+  const api = { CRASH_PLANNED_MULT, crashMult, bestCrashTarget, crashStake, repayAmount, grindGame, dayKey };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BotterAuto = api;
 })(globalThis);

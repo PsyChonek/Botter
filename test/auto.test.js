@@ -32,6 +32,29 @@ test('bestCrashTarget values planned outages and conditions on the entry point',
   assert.ok(late.ev > 0);
 });
 
+test('bestCrashTarget exposes the win probability and payout of its choice', () => {
+  const history = [2, 2, 2, 8, 8].map((mult) => ({ mult }));
+  const best = A.bestCrashTarget(history, 1, 1);
+  // Chosen target ~8 wins on 2 of 5 rounds, paying the target multiple.
+  assert.ok(Math.abs(best.p - 0.4) < 1e-9, `p ${best.p}`);
+  assert.ok(Math.abs(best.payout - best.target) < 1e-9, `payout ${best.payout}`);
+  assert.ok(Math.abs(best.ev - best.p * best.payout) < 1e-9);
+});
+
+test('crashStake sizes by fractional Kelly and refuses a non-positive edge', () => {
+  // ev 1.6, payout 8 -> full Kelly (ev-1)/(payout-1) = 0.6/7; half of that * 7000.
+  const plan = { p: 0.2, payout: 8, ev: 1.6 };
+  const full = A.crashStake(plan, 7000, 1);
+  assert.equal(full, Math.floor((0.6 / 7) * 7000));
+  assert.equal(A.crashStake(plan, 7000, 0.5), Math.floor((0.6 / 7) * 0.5 * 7000));
+  // No edge, no money.
+  assert.equal(A.crashStake({ p: 0.1, payout: 8, ev: 0.8 }, 7000, 0.5), 0);
+  assert.equal(A.crashStake(plan, 0, 0.5), 0);
+  assert.equal(A.crashStake(null, 7000, 0.5), 0);
+  // Kelly is capped at the whole bankroll even if the formula exceeds it.
+  assert.equal(A.crashStake({ p: 0.95, payout: 1.5, ev: 1.425 }, 1000, 1), 850);
+});
+
 test('repayAmount keeps the reserve and never exceeds the debt', () => {
   assert.equal(A.repayAmount({ credits: 1000, loan: { debt: 300 } }, 100), 300);
   assert.equal(A.repayAmount({ credits: 1000, loan: { debt: 3000 } }, 100), 900);

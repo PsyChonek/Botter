@@ -23,6 +23,7 @@ const NUMBERS = [
   'reserve',
   'gameDelayMs',
   'crashMinEv',
+  'crashKelly',
   'xpBudget',
   'grindExploreRounds',
 ];
@@ -36,6 +37,7 @@ const DEFAULTS = {
   crashEnabled: true,
   crashBet: 100,
   crashMinEv: 1.05,
+  crashKelly: 0.5,
   xpBudget: 0,
   grindGame: 'auto',
   grindBet: 20,
@@ -273,6 +275,7 @@ $('save').addEventListener('click', async () => {
   for (const name of TEXTS) next[name] = field(name).value.trim();
   for (const name of NUMBERS) next[name] = Math.max(0, Number(field(name).value) || 0);
   next.crashMinEv = Math.max(1, next.crashMinEv);
+  next.crashKelly = Math.max(0, Math.min(1, next.crashKelly));
   if (next.maxDelayMs < next.minDelayMs) next.maxDelayMs = next.minDelayMs;
   await chrome.storage.local.set({
     settings: next,

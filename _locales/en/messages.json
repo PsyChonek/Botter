@@ -363,10 +363,13 @@
     "message": "Bet on crash when the history says it pays"
   },
   "optionsCrashBet": {
-    "message": "Crash stake"
+    "message": "Max crash stake"
   },
   "optionsCrashMinEv": {
     "message": "Minimum crash expected return (1.05 = +5 %)"
+  },
+  "optionsCrashKelly": {
+    "message": "Crash bet sizing (0.5 = half Kelly, 0 = always max)"
   },
   "optionsXpBudget": {
     "message": "Daily loss budget for XP grinding (0 = off)"
