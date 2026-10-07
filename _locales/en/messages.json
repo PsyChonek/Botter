@@ -356,6 +356,139 @@
   "optionsXpBudget": {
     "message": "Daily loss budget for XP grinding (0 = off)"
   },
+  "grind_auto": {
+    "message": "Cheapest per XP (auto)"
+  },
+  "scatter_symbols": {
+    "message": "stars counted per symbol"
+  },
+  "scatter_reels": {
+    "message": "stars counted per reel"
+  },
+  "statusBuying": {
+    "message": "Buying $P1$ level $P2$ for $P3$...",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "optionsGrindGame": {
+    "message": "XP grinding game"
+  },
+  "optionsGrindBet": {
+    "message": "XP grinding bet"
+  },
+  "optionsGrindExplore": {
+    "message": "Rounds to measure each game first"
+  },
+  "optionsGrindHint": {
+    "message": "Auto picks the unlocked game that has cost the fewest credits per XP, after measuring each one for the given number of rounds. A bigger bet loses more per round; it only pays off if the server gives XP per credit wagered rather than per round."
+  },
+  "optionsShopHeading": {
+    "message": "Shop upgrades"
+  },
+  "optionsBuyUpgrades": {
+    "message": "Buy upgrades automatically, in the order below"
+  },
+  "optionsUpgradePlan": {
+    "message": "Upgrade plan (game:key, in priority order)"
+  },
+  "optionsUpgradeHint": {
+    "message": "Auto buys the next level of the first entry that is not maxed and allowed at your level, as soon as it fits above the reserve; later entries wait. Keys: crash:sla, blaze:lucky/wild/star, skeleton:team/wild/deploy, slotingi:crown/gulas/mint, blackjack:ties/bjpay/soft17/double/hint, roulette:zeros, global:bets. Only crash:sla raises the expected return of a game the bot actually plays; Blaze pays off only if the model check below says so. Maxing any game also pays a one-time 5000 achievement; crash is the cheapest to max (about 32,000)."
+  },
+  "optionsModelHeading": {
+    "message": "Blaze model check"
+  },
+  "optionsModelHint": {
+    "message": "Every Blaze spin is recorded with its board and the server win. The check replays them through the slot model built from the client tables, shows which scatter rule reproduces the server, then simulates the payout rate for your current upgrades and for everything maxed. A few hundred spins are enough."
+  },
+  "optionsRecordSpins": {
+    "message": "Record Blaze spins"
+  },
+  "optionsSpinCount": {
+    "message": "Recorded spins: $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsCheckModel": {
+    "message": "Check the model"
+  },
+  "optionsExportSpins": {
+    "message": "Export spins"
+  },
+  "optionsClearSpins": {
+    "message": "Clear spins"
+  },
+  "optionsClearSpinsConfirm": {
+    "message": "Delete every recorded spin?"
+  },
+  "optionsModelEmpty": {
+    "message": "No spins recorded yet. Play some Blaze rounds first."
+  },
+  "optionsModelRunning": {
+    "message": "Checking..."
+  },
+  "optionsModelMatch": {
+    "message": "$P1$: matches $P2$ of $P3$ spins",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "optionsModelRtp": {
+    "message": "Payout rate ($P1$) with your upgrades: $P2$ (upgrades $P3$)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "optionsModelRtpMax": {
+    "message": "Payout rate with lucky, wild and star all at 5: $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsModelMismatch": {
+    "message": "Neither rule reproduces every spin, so the model is missing a rule. Export the spins and send them over before trusting these numbers."
+  },
+  "optionsDebugHeading": {
+    "message": "Debug"
+  },
+  "optionsCaptureDebug": {
+    "message": "Capture raw loan, crash, shop, leaderboard and bonus responses"
+  },
+  "optionsCaptureHint": {
+    "message": "Keeps the last 40 responses so field names the bot guessed can be checked. They contain your game data and the logins of other players on the crash board, so share the export only where that is fine."
+  },
+  "optionsExportCapture": {
+    "message": "Export captured responses"
+  },
   "optionsTitle": {
     "message": "Botter settings"
   },

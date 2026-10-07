@@ -1,10 +1,30 @@
 const msg = (key, subs) => chrome.i18n.getMessage(key, subs) || key;
 
-const CHECKBOXES = ['guessUnknown', 'stopAtNorm', 'autoClaim', 'repayDebt', 'loanTrick', 'crashEnabled'];
-const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet'];
-const INT_SELECTS = ['gameBet', 'crashBet'];
-const TEXTS = ['openrouterModel'];
-const NUMBERS = ['minDelayMs', 'maxDelayMs', 'stopLoss', 'takeProfit', 'reserve', 'gameDelayMs', 'crashMinEv', 'xpBudget'];
+const CHECKBOXES = [
+  'guessUnknown',
+  'stopAtNorm',
+  'autoClaim',
+  'repayDebt',
+  'loanTrick',
+  'crashEnabled',
+  'buyUpgrades',
+  'recordSpins',
+  'captureDebug',
+];
+const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet', 'grindGame'];
+const INT_SELECTS = ['gameBet', 'crashBet', 'grindBet'];
+const TEXTS = ['openrouterModel', 'upgradePlan'];
+const NUMBERS = [
+  'minDelayMs',
+  'maxDelayMs',
+  'stopLoss',
+  'takeProfit',
+  'reserve',
+  'gameDelayMs',
+  'crashMinEv',
+  'xpBudget',
+  'grindExploreRounds',
+];
 const DEFAULTS = {
   aiSolver: 'local',
   guessUnknown: true,
@@ -16,6 +36,13 @@ const DEFAULTS = {
   crashBet: 100,
   crashMinEv: 1.05,
   xpBudget: 0,
+  grindGame: 'auto',
+  grindBet: 20,
+  grindExploreRounds: 30,
+  buyUpgrades: false,
+  upgradePlan: 'crash:sla, blaze:star, blaze:lucky, blaze:wild',
+  recordSpins: true,
+  captureDebug: false,
   model: 'claude-opus-5-5',
   openrouterModel: 'google/gemini-2.5-flash',
   effort: 'medium',
@@ -46,6 +73,8 @@ for (const name of INT_SELECTS) {
   for (const bet of G.BET_LEVELS) field(name).add(new Option(num.format(bet), String(bet)));
 }
 for (const key of G.ROULETTE_BETS) field('rouletteBet').add(new Option(msg(`roulette_${key}`), key));
+field('grindGame').add(new Option(msg('grind_auto'), 'auto'));
+for (const game of G.GAME_KEYS) field('grindGame').add(new Option(msg(`game_${game}`), game));
 
 async function load() {
   const { settings = {}, apiKey = '', openrouterKey = '', bank = {}, stats } = await chrome.storage.local.get([
@@ -63,7 +92,65 @@ async function load() {
   showBankSize(bank);
   showLocalStatus();
   showProfit(stats);
+  showSpinCount();
 }
+
+const Z = globalThis.BotterBlaze;
+const pct2 = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 });
+
+async function showSpinCount() {
+  const { spins = [] } = await chrome.storage.local.get('spins');
+  $('spinCount').textContent = msg('optionsSpinCount', [num.format(spins.length)]);
+  return spins;
+}
+
+function download(name, value) {
+  const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// Which scatter rule reproduces the server, then the RTP that rule implies for
+// the current upgrades and for every upgrade maxed.
+$('checkModel').addEventListener('click', async () => {
+  const spins = await showSpinCount();
+  if (!spins.length) {
+    $('modelResult').textContent = msg('optionsModelEmpty');
+    return;
+  }
+  $('modelResult').textContent = msg('optionsModelRunning');
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const check = Z.checkSpins(spins);
+  const rate = (mode) => (check[mode].total ? check[mode].match / check[mode].total : 0);
+  const best = Z.SCATTER_MODES.reduce((a, b) => (rate(b) > rate(a) ? b : a));
+  const current = spins[spins.length - 1].upgrades ?? {};
+  const lines = Z.SCATTER_MODES.map((mode) =>
+    msg('optionsModelMatch', [msg(`scatter_${mode}`), pct2.format(rate(mode)), num.format(check[mode].total)]),
+  );
+  lines.push(
+    msg('optionsModelRtp', [msg(`scatter_${best}`), pct2.format(Z.simulateRtp(Z.config(current), best)), JSON.stringify(current)]),
+    msg('optionsModelRtpMax', [pct2.format(Z.simulateRtp(Z.config({ lucky: 5, wild: 5, star: 5 }), best))]),
+  );
+  if (rate(best) < 0.99) lines.push(msg('optionsModelMismatch'));
+  $('modelResult').textContent = lines.join('\n');
+});
+
+$('exportSpins').addEventListener('click', async () => download('botter-blaze-spins.json', await showSpinCount()));
+
+$('clearSpins').addEventListener('click', async () => {
+  if (!confirm(msg('optionsClearSpinsConfirm'))) return;
+  await chrome.storage.local.set({ spins: [] });
+  showSpinCount();
+  $('modelResult').textContent = '';
+});
+
+$('exportCapture').addEventListener('click', async () => {
+  const { capture = [] } = await chrome.storage.local.get('capture');
+  download('botter-capture.json', capture);
+});
 
 function cell(text, tone) {
   const td = document.createElement('td');

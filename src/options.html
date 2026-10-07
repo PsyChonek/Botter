@@ -100,7 +100,26 @@
             <label for="xpBudget" data-i18n="optionsXpBudget"></label>
             <input id="xpBudget" name="xpBudget" type="number" min="0" step="100" />
           </div>
+          <div>
+            <label for="grindGame" data-i18n="optionsGrindGame"></label>
+            <select id="grindGame" name="grindGame"></select>
+          </div>
+          <div>
+            <label for="grindBet" data-i18n="optionsGrindBet"></label>
+            <select id="grindBet" name="grindBet"></select>
+          </div>
+          <div>
+            <label for="grindExploreRounds" data-i18n="optionsGrindExplore"></label>
+            <input id="grindExploreRounds" name="grindExploreRounds" type="number" min="0" step="10" />
+          </div>
         </div>
+        <p class="hint" data-i18n="optionsGrindHint"></p>
+
+        <h3 data-i18n="optionsShopHeading"></h3>
+        <label class="check"><input type="checkbox" name="buyUpgrades" /> <span data-i18n="optionsBuyUpgrades"></span></label>
+        <label for="upgradePlan" data-i18n="optionsUpgradePlan"></label>
+        <textarea id="upgradePlan" name="upgradePlan" rows="3" spellcheck="false"></textarea>
+        <p class="hint" data-i18n="optionsUpgradeHint"></p>
       </section>
 
       <section aria-labelledby="games-heading">
@@ -150,6 +169,28 @@
         </div>
       </section>
 
+      <section aria-labelledby="model-heading">
+        <h2 id="model-heading" data-i18n="optionsModelHeading"></h2>
+        <p class="hint" data-i18n="optionsModelHint"></p>
+        <label class="check"><input type="checkbox" name="recordSpins" /> <span data-i18n="optionsRecordSpins"></span></label>
+        <p id="spinCount"></p>
+        <div class="actions">
+          <button id="checkModel" type="button" data-i18n="optionsCheckModel"></button>
+          <button id="exportSpins" type="button" data-i18n="optionsExportSpins"></button>
+          <button id="clearSpins" type="button" data-i18n="optionsClearSpins"></button>
+        </div>
+        <pre id="modelResult" role="status" aria-live="polite"></pre>
+      </section>
+
+      <section aria-labelledby="debug-heading">
+        <h2 id="debug-heading" data-i18n="optionsDebugHeading"></h2>
+        <label class="check"><input type="checkbox" name="captureDebug" /> <span data-i18n="optionsCaptureDebug"></span></label>
+        <p class="hint" data-i18n="optionsCaptureHint"></p>
+        <div class="actions">
+          <button id="exportCapture" type="button" data-i18n="optionsExportCapture"></button>
+        </div>
+      </section>
+
       <section aria-labelledby="profit-heading">
         <h2 id="profit-heading" data-i18n="optionsProfitHeading"></h2>
         <p class="hint" data-i18n="optionsProfitHint"></p>
@@ -176,6 +217,7 @@
     </main>
     <script src="core.js"></script>
     <script src="games.js"></script>
+    <script src="blaze.js"></script>
     <script src="local-model.js"></script>
     <script src="options.js"></script>
   </body>

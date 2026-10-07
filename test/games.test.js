@@ -50,3 +50,24 @@ test('profitRows computes return rate and net per round', () => {
   assert.equal(row.perRound, -4);
   assert.equal(G.totalNet({ a: { net: 5 }, b: { net: -8 } }), -3);
 });
+
+test('upgradeOffer prices the next level like the shop does', () => {
+  assert.deepEqual(G.upgradeOffer({}, 'crash', 'sla'), { game: 'crash', key: 'sla', next: 1, price: 4000, minLevel: 3 });
+  assert.equal(G.upgradeOffer({ crash: { sla: 1 } }, 'crash', 'sla').price, 8800);
+  assert.equal(G.upgradeOffer({ crash: { sla: 2 } }, 'crash', 'sla').minLevel, 9);
+  assert.equal(G.upgradeOffer({ crash: { sla: 3 } }, 'crash', 'sla'), null);
+  assert.equal(G.upgradeOffer({}, 'crash', 'nope'), null);
+});
+
+test('parsePlan and nextPurchase follow the plan order and level gates', () => {
+  const plan = G.parsePlan('crash:sla, blaze:star\nbogus:x blaze:lucky');
+  assert.deepEqual(plan, [
+    { game: 'crash', key: 'sla' },
+    { game: 'blaze', key: 'star' },
+    { game: 'blaze', key: 'lucky' },
+  ]);
+  assert.equal(G.nextPurchase(plan, { level: 1, upgrades: {} }).key, 'star');
+  assert.equal(G.nextPurchase(plan, { level: 3, upgrades: {} }).key, 'sla');
+  assert.equal(G.nextPurchase(plan, { level: 3, upgrades: { crash: { sla: 1 } } }).key, 'star');
+  assert.equal(G.nextPurchase([], { level: 50, upgrades: {} }), null);
+});

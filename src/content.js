@@ -33,6 +33,13 @@
     crashBet: 100,
     crashMinEv: 1.05,
     xpBudget: 0,
+    grindGame: 'auto',
+    grindBet: 20,
+    grindExploreRounds: 30,
+    buyUpgrades: false,
+    upgradePlan: 'crash:sla, blaze:star, blaze:lucky, blaze:wild',
+    recordSpins: true,
+    captureDebug: false,
     logLevel: 'info',
   };
   const EMPTY_STATS = {
@@ -54,6 +61,10 @@
   const CRASH_POLL_MS = 60_000;
   const LEADERBOARDS = ['level', 'credits', 'biggest', 'losers', 'debtors'];
   const CLEAN_LOAN = 500;
+  const MAX_SPINS = 2000;
+  const MAX_CAPTURE = 40;
+  const SPIN_FLUSH_EVERY = 10;
+  const CAPTURE_PATHS = /^\/api\/(loan|crash|shop|leaderboard|bonus)/;
   const FREE_PATHS = { '/api/bonus/daily': 'daily', '/api/bonus/bailout': 'bailout' };
   const CLAIM_RETRY_MS = 10 * 60_000;
   const TICK_MS = 700;
@@ -73,6 +84,9 @@
   let sessionBase = 0; // total game net when the game bot was started
   const claimTried = {}; // kind -> last attempt, so a refused claim is not spammed
   let crashPolledAt = 0;
+  let spins = []; // recorded Blaze spins for the model check
+  let capture = []; // raw responses of rarely seen endpoints, for debugging
+  let unsavedSpins = 0;
   let grindPausedUntil = 0;
   let busy = false;
   let status = { key: 'statusIdle' };
@@ -101,7 +115,9 @@
   const mergeStats = (stored) => ({ ...structuredClone(EMPTY_STATS), ...stored });
 
   async function load() {
-    const stored = await chrome.storage.local.get(['settings', 'bank', 'stats']);
+    const stored = await chrome.storage.local.get(['settings', 'bank', 'stats', 'spins', 'capture']);
+    spins = stored.spins ?? [];
+    capture = stored.capture ?? [];
     settings = { ...DEFAULT_SETTINGS, ...stored.settings };
     bank = stored.bank ?? {};
     stats = mergeStats(stored.stats);
@@ -117,6 +133,8 @@
     }
     if (changes.bank) bank = changes.bank.newValue ?? {};
     if (changes.stats) stats = mergeStats(changes.stats.newValue);
+    if (changes.spins) spins = changes.spins.newValue ?? [];
+    if (changes.capture) capture = changes.capture.newValue ?? [];
     render();
   });
 
@@ -155,8 +173,13 @@
   function onResponse({ path, ok, request, data }) {
     const before = player?.credits;
     if (data?.player) player = data.player;
+    if (settings.captureDebug && CAPTURE_PATHS.test(path)) {
+      capture = [...capture, { at: Date.now(), path, ok, request, data }].slice(-MAX_CAPTURE);
+      chrome.storage.local.set({ capture });
+    }
     if (!ok) return;
     if (data?.crash) bookCrash(data.crash);
+    if (path === '/api/slot/spin' && data.result) recordSpin(request, data);
 
     if (path === '/api/work/start' && data.task) {
       task = data.task;
@@ -177,6 +200,24 @@
       }
     }
     render();
+  }
+
+  // Keeps the Blaze board and the server's win so the slot model can be checked.
+  function recordSpin(request, data) {
+    if (!settings.recordSpins) return;
+    const { result } = data;
+    spins.push({
+      grid: result.grid,
+      finalGrid: result.finalGrid,
+      bet: result.bet ?? request?.bet,
+      win: result.totalWin,
+      upgrades: data.player?.upgrades?.blaze ?? {},
+    });
+    if (spins.length > MAX_SPINS) spins = spins.slice(-MAX_SPINS);
+    if (++unsavedSpins >= SPIN_FLUSH_EVERY) {
+      unsavedSpins = 0;
+      chrome.storage.local.set({ spins });
+    }
   }
 
   // Crash pays auto cash-outs without a response, so settled bets are booked
@@ -441,6 +482,19 @@
     return true;
   }
 
+  // Buys the next upgrade in the plan as soon as it is affordable above the reserve.
+  async function buyStep() {
+    if (!settings.buyUpgrades || Date.now() - (claimTried.buy ?? 0) < CRASH_POLL_MS) return false;
+    const offer = G.nextPurchase(G.parsePlan(settings.upgradePlan), player);
+    if (!offer || player.credits - offer.price < settings.reserve) return false;
+    claimTried.buy = Date.now();
+    setStatus('statusBuying', [`${offer.game}:${offer.key}`, String(offer.next), credits(offer.price)]);
+    const res = await api('/api/shop/buy', { game: offer.game, key: offer.key });
+    if (!res.ok) log.warn('buy_failed', { ...offer, status: res.status, error: res.data?.error });
+    else log.info('upgrade_bought', offer);
+    return true;
+  }
+
   // Opening the boards is what checks the podium achievement (top 3 on any board).
   async function leaderboardStep() {
     const today = A.dayKey();
@@ -487,8 +541,9 @@
     if (stats.grind.day !== today) stats.grind = { day: today, net: 0 };
     if (-stats.grind.net >= settings.xpBudget) return false;
     const unlocks = Object.fromEntries(G.GAME_KEYS.map((game) => [game, G.GAMES[game].unlock]));
-    const game = A.grindGame(G.GAME_KEYS, player.level, stats.games, unlocks);
-    const bet = G.BET_LEVELS[0];
+    const candidates = settings.grindGame === 'auto' ? G.GAME_KEYS : [settings.grindGame];
+    const game = A.grindGame(candidates, player.level, stats.games, unlocks, settings.grindExploreRounds);
+    const bet = G.betFor(settings.grindBet, player.maxBet);
     if (!game || player.credits - bet < settings.reserve) return false;
     setStatus('statusGrinding', [msg(`game_${game}`), credits(Math.max(0, -stats.grind.net)), credits(settings.xpBudget)]);
     const res = await playRound(game, bet);
@@ -509,6 +564,7 @@
     if (await claimFreebies()) return;
     if (await repayStep()) return;
     if (await loanTrickStep()) return;
+    if (await buyStep()) return;
     if (await leaderboardStep()) return;
     if (await crashStep()) return;
     if (workAvailable()) return workStep();

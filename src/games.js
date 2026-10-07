@@ -16,8 +16,8 @@
   const GAME_KEYS = Object.keys(GAMES);
   const ROULETTE_BETS = ['red', 'black', 'even', 'odd', 'low', 'high'];
 
-  // Crash is left out on purpose: its auto cash-out is paid by the server
-  // later without a response, so a bet would look like a pure loss.
+  // Crash is not here: its auto cash-out is paid without a response, so its
+  // bets are booked from the round's bet list instead (see the content script).
   const PATH_GAME = {
     '/api/slot/spin': 'blaze',
     '/api/skeleton/spin': 'skeleton',
@@ -26,6 +26,54 @@
     '/api/blackjack/deal': 'blackjack',
     '/api/blackjack/action': 'blackjack',
   };
+
+  // Shop catalog copied from the client: [max level, base price, price growth].
+  const SHOP = {
+    global: { bets: [3, 5000, 2.5] },
+    blaze: { lucky: [5, 3000, 1.8], wild: [5, 4000, 1.8], star: [5, 2000, 1.8] },
+    crash: { sla: [3, 4000, 2.2] },
+    skeleton: { team: [4, 4000, 1.8], wild: [4, 5000, 1.8], deploy: [3, 6000, 2] },
+    slotingi: { crown: [3, 6000, 2], gulas: [4, 5000, 1.8], mint: [3, 8000, 2.2] },
+    blackjack: { ties: [4, 8000, 1.8], bjpay: [2, 10000, 2], soft17: [1, 6000, 1], double: [1, 4000, 1], hint: [1, 3000, 1] },
+    roulette: { zeros: [2, 15000, 2.5] },
+  };
+  const SHOP_UNLOCK = { global: 1, blaze: 1, crash: 3, skeleton: 5, slotingi: 7, blackjack: 10, roulette: 15 };
+
+  // Next level of an upgrade: its price and the player level it needs.
+  function upgradeOffer(upgrades, game, key) {
+    const item = SHOP[game]?.[key];
+    if (!item) return null;
+    const [max, base, growth] = item;
+    const have = upgrades?.[game]?.[key] ?? 0;
+    if (have >= max) return null;
+    const next = have + 1;
+    return {
+      game,
+      key,
+      next,
+      price: Math.round((base * growth ** (next - 1)) / 100) * 100,
+      minLevel: SHOP_UNLOCK[game] + (next - 1) * 3,
+    };
+  }
+
+  // "crash:sla, blaze:star" -> [{ game, key }], unknown entries dropped.
+  function parsePlan(text) {
+    return String(text ?? '')
+      .split(/[\s,;]+/)
+      .map((entry) => entry.split(':'))
+      .filter(([game, key]) => SHOP[game]?.[key])
+      .map(([game, key]) => ({ game, key }));
+  }
+
+  // First upgrade in plan order that is not maxed and is allowed at this level.
+  // Later entries wait until it is bought, so the order is the priority.
+  function nextPurchase(plan, player) {
+    for (const { game, key } of plan) {
+      const offer = upgradeOffer(player?.upgrades, game, key);
+      if (offer && player.level >= offer.minLevel) return offer;
+    }
+    return null;
+  }
 
   // Highest allowed bet level that does not exceed what the user asked for.
   function betFor(wanted, maxBet) {
@@ -105,6 +153,10 @@
     GAME_KEYS,
     ROULETTE_BETS,
     PATH_GAME,
+    SHOP,
+    upgradeOffer,
+    parsePlan,
+    nextPurchase,
     betFor,
     energyNow,
     gameDelta,

@@ -59,6 +59,13 @@ progress shows at `chrome://on-device-internals`.
   base to -2.9 % fully upgraded (exact solver in `src/blackjack.js`), roulette -7.7 %
   to -2.7 %, Blaze about 66 % RTP by simulation. Grinding explores each unlocked game
   for 30 rounds, then sticks to the lowest measured loss per XP.
+- **Settings for the rest** (settings page, Auto section): XP grinding game (cheapest
+  per XP or a fixed game), bet and exploration rounds; automatic shop purchases from
+  a priority plan (`game:key` list, off by default) using the client's price and
+  level formulas; a Blaze model check (`src/blaze.js`) that records every Blaze spin
+  with its board and the server win, reports which scatter rule reproduces the
+  server and simulates the payout rate for current and maxed upgrades; and a debug
+  capture of raw loan, crash, shop, leaderboard and bonus responses for export.
 - **Profit tracking**: every game response (bot or manual play) is booked per game
   from the credit balance before and after, plus anything the debt collector took
   from the win. The panel shows rounds, net and return rate per game; the settings

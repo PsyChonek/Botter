@@ -41,7 +41,9 @@ input, select, button, label.button {
   border-radius: 6px;
   padding: 6px 10px;
 }
-input[type='password'], input[type='text'], select { width: 100%; box-sizing: border-box; }
+input[type='password'], input[type='text'], select, textarea { width: 100%; box-sizing: border-box; }
+textarea { font: 0.9rem/1.4 ui-monospace, monospace; color: inherit; background: transparent; border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; }
+pre { white-space: pre-wrap; font: 0.9rem/1.5 ui-monospace, monospace; }
 /* Native dropdown lists ignore a transparent background and render white. */
 select, option { background-color: var(--bg); color: var(--fg); }
 input[type='number'] { width: 100%; box-sizing: border-box; }

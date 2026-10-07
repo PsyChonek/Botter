@@ -356,6 +356,139 @@
   "optionsXpBudget": {
     "message": "Denní rozpočet ztráty na farmění XP (0 = vypnuto)"
   },
+  "grind_auto": {
+    "message": "Nejlevnější za XP (auto)"
+  },
+  "scatter_symbols": {
+    "message": "hvězdy počítané po symbolech"
+  },
+  "scatter_reels": {
+    "message": "hvězdy počítané po válcích"
+  },
+  "statusBuying": {
+    "message": "Kupuji $P1$ úroveň $P2$ za $P3$...",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "optionsGrindGame": {
+    "message": "Hra pro farmění XP"
+  },
+  "optionsGrindBet": {
+    "message": "Sázka při farmění XP"
+  },
+  "optionsGrindExplore": {
+    "message": "Kol na změření každé hry"
+  },
+  "optionsGrindHint": {
+    "message": "Auto vybere odemčenou hru, která stála nejméně kreditů za XP, poté co každou změří zadaným počtem kol. Vyšší sázka prodělává víc za kolo; vyplatí se jen tehdy, když server dává XP podle vsazených kreditů, a ne za kolo."
+  },
+  "optionsShopHeading": {
+    "message": "Vylepšení z obchodu"
+  },
+  "optionsBuyUpgrades": {
+    "message": "Kupovat vylepšení automaticky v pořadí níže"
+  },
+  "optionsUpgradePlan": {
+    "message": "Plán vylepšení (hra:klíč, podle priority)"
+  },
+  "optionsUpgradeHint": {
+    "message": "Auto koupí další úroveň první položky, která není na maximu a je povolená na tvém levelu, jakmile se vejde nad rezervu; další položky čekají. Klíče: crash:sla, blaze:lucky/wild/star, skeleton:team/wild/deploy, slotingi:crown/gulas/mint, blackjack:ties/bjpay/soft17/double/hint, roulette:zeros, global:bets. Očekávaný výnos hry, kterou bot opravdu hraje, zvedá jen crash:sla; Blaze se vyplatí jen pokud to potvrdí kontrola modelu níže. Vymaxování libovolné hry dává jednorázově achievement 5000; crash je nejlevnější (asi 32 000)."
+  },
+  "optionsModelHeading": {
+    "message": "Kontrola modelu Blaze"
+  },
+  "optionsModelHint": {
+    "message": "Každé točení Blaze se uloží i s rozložením válců a výhrou ze serveru. Kontrola je přehraje přes model automatu z tabulek klienta, ukáže, které pravidlo pro hvězdy odpovídá serveru, a nasimuluje návratnost pro tvá vylepšení i pro vše na maximu. Stačí pár set točení."
+  },
+  "optionsRecordSpins": {
+    "message": "Ukládat točení Blaze"
+  },
+  "optionsSpinCount": {
+    "message": "Uložená točení: $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsCheckModel": {
+    "message": "Zkontrolovat model"
+  },
+  "optionsExportSpins": {
+    "message": "Exportovat točení"
+  },
+  "optionsClearSpins": {
+    "message": "Smazat točení"
+  },
+  "optionsClearSpinsConfirm": {
+    "message": "Smazat všechna uložená točení?"
+  },
+  "optionsModelEmpty": {
+    "message": "Zatím žádná točení. Nejdřív odehraj pár kol Blaze."
+  },
+  "optionsModelRunning": {
+    "message": "Kontroluji..."
+  },
+  "optionsModelMatch": {
+    "message": "$P1$: sedí $P2$ z $P3$ točení",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "optionsModelRtp": {
+    "message": "Návratnost ($P1$) s tvými vylepšeními: $P2$ (vylepšení $P3$)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "optionsModelRtpMax": {
+    "message": "Návratnost se šťastnými válci, wildem a hvězdami na 5: $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsModelMismatch": {
+    "message": "Ani jedno pravidlo nesedí na všechna točení, modelu tedy chybí nějaké pravidlo. Než se na čísla spolehneš, exportuj točení a pošli je."
+  },
+  "optionsDebugHeading": {
+    "message": "Ladění"
+  },
+  "optionsCaptureDebug": {
+    "message": "Ukládat surové odpovědi půjček, crashe, obchodu, žebříčků a bonusů"
+  },
+  "optionsCaptureHint": {
+    "message": "Drží posledních 40 odpovědí, aby šlo ověřit názvy polí, které bot odhadl. Obsahují tvá herní data a loginy ostatních hráčů z crashe, takže export sdílej jen tam, kde to nevadí."
+  },
+  "optionsExportCapture": {
+    "message": "Exportovat zachycené odpovědi"
+  },
   "optionsTitle": {
     "message": "Nastavení Botteru"
   },
