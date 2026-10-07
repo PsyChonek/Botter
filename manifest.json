@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_extName__",
+  "description": "__MSG_extDescription__",
+  "version": "0.1.0",
+  "default_locale": "en",
+  "permissions": ["storage"],
+  "host_permissions": ["https://skeleton-casino.vercel.app/*", "https://api.anthropic.com/*"],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://skeleton-casino.vercel.app/*"],
+      "js": ["src/page-hook.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://skeleton-casino.vercel.app/*"],
+      "js": ["src/core.js", "src/content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "options_page": "src/options.html",
+  "action": {
+    "default_title": "__MSG_extName__"
+  }
+}

@@ -1,0 +1,171 @@
+{
+  "extName": {
+    "message": "Botter"
+  },
+  "extDescription": {
+    "message": "Solves Skeleton Casino work tickets automatically."
+  },
+  "panelStart": {
+    "message": "Start"
+  },
+  "panelStop": {
+    "message": "Stop"
+  },
+  "panelType": {
+    "message": "Tickets"
+  },
+  "type_alternate": {
+    "message": "Alternate"
+  },
+  "type_bughunt": {
+    "message": "Bug hunt"
+  },
+  "type_output": {
+    "message": "What does it print?"
+  },
+  "statusIdle": {
+    "message": "Stopped."
+  },
+  "statusOpening": {
+    "message": "Opening the work screen..."
+  },
+  "statusStarting": {
+    "message": "Picking a ticket..."
+  },
+  "statusNoEnergy": {
+    "message": "Out of energy, waiting for it to refill."
+  },
+  "statusNormDone": {
+    "message": "Daily quota done, stopped."
+  },
+  "statusNoSolver": {
+    "message": "Unknown ticket and no AI or guessing enabled, stopped."
+  },
+  "statusThinking": {
+    "message": "Asking Claude about $P1$...",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusAnswering": {
+    "message": "Answering $P1$ ($P2$)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "source_bank": {
+    "message": "known"
+  },
+  "source_ai": {
+    "message": "Claude"
+  },
+  "source_guess": {
+    "message": "guess"
+  },
+  "panelStats": {
+    "message": "Bank: $P1$ | known $P2$ | AI $P3$ | guess $P4$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      },
+      "p4": {
+        "content": "$4"
+      }
+    }
+  },
+  "optionsTitle": {
+    "message": "Botter settings"
+  },
+  "optionsAiHeading": {
+    "message": "Claude solver"
+  },
+  "optionsUseAi": {
+    "message": "Ask Claude when a ticket is not in the bank"
+  },
+  "optionsApiKey": {
+    "message": "Anthropic API key"
+  },
+  "optionsApiKeyHint": {
+    "message": "Stored only in this browser profile (chrome.storage.local). Each unknown ticket costs one API call."
+  },
+  "optionsModel": {
+    "message": "Model"
+  },
+  "optionsEffort": {
+    "message": "Effort"
+  },
+  "optionsBotHeading": {
+    "message": "Bot"
+  },
+  "optionsGuess": {
+    "message": "Guess when the answer is unknown (the bank learns the right answer either way)"
+  },
+  "optionsStopAtNorm": {
+    "message": "Stop once the daily paid quota is done"
+  },
+  "optionsMinDelay": {
+    "message": "Min answer delay (ms)"
+  },
+  "optionsMaxDelay": {
+    "message": "Max answer delay (ms)"
+  },
+  "optionsLogLevel": {
+    "message": "Console log level"
+  },
+  "optionsSave": {
+    "message": "Save"
+  },
+  "optionsSaved": {
+    "message": "Saved."
+  },
+  "optionsBankHeading": {
+    "message": "Answer bank"
+  },
+  "optionsBankSize": {
+    "message": "Known tickets: $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsExport": {
+    "message": "Export"
+  },
+  "optionsImport": {
+    "message": "Import"
+  },
+  "optionsClear": {
+    "message": "Clear bank and stats"
+  },
+  "optionsClearConfirm": {
+    "message": "Delete every learned answer and the stats?"
+  },
+  "optionsCleared": {
+    "message": "Bank cleared."
+  },
+  "optionsImported": {
+    "message": "Imported $P1$ answers.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsImportFailed": {
+    "message": "That file is not a valid bank export."
+  }
+}

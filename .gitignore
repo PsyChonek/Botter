@@ -1,0 +1,5 @@
+node_modules/
+*.zip
+*.crx
+*.pem
+botter-bank.json

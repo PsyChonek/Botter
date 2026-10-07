@@ -1,0 +1,9 @@
+{
+  "name": "botter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chrome extension that solves Skeleton Casino work tickets.",
+  "scripts": {
+    "check": "node scripts/check.mjs && node --test test/*.test.js"
+  }
+}

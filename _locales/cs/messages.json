@@ -1,0 +1,171 @@
+{
+  "extName": {
+    "message": "Botter"
+  },
+  "extDescription": {
+    "message": "Automaticky řeší pracovní tickety ve Skeleton Casinu."
+  },
+  "panelStart": {
+    "message": "Spustit"
+  },
+  "panelStop": {
+    "message": "Zastavit"
+  },
+  "panelType": {
+    "message": "Tickety"
+  },
+  "type_alternate": {
+    "message": "Střídat"
+  },
+  "type_bughunt": {
+    "message": "Bug hunt"
+  },
+  "type_output": {
+    "message": "Co to vypíše?"
+  },
+  "statusIdle": {
+    "message": "Zastaveno."
+  },
+  "statusOpening": {
+    "message": "Otevírám Práci..."
+  },
+  "statusStarting": {
+    "message": "Beru ticket..."
+  },
+  "statusNoEnergy": {
+    "message": "Došla energie, čekám na doplnění."
+  },
+  "statusNormDone": {
+    "message": "Denní norma splněná, zastaveno."
+  },
+  "statusNoSolver": {
+    "message": "Neznámý ticket a AI ani hádání nejsou zapnuté, zastaveno."
+  },
+  "statusThinking": {
+    "message": "Ptám se Clauda na $P1$...",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusAnswering": {
+    "message": "Odpovídám na $P1$ ($P2$)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "source_bank": {
+    "message": "známé"
+  },
+  "source_ai": {
+    "message": "Claude"
+  },
+  "source_guess": {
+    "message": "odhad"
+  },
+  "panelStats": {
+    "message": "Banka: $P1$ | známé $P2$ | AI $P3$ | odhad $P4$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      },
+      "p4": {
+        "content": "$4"
+      }
+    }
+  },
+  "optionsTitle": {
+    "message": "Nastavení Botteru"
+  },
+  "optionsAiHeading": {
+    "message": "Řešení přes Clauda"
+  },
+  "optionsUseAi": {
+    "message": "Ptát se Clauda, když ticket není v bance"
+  },
+  "optionsApiKey": {
+    "message": "Anthropic API klíč"
+  },
+  "optionsApiKeyHint": {
+    "message": "Uloží se jen v tomto profilu prohlížeče (chrome.storage.local). Každý neznámý ticket stojí jedno volání API."
+  },
+  "optionsModel": {
+    "message": "Model"
+  },
+  "optionsEffort": {
+    "message": "Úsilí (effort)"
+  },
+  "optionsBotHeading": {
+    "message": "Bot"
+  },
+  "optionsGuess": {
+    "message": "Hádat, když odpověď není známá (banka se správnou odpověď naučí tak jako tak)"
+  },
+  "optionsStopAtNorm": {
+    "message": "Zastavit po splnění denní normy"
+  },
+  "optionsMinDelay": {
+    "message": "Min. prodleva odpovědi (ms)"
+  },
+  "optionsMaxDelay": {
+    "message": "Max. prodleva odpovědi (ms)"
+  },
+  "optionsLogLevel": {
+    "message": "Úroveň logování"
+  },
+  "optionsSave": {
+    "message": "Uložit"
+  },
+  "optionsSaved": {
+    "message": "Uloženo."
+  },
+  "optionsBankHeading": {
+    "message": "Banka odpovědí"
+  },
+  "optionsBankSize": {
+    "message": "Známé tickety: $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsExport": {
+    "message": "Exportovat"
+  },
+  "optionsImport": {
+    "message": "Importovat"
+  },
+  "optionsClear": {
+    "message": "Smazat banku a statistiky"
+  },
+  "optionsClearConfirm": {
+    "message": "Smazat všechny naučené odpovědi a statistiky?"
+  },
+  "optionsCleared": {
+    "message": "Banka smazána."
+  },
+  "optionsImported": {
+    "message": "Importováno odpovědí: $P1$.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsImportFailed": {
+    "message": "Soubor není platný export banky."
+  }
+}

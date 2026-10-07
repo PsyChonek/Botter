@@ -1,0 +1,52 @@
+:root {
+  --bg: #f7f9f2;
+  --fg: #1b2410;
+  --muted: #4d5c3a;
+  --accent: #4f7a12;
+  --border: #b9c9a0;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1608;
+    --fg: #e8f5c8;
+    --muted: #b5c99a;
+    --accent: #a6d64a;
+    --border: #3d5420;
+  }
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.5 system-ui, sans-serif;
+}
+main {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+h1 { font-size: 1.5rem; }
+h2 { font-size: 1.1rem; margin-top: 28px; }
+label { display: block; margin: 12px 0 4px; }
+label.check { display: flex; gap: 8px; align-items: center; }
+input, select, button, label.button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+input[type='password'], select { width: 100%; box-sizing: border-box; }
+input[type='number'] { width: 100%; box-sizing: border-box; }
+input[type='checkbox'] { width: 18px; height: 18px; }
+button, label.button { cursor: pointer; display: inline-block; margin: 0; }
+button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 16px; }
+.hint, #saved { color: var(--muted); font-size: 0.9rem; }
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}

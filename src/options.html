@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n="optionsTitle"></title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <h1 data-i18n="optionsTitle"></h1>
+
+      <section aria-labelledby="ai-heading">
+        <h2 id="ai-heading" data-i18n="optionsAiHeading"></h2>
+        <label class="check"><input type="checkbox" name="useAi" /> <span data-i18n="optionsUseAi"></span></label>
+        <label for="apiKey" data-i18n="optionsApiKey"></label>
+        <input id="apiKey" type="password" autocomplete="off" spellcheck="false" />
+        <p class="hint" data-i18n="optionsApiKeyHint"></p>
+        <label for="model" data-i18n="optionsModel"></label>
+        <select id="model" name="model">
+          <option value="claude-opus-5-5">Claude Opus 5.5</option>
+          <option value="claude-sonnet-5-5">Claude Sonnet 5.5</option>
+          <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
+        </select>
+        <label for="effort" data-i18n="optionsEffort"></label>
+        <select id="effort" name="effort">
+          <option value="low">low</option>
+          <option value="medium">medium</option>
+          <option value="high">high</option>
+        </select>
+      </section>
+
+      <section aria-labelledby="bot-heading">
+        <h2 id="bot-heading" data-i18n="optionsBotHeading"></h2>
+        <label class="check"><input type="checkbox" name="guessUnknown" /> <span data-i18n="optionsGuess"></span></label>
+        <label class="check"><input type="checkbox" name="stopAtNorm" /> <span data-i18n="optionsStopAtNorm"></span></label>
+        <div class="pair">
+          <div>
+            <label for="minDelayMs" data-i18n="optionsMinDelay"></label>
+            <input id="minDelayMs" name="minDelayMs" type="number" min="0" step="100" />
+          </div>
+          <div>
+            <label for="maxDelayMs" data-i18n="optionsMaxDelay"></label>
+            <input id="maxDelayMs" name="maxDelayMs" type="number" min="0" step="100" />
+          </div>
+        </div>
+        <label for="logLevel" data-i18n="optionsLogLevel"></label>
+        <select id="logLevel" name="logLevel">
+          <option value="debug">debug</option>
+          <option value="info">info</option>
+          <option value="warn">warn</option>
+          <option value="error">error</option>
+        </select>
+      </section>
+
+      <div class="actions">
+        <button id="save" type="button" class="primary" data-i18n="optionsSave"></button>
+        <span id="saved" role="status" aria-live="polite"></span>
+      </div>
+
+      <section aria-labelledby="bank-heading">
+        <h2 id="bank-heading" data-i18n="optionsBankHeading"></h2>
+        <p id="bankSize"></p>
+        <div class="actions">
+          <button id="export" type="button" data-i18n="optionsExport"></button>
+          <label class="button" for="import" data-i18n="optionsImport"></label>
+          <input id="import" type="file" accept="application/json" hidden />
+          <button id="clear" type="button" data-i18n="optionsClear"></button>
+        </div>
+      </section>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>
