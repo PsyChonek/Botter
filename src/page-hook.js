@@ -29,6 +29,32 @@
     return lastAuth;
   }
 
+  const isPlayer = (value) =>
+    value !== null && typeof value === 'object' && typeof value.credits === 'number' && typeof value.level === 'number' && 'work' in value;
+
+  // The app loads the player once on mount and then only updates it from its
+  // own calls, so rounds the bot plays would leave the credits, XP bar and level
+  // on the page frozen. Find the app's player useState (the topmost state hook
+  // holding a player) and hand it the fresh snapshot.
+  function syncAppPlayer(player) {
+    const root = document.getElementById('root');
+    const key = root && Object.keys(root).find((k) => k.startsWith('__reactContainer$'));
+    if (!key) return;
+    const stack = [root[key]];
+    while (stack.length) {
+      const fiber = stack.pop();
+      if (!fiber) continue;
+      for (let hook = fiber.memoizedState; hook && typeof hook === 'object' && 'next' in hook; hook = hook.next) {
+        if (hook.queue?.dispatch && isPlayer(hook.memoizedState)) {
+          hook.queue.dispatch(player);
+          return;
+        }
+      }
+      // Sibling below child, so the walk is depth first, top down.
+      stack.push(fiber.sibling, fiber.child);
+    }
+  }
+
   window.fetch = async function (input, init) {
     const auth = readAuth(init?.headers);
     if (auth) lastAuth = auth;
@@ -66,6 +92,11 @@
         body: body === undefined ? undefined : JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
+      if (res.ok && isPlayer(data?.player)) {
+        try {
+          syncAppPlayer(data.player);
+        } catch {}
+      }
       post({ kind: 'api-result', id, ok: res.ok, status: res.status, data });
     } catch (err) {
       post({ kind: 'api-result', id, ok: false, status: 0, data: { error: String(err) } });
