@@ -172,3 +172,24 @@ test('grindAllowed keeps the reserve under either limit', () => {
   assert.equal(A.grindAllowed(daily, 310, 0, 20), false);
   assert.equal(A.grindAllowed({ ...daily, grindLimit: 'balance', grindMinBalance: 100 }, 310, 0, 20), false);
 });
+
+test('pickAccount visits an account not seen today first', () => {
+  const accounts = [
+    { id: 'a', seenAt: 300, seenDay: '2026-10-07', energy: 20, normDone: false },
+    { id: 'b', seenAt: 200, seenDay: '2026-10-06', energy: 0, normDone: false },
+    { id: 'c', seenAt: 100, seenDay: '2026-10-05', energy: 0, normDone: false },
+  ];
+  assert.equal(A.pickAccount(accounts, '2026-10-07', 5), 'c');
+});
+
+test('pickAccount takes the most energy, only above the minimum and before the norm', () => {
+  const today = '2026-10-07';
+  const accounts = [
+    { id: 'a', seenAt: 1, seenDay: today, energy: 8, normDone: false },
+    { id: 'b', seenAt: 2, seenDay: today, energy: 15, normDone: true },
+    { id: 'c', seenAt: 3, seenDay: today, energy: 4, normDone: false },
+  ];
+  assert.equal(A.pickAccount(accounts, today, 5), 'a');
+  assert.equal(A.pickAccount(accounts, today, 10), null);
+  assert.equal(A.pickAccount([], today, 5), null);
+});

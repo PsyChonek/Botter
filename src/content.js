@@ -45,6 +45,7 @@
     captureDebug: false,
     logLevel: 'info',
     panelHidden: false,
+    rotateAccounts: true,
   };
   const EMPTY_STATS = {
     bank: { correct: 0, wrong: 0 },
@@ -76,6 +77,13 @@
   const CLAIM_RETRY_MS = 10 * 60_000;
   const TICK_MS = 700;
   const API_TIMEOUT_MS = 30_000;
+  const STATS_PREFIX = 'stats:';
+  const ACCOUNT_PREFIX = 'account:';
+  const SWITCH_KEY = 'botter-switch'; // sessionStorage: { from, to } of a switch in progress
+  const ACCOUNT_SAVE_MS = 30_000;
+  const ROTATE_DWELL_MS = 60_000;
+  const ROTATE_MIN_ENERGY = 5;
+  const LOGGED_OUT_WAIT_MS = 10_000;
 
   let settings = { ...DEFAULT_SETTINGS };
   let bank = {};
@@ -83,6 +91,15 @@
   let log = C.createLogger(settings.logLevel);
 
   let player = null;
+  let accountId = null; // supabase user id of the logged-in player
+  let accountSince = 0; // when this page started working for that account
+  let accountSavedAt = 0;
+  let accounts = {}; // id -> saved login session and last player snapshot
+  let statsCache = {}; // id -> stored stats of every account
+  let legacyStats = null; // stats saved before accounts existed
+  let accountOptions = ''; // what the account dropdown currently lists
+  let switching = false;
+  let early = []; // page-hook responses received before load() finished
   let task = null; // current task as returned by /api/work/start
   let answeredTaskId = null; // task the bot already clicked an answer for
   let pending = null; // { taskId, source } of the bot's last answer
@@ -124,14 +141,24 @@
 
   const mergeStats = (stored) => ({ ...structuredClone(EMPTY_STATS), ...stored });
 
+  // Stats and saved logins live under one key per account, so two tabs on
+  // different accounts never overwrite each other.
+  const byPrefix = (items, prefix) =>
+    Object.fromEntries(
+      Object.entries(items)
+        .filter(([key]) => key.startsWith(prefix))
+        .map(([key, value]) => [key.slice(prefix.length), value]),
+    );
+
   async function load() {
-    const stored = await chrome.storage.local.get(['settings', 'bank', 'stats', 'spins', 'capture']);
+    const stored = await chrome.storage.local.get(null);
     spins = stored.spins ?? [];
     capture = stored.capture ?? [];
     settings = { ...DEFAULT_SETTINGS, ...stored.settings };
     bank = stored.bank ?? {};
-    stats = mergeStats(stored.stats);
-    sessionBase = G.totalNet(stats.games);
+    statsCache = byPrefix(stored, STATS_PREFIX);
+    accounts = byPrefix(stored, ACCOUNT_PREFIX);
+    legacyStats = stored.stats ?? null;
     log = C.createLogger(settings.logLevel);
   }
 
@@ -142,14 +169,27 @@
       log = C.createLogger(settings.logLevel);
     }
     if (changes.bank) bank = changes.bank.newValue ?? {};
-    if (changes.stats) stats = mergeStats(changes.stats.newValue);
+    for (const [key, { newValue }] of Object.entries(changes)) {
+      if (key.startsWith(STATS_PREFIX)) {
+        const id = key.slice(STATS_PREFIX.length);
+        if (newValue) statsCache[id] = newValue;
+        else delete statsCache[id];
+        if (id === accountId) stats = mergeStats(newValue);
+      } else if (key.startsWith(ACCOUNT_PREFIX)) {
+        const id = key.slice(ACCOUNT_PREFIX.length);
+        if (newValue) accounts[id] = newValue;
+        else delete accounts[id];
+      }
+    }
     if (changes.spins) spins = changes.spins.newValue ?? [];
     if (changes.capture) capture = changes.capture.newValue ?? [];
     render();
   });
 
   const saveSettings = (patch) => chrome.storage.local.set({ settings: { ...settings, ...patch } });
-  const saveStats = () => chrome.storage.local.set({ stats });
+  // Nothing is saved until a response says whose stats these are.
+  const statsEntry = () => (accountId ? { [STATS_PREFIX + accountId]: stats } : {});
+  const saveStats = () => chrome.storage.local.set(statsEntry());
 
   // ---------- messages from the page hook ----------
 
@@ -176,13 +216,20 @@
       resolve?.(event.data);
       return;
     }
-    onResponse(event.data);
+    // Responses that arrive before storage is loaded wait, so they are booked
+    // to the right account's stats instead of an empty placeholder.
+    if (early) early.push(event.data);
+    else onResponse(event.data);
   });
 
   // Every /api/ response the page sees, from the app or from the bot.
-  function onResponse({ path, ok, request, data }) {
+  function onResponse({ path, ok, request, data, uid }) {
+    if (uid) useAccount(uid);
     const before = player?.credits;
-    if (data?.player) player = data.player;
+    if (data?.player) {
+      player = data.player;
+      saveAccount();
+    }
     if (settings.captureDebug && CAPTURE_PATHS.test(path)) {
       capture = [...capture, { at: Date.now(), path, ok, request, data }].slice(-MAX_CAPTURE);
       chrome.storage.local.set({ capture });
@@ -264,7 +311,7 @@
       pending = null;
       log.info('task_result', { ticket: C.ticketLabel(task.id), type: task.type, source, correct: result.correct });
     }
-    chrome.storage.local.set({ bank, stats });
+    chrome.storage.local.set({ bank, ...statsEntry() });
   }
 
   // The app only toasts a rejected submit and leaves the task open, so without
@@ -296,6 +343,160 @@
     stats.spend.usd += cost;
     stats.spend.calls += 1;
     saveStats();
+  }
+
+  // ---------- accounts ----------
+
+  // The supabase session of whoever is logged in. Content scripts share the
+  // page's localStorage, so this is the same entry the app reads.
+  function readSession() {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!/^sb-.+-auth-token$/.test(key)) continue;
+      const raw = localStorage.getItem(key);
+      try {
+        return { key, raw, uid: C.tokenSubject(JSON.parse(raw)?.access_token) };
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  function readSwitch() {
+    try {
+      return JSON.parse(sessionStorage.getItem(SWITCH_KEY));
+    } catch {
+      return null;
+    }
+  }
+
+  // Every response names the account its token belongs to. A new one means the
+  // page is logged in as someone else: load that account's stats and forget
+  // everything known about the previous player.
+  function useAccount(id) {
+    if (id === accountId) return;
+    accountId = id;
+    accountSince = Date.now();
+    accountSavedAt = 0;
+    stats = mergeStats(statsCache[id] ?? adoptLegacyStats(id));
+    sessionBase = G.totalNet(stats.games);
+    player = null;
+    task = null;
+    answeredTaskId = null;
+    pending = null;
+    lastType = null;
+    bjStake = 0;
+    crashPolledAt = 0;
+    grindPausedUntil = 0;
+    for (const kind of Object.keys(claimTried)) delete claimTried[kind];
+    if (readSwitch()?.to === id) sessionStorage.removeItem(SWITCH_KEY);
+    log.info('account', { id });
+  }
+
+  // Stats from before accounts existed belong to whoever logs in first.
+  function adoptLegacyStats(id) {
+    if (!legacyStats || Object.keys(statsCache).length) return undefined;
+    const adopted = legacyStats;
+    legacyStats = null;
+    statsCache[id] = adopted;
+    chrome.storage.local.set({ [STATS_PREFIX + id]: adopted });
+    chrome.storage.local.remove('stats');
+    return adopted;
+  }
+
+  // Keeps the account's login session and a snapshot of its player, so the panel
+  // can switch back to it and rotation can project its energy.
+  function saveAccount(force = false) {
+    if (!accountId || !player) return Promise.resolve();
+    const saved = accounts[accountId] ?? {};
+    const session = readSession();
+    const own = session?.uid === accountId;
+    const newSession = own && session.raw !== saved.session;
+    if (!force && !newSession && Date.now() - accountSavedAt < ACCOUNT_SAVE_MS) return Promise.resolve();
+    accountSavedAt = Date.now();
+    const record = {
+      ...saved,
+      login: player.login,
+      level: player.level,
+      credits: player.credits,
+      work: player.work,
+      seenAt: Date.now(),
+      seenDay: A.dayKey(),
+      ...(own ? { storageKey: session.key, session: session.raw } : {}),
+    };
+    accounts[accountId] = record;
+    return chrome.storage.local.set({ [ACCOUNT_PREFIX + accountId]: record });
+  }
+
+  // Logs the page in as a saved account: its session goes where the app keeps
+  // it, then the page reloads. The current session is saved first so it can return.
+  async function switchAccount(id) {
+    const target = accounts[id];
+    if (switching || id === accountId || !target?.session) return;
+    switching = true;
+    setStatus('statusSwitching', [target.login ?? id]);
+    await saveAccount(true);
+    sessionStorage.setItem(SWITCH_KEY, JSON.stringify({ from: accountId, to: id }));
+    localStorage.setItem(target.storageKey, target.session);
+    location.reload();
+  }
+
+  // Detaches the current session and reloads to the login screen. The app's own
+  // log out would revoke the session on the server, and with it the saved copy.
+  async function addAccount() {
+    if (switching) return;
+    switching = true;
+    await saveAccount(true);
+    const session = readSession();
+    if (session) localStorage.removeItem(session.key);
+    location.reload();
+  }
+
+  // Asks for the player snapshot. With no session left the page is on the login
+  // screen; if a switch just landed there, that saved login has expired.
+  async function loadPlayer() {
+    setStatus('statusLoading');
+    const res = await api('/api/me');
+    if (res.ok) return;
+    if (readSession()) return sleep(LOGGED_OUT_WAIT_MS);
+    const marker = readSwitch();
+    sessionStorage.removeItem(SWITCH_KEY);
+    const expired = marker && accounts[marker.to];
+    if (!expired) {
+      setStatus('statusLoggedOut');
+      return sleep(LOGGED_OUT_WAIT_MS);
+    }
+    const kept = { ...expired };
+    delete kept.session;
+    delete kept.storageKey;
+    accounts[marker.to] = kept;
+    await chrome.storage.local.set({ [ACCOUNT_PREFIX + marker.to]: kept });
+    log.warn('session_expired', { login: expired.login });
+    setStatus('statusSessionExpired', [expired.login ?? marker.to]);
+    if (accounts[marker.from]?.session) await switchAccount(marker.from);
+  }
+
+  // An account with nothing left to do hands over to another saved account
+  // instead of idling while its energy refills.
+  async function rotateStep() {
+    if (!settings.rotateAccounts || !player || Date.now() - accountSince < ROTATE_DWELL_MS) return false;
+    const now = Date.now();
+    const today = A.dayKey(now);
+    const candidates = Object.entries(accounts)
+      .filter(([id, saved]) => id !== accountId && saved.session)
+      .map(([id, saved]) => ({
+        id,
+        seenAt: saved.seenAt ?? 0,
+        seenDay: saved.seenDay,
+        energy: G.energyNow(saved.work, now),
+        normDone: settings.stopAtNorm && saved.seenDay === today && saved.work?.paidToday >= saved.work?.norm,
+      }));
+    const id = A.pickAccount(candidates, today, ROTATE_MIN_ENERGY);
+    if (!id) return false;
+    log.info('account_rotate', { to: accounts[id].login, energy: G.energyNow(accounts[id].work, now) });
+    await switchAccount(id);
+    return true;
   }
 
   // ---------- work bot ----------
@@ -473,11 +674,7 @@
   }
 
   async function gameStep() {
-    if (!player) {
-      setStatus('statusLoading');
-      await api('/api/me');
-      return;
-    }
+    if (!player) return loadPlayer();
     const game = settings.game;
     const info = G.GAMES[game];
     if (!info) return stopGames('statusIdle');
@@ -676,11 +873,7 @@
   }
 
   async function autoStep() {
-    if (!player) {
-      setStatus('statusLoading');
-      await api('/api/me');
-      return;
-    }
+    if (!player) return loadPlayer();
     if (await claimFreebies()) return;
     if (await repayStep()) return;
     if (await loanTrickStep()) return;
@@ -689,6 +882,7 @@
     if (await crashStep()) return;
     if (workAvailable()) return workStep();
     if (await grindStep()) return;
+    if (await rotateStep()) return;
     return workStep();
   }
 
@@ -697,11 +891,12 @@
     if (await claimFreebies()) return;
     if (settings.enabled && workAvailable()) return workStep();
     if (settings.gamesEnabled) return gameStep();
+    if (settings.enabled && (await rotateStep())) return;
     if (settings.enabled) return workStep();
   }
 
   async function tick() {
-    if ((!settings.enabled && !settings.gamesEnabled && !settings.autoMode) || busy) return;
+    if ((!settings.enabled && !settings.gamesEnabled && !settings.autoMode) || busy || switching) return;
     busy = true;
     try {
       await step();
@@ -779,6 +974,11 @@
           <button type="button" class="hide"></button>
         </div>
         <div class="row">
+          <label class="muted" for="account"></label>
+          <select id="account" class="grow"></select>
+          <button type="button" class="add-account"></button>
+        </div>
+        <div class="row">
           <label class="muted grow" for="type"></label>
           <select id="type">
             <option value="alternate"></option>
@@ -813,6 +1013,9 @@
       type: $('#type'),
       autoToggle: $('.auto-toggle'),
       hide: $('.hide'),
+      accountLabel: $('label[for="account"]'),
+      account: $('#account'),
+      addAccount: $('.add-account'),
       show: $('.show'),
       workToggle: $('.work-toggle'),
       gameLabel: $('label[for="game"]'),
@@ -831,6 +1034,9 @@
     ui.hide.setAttribute('aria-label', msg('panelHideLabel'));
     ui.show.textContent = msg('extName');
     ui.show.setAttribute('aria-label', msg('panelShowLabel'));
+    ui.accountLabel.textContent = msg('panelAccount');
+    ui.addAccount.textContent = msg('panelAddAccount');
+    ui.addAccount.setAttribute('aria-label', msg('panelAddAccountLabel'));
     ui.typeLabel.textContent = msg('panelWork');
     ui.gameLabel.textContent = msg('panelGames');
     ui.summary.textContent = msg('panelProfit');
@@ -842,6 +1048,8 @@
       setStatus(settings.autoMode ? 'statusIdle' : 'statusStarting');
     });
     ui.hide.addEventListener('click', () => setPanelHidden(true));
+    ui.account.addEventListener('change', () => switchAccount(ui.account.value));
+    ui.addAccount.addEventListener('click', addAccount);
     ui.show.addEventListener('click', () => setPanelHidden(false));
     ui.workToggle.addEventListener('click', () => (settings.enabled ? stopWork() : startWork()));
     ui.gamesToggle.addEventListener('click', () => (settings.gamesEnabled ? stopGames() : startGames()));
@@ -895,6 +1103,35 @@
     );
   }
 
+  // Rebuilt only when the list changes, so a render does not close an open dropdown.
+  function renderAccounts() {
+    const now = Date.now();
+    const list = Object.entries(accounts).map(([id, saved]) => ({
+      id,
+      login: saved.login ?? id,
+      work: id === accountId ? (player?.work ?? saved.work) : saved.work,
+      session: Boolean(saved.session),
+    }));
+    if (accountId && !accounts[accountId] && player) list.push({ id: accountId, login: player.login, work: player.work });
+    list.sort((a, b) => a.login.localeCompare(b.login));
+    const options = list.map((a) => ({
+      value: a.id,
+      text: msg('panelAccountOption', [a.login, String(G.energyNow(a.work, now))]),
+      disabled: a.id !== accountId && !a.session,
+    }));
+    if (!accountId) options.unshift({ value: '', text: msg('panelNoAccount'), disabled: true });
+    const signature = JSON.stringify(options);
+    if (signature !== accountOptions) {
+      accountOptions = signature;
+      ui.account.replaceChildren(
+        ...options.map(({ value, text, disabled }) => Object.assign(new Option(text, value), { disabled })),
+      );
+    }
+    ui.account.value = accountId ?? '';
+    ui.account.disabled = switching;
+    ui.addAccount.disabled = switching;
+  }
+
   function setToggle(button, on) {
     button.textContent = msg(on ? 'panelStop' : 'panelStart');
     button.classList.toggle('on', on);
@@ -912,6 +1149,7 @@
     setToggle(ui.gamesToggle, settings.gamesEnabled);
     ui.workToggle.setAttribute('aria-label', `${msg('panelWork')}: ${ui.workToggle.textContent}`);
     ui.gamesToggle.setAttribute('aria-label', `${msg('panelGames')}: ${ui.gamesToggle.textContent}`);
+    renderAccounts();
     ui.type.value = settings.taskType;
     ui.game.value = settings.game;
     ui.status.textContent = msg(status.key, status.subs);
@@ -930,6 +1168,8 @@
   // ---------- boot ----------
 
   load().then(() => {
+    for (const response of early.splice(0)) onResponse(response);
+    early = null;
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountPanel);
     else mountPanel();
     setInterval(tick, TICK_MS);

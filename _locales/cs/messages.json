@@ -730,5 +730,113 @@
   },
   "optionsImportFailed": {
     "message": "Soubor není platný export banky."
+  },
+  "panelAccount": {
+    "message": "Účet"
+  },
+  "panelAccountOption": {
+    "message": "$P1$ (energie $P2$)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "panelNoAccount": {
+    "message": "Nepřihlášeno"
+  },
+  "panelAddAccount": {
+    "message": "Přidat"
+  },
+  "panelAddAccountLabel": {
+    "message": "Přihlásit další účet"
+  },
+  "statusSwitching": {
+    "message": "Přepínám na $P1$...",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusLoggedOut": {
+    "message": "Nepřihlášeno. Přihlas se do kasina."
+  },
+  "statusSessionExpired": {
+    "message": "Uložené přihlášení k účtu $P1$ vypršelo. Přihlas se k němu znovu.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsRotateAccounts": {
+    "message": "Přepnout na jiný uložený účet, když tomuhle dojde energie"
+  },
+  "optionsRotateHint": {
+    "message": "Přednost má účet, který dnes ještě nebyl otevřený, aby si vybral denní bonus a proběhly kontroly. Jinak účet s nejvíc energií, aspoň 5. Každé přepnutí znovu načte záložku kasina."
+  },
+  "optionsAccountsHeading": {
+    "message": "Účty"
+  },
+  "optionsAccountsHint": {
+    "message": "Každý účet má vlastní zisk, příznaky achievementů a denní rozpočty. Banka odpovědí a nastavení jsou společné. Účet přidáš tlačítkem Přidat v panelu a přihlášením, přepínáš výběrem vedle něj. Nepoužívej Odhlásit v kasinu: ukončí i uložené přihlášení. Pro dva účty najednou otevři druhý v anonymním okně (povol Botter v anonymním režimu)."
+  },
+  "optionsAccountsEmpty": {
+    "message": "Zatím žádný účet. Otevři kasino a přihlas se."
+  },
+  "optionsAccountNoLogin": {
+    "message": "$P1$ (přihlášení vypršelo)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsForget": {
+    "message": "Zapomenout"
+  },
+  "optionsForgetLabel": {
+    "message": "Zapomenout uložené přihlášení k účtu $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsForgetConfirm": {
+    "message": "Zapomenout uložené přihlášení k účtu $P1$? Jeho zisk zůstane.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsProfitAll": {
+    "message": "Všechny účty"
+  },
+  "accountLegacy": {
+    "message": "Před účty"
+  },
+  "colAccount": {
+    "message": "Účet"
+  },
+  "colLevel": {
+    "message": "Level"
+  },
+  "colCredits": {
+    "message": "Kredity"
+  },
+  "colEnergy": {
+    "message": "Energie"
+  },
+  "colSeen": {
+    "message": "Naposledy"
+  },
+  "colActions": {
+    "message": "Akce"
   }
 }

@@ -117,6 +117,8 @@
           <p class="hint" data-i18n="optionsAutoHint"></p>
           <label class="check"><span data-i18n="optionsRepayDebt"></span><input type="checkbox" role="switch" name="repayDebt" /></label>
           <label class="check"><span data-i18n="optionsLoanTrick"></span><input type="checkbox" role="switch" name="loanTrick" /></label>
+          <label class="check"><span data-i18n="optionsRotateAccounts"></span><input type="checkbox" role="switch" name="rotateAccounts" /></label>
+          <p class="hint" data-when="rotateAccounts" data-i18n="optionsRotateHint"></p>
           <label class="check"><span data-i18n="optionsCrashEnabled"></span><input type="checkbox" role="switch" name="crashEnabled" /></label>
           <div class="grid" data-when="crashEnabled">
             <div>
@@ -213,9 +215,32 @@
       </div>
 
       <div role="tabpanel" id="panel-profit" aria-labelledby="tab-profit" tabindex="0" hidden>
+        <section class="card" aria-labelledby="accounts-heading">
+          <h2 id="accounts-heading" data-i18n="optionsAccountsHeading"></h2>
+          <p class="hint" data-i18n="optionsAccountsHint"></p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col" data-i18n="colAccount"></th>
+                  <th scope="col" data-i18n="colLevel"></th>
+                  <th scope="col" data-i18n="colCredits"></th>
+                  <th scope="col" data-i18n="colEnergy"></th>
+                  <th scope="col" data-i18n="colSeen"></th>
+                  <th scope="col"><span class="visually-hidden" data-i18n="colActions"></span></th>
+                </tr>
+              </thead>
+              <tbody id="accountsBody"></tbody>
+            </table>
+          </div>
+          <p id="accountsEmpty" class="hint" data-i18n="optionsAccountsEmpty"></p>
+        </section>
+
         <section class="card" aria-labelledby="profit-heading">
           <h2 id="profit-heading" data-i18n="optionsProfitHeading"></h2>
           <p class="hint" data-i18n="optionsProfitHint"></p>
+          <label for="profitAccount" data-i18n="colAccount"></label>
+          <select id="profitAccount"></select>
           <div class="table-wrap">
             <table>
               <thead>

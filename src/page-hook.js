@@ -1,8 +1,9 @@
 // Runs in the page's own JS world at document_start, before the app bundle.
 // - Wraps fetch so the content script sees every /api/ response (tasks, results,
-//   game rounds, the player snapshot).
+//   game rounds, the player snapshot), tagged with the user id of the token the
+//   request was made with, so the content script can file it under the right account.
 // - Performs API calls for the game bot with the user's current session, so the
-//   token never leaves the page.
+//   bot code never handles the token.
 (() => {
   const originalFetch = window.fetch;
   let lastAuth = null;
@@ -55,6 +56,18 @@
     }
   }
 
+  // Same decoding as BotterCore.tokenSubject, which is not loaded in this world.
+  function subject(auth) {
+    const token = auth?.replace(/^Bearer\s+/i, '');
+    if (!token) return null;
+    if (token.startsWith('dev:')) return token;
+    try {
+      return JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   window.fetch = async function (input, init) {
     const auth = readAuth(init?.headers);
     if (auth) lastAuth = auth;
@@ -62,6 +75,7 @@
     try {
       const url = new URL(typeof input === 'string' ? input : input.url, location.href);
       if (url.origin === location.origin && url.pathname.startsWith('/api/')) {
+        const uid = subject(auth ?? currentAuth());
         let request = null;
         try {
           request = typeof init?.body === 'string' ? JSON.parse(init.body) : null;
@@ -69,7 +83,7 @@
         response
           .clone()
           .json()
-          .then((data) => post({ kind: 'response', path: url.pathname, ok: response.ok, request, data }))
+          .then((data) => post({ kind: 'response', path: url.pathname, ok: response.ok, request, data, uid }))
           .catch(() => {});
       }
     } catch {}

@@ -236,6 +236,20 @@
     return `JIRA-${(parseInt(id.slice(0, 4), 16) % 9000) + 1000}`;
   }
 
+  // User id (JWT `sub`) of a supabase access token, or the token itself for the
+  // casino's dev login (`dev:name`). Only the payload is decoded, nothing is verified.
+  function tokenSubject(token) {
+    if (typeof token !== 'string') return null;
+    const bare = token.replace(/^Bearer\s+/i, '');
+    if (bare.startsWith('dev:')) return bare;
+    try {
+      const payload = bare.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      return JSON.parse(atob(payload)).sub ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   const LEVELS = { debug: 10, info: 20, warn: 30, error: 40 };
 
   // Structured console logger; every line is one JSON object.
@@ -271,6 +285,7 @@
     nextType,
     claudeCost,
     ticketLabel,
+    tokenSubject,
     createLogger,
   };
 

@@ -148,3 +148,12 @@ test('delayBetween stays within bounds', () => {
   assert.equal(C.delayBetween(100, 200, () => 0.999999), 200);
   assert.equal(C.delayBetween(300, 100, () => 0.5), 300);
 });
+
+test('tokenSubject reads the user id from a bearer token', () => {
+  const payload = Buffer.from(JSON.stringify({ sub: 'user-1', role: 'authenticated' })).toString('base64url');
+  assert.equal(C.tokenSubject(`Bearer header.${payload}.signature`), 'user-1');
+  assert.equal(C.tokenSubject(`header.${payload}.signature`), 'user-1');
+  assert.equal(C.tokenSubject('Bearer dev:alice'), 'dev:alice');
+  assert.equal(C.tokenSubject('not-a-jwt'), null);
+  assert.equal(C.tokenSubject(null), null);
+});

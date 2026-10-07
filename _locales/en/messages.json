@@ -730,5 +730,113 @@
   },
   "optionsImportFailed": {
     "message": "That file is not a valid bank export."
+  },
+  "panelAccount": {
+    "message": "Account"
+  },
+  "panelAccountOption": {
+    "message": "$P1$ ($P2$ energy)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "panelNoAccount": {
+    "message": "Not logged in"
+  },
+  "panelAddAccount": {
+    "message": "Add"
+  },
+  "panelAddAccountLabel": {
+    "message": "Log in to another account"
+  },
+  "statusSwitching": {
+    "message": "Switching to $P1$...",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusLoggedOut": {
+    "message": "Not logged in. Log in to the casino."
+  },
+  "statusSessionExpired": {
+    "message": "The saved login for $P1$ has expired. Log in to it again.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsRotateAccounts": {
+    "message": "Switch to another saved account when this one runs out of energy"
+  },
+  "optionsRotateHint": {
+    "message": "An account not visited today goes first, so its daily bonus and checks run. Otherwise the account with the most energy, at least 5. Each switch reloads the casino tab."
+  },
+  "optionsAccountsHeading": {
+    "message": "Accounts"
+  },
+  "optionsAccountsHint": {
+    "message": "Each account keeps its own profit, achievement flags and daily budgets. The answer bank and settings are shared. To add an account, press Add in the panel and log in; switch with the dropdown next to it. Do not use the casino's Log out: it also ends the saved login. To run two accounts at once, use an incognito window for the second one (allow Botter in incognito)."
+  },
+  "optionsAccountsEmpty": {
+    "message": "No account yet. Open the casino and log in."
+  },
+  "optionsAccountNoLogin": {
+    "message": "$P1$ (login expired)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsForget": {
+    "message": "Forget"
+  },
+  "optionsForgetLabel": {
+    "message": "Forget the saved login for $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsForgetConfirm": {
+    "message": "Forget the saved login for $P1$? Its profit stays.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsProfitAll": {
+    "message": "All accounts"
+  },
+  "accountLegacy": {
+    "message": "Before accounts"
+  },
+  "colAccount": {
+    "message": "Account"
+  },
+  "colLevel": {
+    "message": "Level"
+  },
+  "colCredits": {
+    "message": "Credits"
+  },
+  "colEnergy": {
+    "message": "Energy"
+  },
+  "colSeen": {
+    "message": "Last seen"
+  },
+  "colActions": {
+    "message": "Actions"
   }
 }

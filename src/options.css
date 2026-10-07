@@ -157,3 +157,11 @@ tfoot td { font-weight: 700; border-bottom: 0; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

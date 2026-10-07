@@ -147,13 +147,36 @@
     return settings.xpBudget > 0 && lostToday < settings.xpBudget;
   }
 
+  // Account to switch to once the current one has nothing left to do. Each
+  // candidate is { id, seenAt, seenDay, energy, normDone }. One not visited
+  // today goes first (its daily bonus and checks are waiting), otherwise the one
+  // with the most refilled energy, if it has at least minEnergy.
+  function pickAccount(candidates, today, minEnergy) {
+    const fresh = candidates.filter((a) => a.seenDay !== today);
+    if (fresh.length) return fresh.reduce((a, b) => (b.seenAt < a.seenAt ? b : a)).id;
+    const ready = candidates.filter((a) => !a.normDone && a.energy >= minEnergy);
+    if (!ready.length) return null;
+    return ready.reduce((a, b) => (b.energy > a.energy ? b : a)).id;
+  }
+
   // Local calendar day, used to reset daily budgets and checks.
   function dayKey(now = Date.now()) {
     const d = new Date(now);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
-  const api = { CRASH_PLANNED_MULT, crashMult, bestCrashTarget, crashStake, repayAmount, grindPlan, grindBets, grindAllowed, dayKey };
+  const api = {
+    CRASH_PLANNED_MULT,
+    crashMult,
+    bestCrashTarget,
+    crashStake,
+    repayAmount,
+    grindPlan,
+    grindBets,
+    grindAllowed,
+    pickAccount,
+    dayKey,
+  };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BotterAuto = api;
 })(globalThis);

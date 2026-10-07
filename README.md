@@ -6,8 +6,9 @@ Chrome extension (Manifest V3) that solves the work tickets ("Práce") in
 ## How it works
 
 - `src/page-hook.js` runs in the page's own JS world before the app loads and
-  wraps `fetch`. It forwards the responses of `/api/me`, `/api/work/start`
-  and `/api/work/submit` to the content script. No auth token is read or reused.
+  wraps `fetch`. It forwards every `/api/` response to the content script, tagged
+  with the user id (`sub`) decoded from the token the request was sent with, so
+  each response is booked to the right account.
 - `src/content.js` runs the loop: open the work screen, pick a ticket card,
   choose an answer, click the app's own button, dismiss the result with Escape, repeat.
   There are three ticket types: bug hunt (click the buggy line), "Co to vypíše?"
@@ -48,10 +49,11 @@ progress shows at `chrome://on-device-internals`.
   Skeleton Slots, Slotingi, Roulette (one outside bet, red by default) and Blackjack
   (follows the table's own hint) through the casino API. The page hook performs the
   calls with the session the app already holds (supabase session in localStorage,
-  falling back to the last Authorization header the app sent), so the token never
-  leaves the page. The game screen does not animate, but after every bot round the
-  hook hands the fresh player snapshot to the app's own state, so the credits, XP
-  bar and level in the top bar update live. Guardrails: stop-loss and take-profit per
+  falling back to the last Authorization header the app sent), so the bot never
+  sends the token anywhere itself (saved sessions for account switching are
+  described under Accounts). The game screen does not animate, but after every bot
+  round the hook hands the fresh player snapshot to the app's own state, so the
+  credits, XP bar and level in the top bar update live. Guardrails: stop-loss and take-profit per
   session, a credit reserve, and the game's unlock level. With both bots on, work
   goes first and games fill the time while energy refills.
 - **Auto mode** (`src/auto.js`, one toggle in the panel) runs everything in order of
@@ -86,6 +88,28 @@ progress shows at `chrome://on-device-internals`.
   the profit table. **Hide** collapses it to a small Botter button in the same corner
   (highlighted while a bot runs); click it to bring the panel back. The same switch is
   in the settings (Bot tab).
+- **Accounts**: stats, profit, achievement flags (clean loan, leaderboards) and the
+  daily XP budget are kept per account under `stats:<user id>`; the answer bank and
+  settings are shared. Stats from before this existed go to the first account that
+  logs in. The content script saves each account's supabase session (the
+  `sb-*-auth-token` entry in the page's localStorage) under `account:<user id>` in
+  `chrome.storage.local`, together with a snapshot of its level, credits and energy.
+  - **Add** in the panel saves the current session, removes it from the page without
+    logging out and reloads to the login screen. Never use the casino's own Log out
+    to switch: supabase revokes the session on the server, so the saved copy dies too.
+  - The account dropdown in the panel writes the chosen session back and reloads.
+    If that login has expired, auto mode forgets it and switches back.
+  - **Rotate accounts** (settings, Auto tab, on by default): when the current
+    account is out of energy and has nothing else to do, auto mode (or the work bot
+    alone) switches to an account not visited today, otherwise to the one with the
+    most projected energy (at least 5), so every account's energy gets used. It stays
+    at least a minute on each account. With one saved account it does nothing.
+  - Use one casino tab per account. Two tabs on the same origin share one supabase
+    session, so a second tab can write its old session back. To run two accounts at
+    once, open the second in an incognito window with Botter allowed in incognito;
+    both share the bank and settings and keep separate stats.
+  - The Profit tab in the settings lists the saved accounts (Forget drops a saved
+    login, not its stats) and shows profit per account or summed over all of them.
 
 ## Install
 

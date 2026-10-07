@@ -11,6 +11,7 @@ const CHECKBOXES = [
   'recordSpins',
   'captureDebug',
   'panelHidden',
+  'rotateAccounts',
 ];
 const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet', 'grindLimit', 'grindGame', 'grindBet'];
 const INT_SELECTS = ['gameBet', 'crashBet'];
@@ -50,6 +51,7 @@ const DEFAULTS = {
   recordSpins: true,
   captureDebug: false,
   panelHidden: false,
+  rotateAccounts: true,
   model: 'claude-opus-5-5',
   openrouterModel: 'google/gemini-2.5-flash',
   effort: 'medium',
@@ -69,6 +71,18 @@ const locale = chrome.i18n.getUILanguage();
 const num = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
 const signed = new Intl.NumberFormat(locale, { maximumFractionDigits: 1, signDisplay: 'exceptZero' });
 const pct = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 });
+const when = new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' });
+
+// Same storage layout as the content script: one key per account.
+const STATS_PREFIX = 'stats:';
+const ACCOUNT_PREFIX = 'account:';
+const ALL_ACCOUNTS = '*';
+const byPrefix = (items, prefix) =>
+  Object.fromEntries(
+    Object.entries(items)
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([key, value]) => [key.slice(prefix.length), value]),
+  );
 
 const $ = (id) => document.getElementById(id);
 const field = (name) => document.querySelector(`[name="${name}"]`);
@@ -87,19 +101,18 @@ field('grindBet').add(new Option(msg('grindBet_auto'), 'auto'));
 for (const bet of G.BET_LEVELS) field('grindBet').add(new Option(num.format(bet), String(bet)));
 
 async function load() {
-  const { settings = {}, apiKey = '', openrouterKey = '', bank = {}, stats } = await chrome.storage.local.get([
+  const { settings = {}, apiKey = '', openrouterKey = '', bank = {} } = await chrome.storage.local.get([
     'settings',
     'apiKey',
     'openrouterKey',
     'bank',
-    'stats',
   ]);
   fill({ ...DEFAULTS, ...settings });
   $('apiKey').value = apiKey;
   $('openrouterKey').value = openrouterKey;
   showBankSize(bank);
   showLocalStatus();
-  showProfit(stats);
+  showAccounts();
   showSpinCount();
 }
 
@@ -338,9 +351,89 @@ function showProfit(stats = {}) {
   $('profitEmpty').hidden = rows.length > 0;
 }
 
+// Totals of several accounts' stats, for the "all accounts" profit view.
+function sumStats(list) {
+  const total = { games: {}, work: { tickets: 0, net: 0, xp: 0 }, free: {} };
+  for (const stats of list) {
+    for (const [game, row] of Object.entries(stats.games ?? {})) G.addDelta(total.games, { game, ...row });
+    for (const key of Object.keys(total.work)) total.work[key] += stats.work?.[key] ?? 0;
+    for (const [kind, amount] of Object.entries(stats.free ?? {})) total.free[kind] = (total.free[kind] ?? 0) + amount;
+  }
+  return total;
+}
+
+let profitStats = {}; // account id -> stats; '' holds stats from before accounts existed
+let profitChoice = ALL_ACCOUNTS;
+let profitOptions = '';
+
+function showChosenProfit() {
+  const chosen = profitChoice === ALL_ACCOUNTS ? sumStats(Object.values(profitStats)) : profitStats[profitChoice];
+  showProfit(chosen);
+}
+
+function forgetAccount(id, login) {
+  if (!confirm(msg('optionsForgetConfirm', [login]))) return;
+  chrome.storage.local.remove(ACCOUNT_PREFIX + id);
+}
+
+function showAccountRows(accounts) {
+  const now = Date.now();
+  const rows = Object.entries(accounts)
+    .sort(([, a], [, b]) => (b.seenAt ?? 0) - (a.seenAt ?? 0))
+    .map(([id, saved]) => {
+      const login = saved.login ?? id;
+      const forget = document.createElement('button');
+      forget.type = 'button';
+      forget.textContent = msg('optionsForget');
+      forget.setAttribute('aria-label', msg('optionsForgetLabel', [login]));
+      forget.addEventListener('click', () => forgetAccount(id, login));
+      const actions = document.createElement('td');
+      actions.append(forget);
+      const energy = saved.work ? `${G.energyNow(saved.work, now)}/${saved.work.maxEnergy ?? 20}` : '-';
+      const tr = document.createElement('tr');
+      tr.append(
+        cell(saved.session ? login : msg('optionsAccountNoLogin', [login])),
+        cell(saved.level == null ? '-' : num.format(saved.level)),
+        cell(saved.credits == null ? '-' : num.format(saved.credits)),
+        cell(energy),
+        cell(saved.seenAt ? when.format(saved.seenAt) : '-'),
+        actions,
+      );
+      return tr;
+    });
+  $('accountsBody').replaceChildren(...rows);
+  $('accountsEmpty').hidden = rows.length > 0;
+}
+
+async function showAccounts() {
+  const stored = await chrome.storage.local.get(null);
+  const accounts = byPrefix(stored, ACCOUNT_PREFIX);
+  showAccountRows(accounts);
+
+  profitStats = byPrefix(stored, STATS_PREFIX);
+  if (stored.stats) profitStats[''] = stored.stats;
+  const label = (id) => (id === '' ? msg('accountLegacy') : (accounts[id]?.login ?? id.slice(0, 8)));
+  const choices = [[ALL_ACCOUNTS, msg('optionsProfitAll')], ...Object.keys(profitStats).map((id) => [id, label(id)])];
+  if (!profitStats[profitChoice]) profitChoice = ALL_ACCOUNTS;
+  // Rebuilt only when the list changes, so a game round does not close an open dropdown.
+  const signature = JSON.stringify(choices);
+  if (signature !== profitOptions) {
+    profitOptions = signature;
+    $('profitAccount').replaceChildren(...choices.map(([id, text]) => new Option(text, id)));
+  }
+  $('profitAccount').value = profitChoice;
+  showChosenProfit();
+}
+
+$('profitAccount').addEventListener('change', (event) => {
+  profitChoice = event.target.value;
+  showChosenProfit();
+});
+
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
-  if (changes.stats) showProfit(changes.stats.newValue);
+  const keys = Object.keys(changes);
+  if (keys.some((key) => key === 'stats' || key.startsWith(STATS_PREFIX) || key.startsWith(ACCOUNT_PREFIX))) showAccounts();
   if (changes.bank) showBankSize(changes.bank.newValue ?? {});
   if (changes.settings && !saveTimer) fill({ ...DEFAULTS, ...changes.settings.newValue });
 });
@@ -409,9 +502,10 @@ $('import').addEventListener('change', async (event) => {
 
 $('clear').addEventListener('click', async () => {
   if (!confirm(msg('optionsClearConfirm'))) return;
-  await chrome.storage.local.set({ bank: {}, stats: {} });
+  const stored = await chrome.storage.local.get(null);
+  await chrome.storage.local.remove(['stats', ...Object.keys(stored).filter((key) => key.startsWith(STATS_PREFIX))]);
+  await chrome.storage.local.set({ bank: {} });
   showBankSize({});
-  showProfit({});
   flash(msg('optionsCleared'));
 });
 
