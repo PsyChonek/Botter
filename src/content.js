@@ -128,6 +128,7 @@
   });
   const num = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
   const signed = new Intl.NumberFormat(locale, { maximumFractionDigits: 0, signDisplay: 'exceptZero' });
+  const decimal = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
   const pct = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 });
   const signedPct = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1, signDisplay: 'exceptZero' });
 
@@ -842,20 +843,28 @@
 
   // Every game loses on average, so gambling only buys XP, within a daily loss
   // budget or down to a minimum account balance.
+  const GRIND_UNLOCKS = Object.fromEntries(G.GAME_KEYS.map((game) => [game, G.GAMES[game].unlock]));
+
+  // Games and bet levels the grinder may pick from right now, and its pick.
+  function grindChoice() {
+    const lost = Math.max(0, -(stats.grind.day === A.dayKey() ? stats.grind.net : 0));
+    const levels = G.BET_LEVELS.filter((bet) => bet <= player.maxBet);
+    const bets =
+      settings.grindBet === 'auto'
+        ? A.grindBets(settings, player.credits, lost, levels)
+        : [G.betFor(Number(settings.grindBet), player.maxBet)].filter((bet) =>
+            A.grindAllowed(settings, player.credits, lost, bet),
+          );
+    const candidates = settings.grindGame === 'auto' ? G.GAME_KEYS : [settings.grindGame];
+    const plan = A.grindPlan(candidates, bets, player.level, stats.games, stats.betXp, GRIND_UNLOCKS, settings.grindExploreRounds);
+    return { lost, levels, candidates, plan };
+  }
+
   async function grindStep() {
     if (Date.now() < grindPausedUntil) return false;
     const today = A.dayKey();
     if (stats.grind.day !== today) stats.grind = { day: today, net: 0 };
-    const lost = Math.max(0, -stats.grind.net);
-    const bets =
-      settings.grindBet === 'auto'
-        ? A.grindBets(settings, player.credits, lost, G.BET_LEVELS.filter((bet) => bet <= player.maxBet))
-        : [G.betFor(Number(settings.grindBet), player.maxBet)].filter((bet) =>
-            A.grindAllowed(settings, player.credits, lost, bet),
-          );
-    const unlocks = Object.fromEntries(G.GAME_KEYS.map((game) => [game, G.GAMES[game].unlock]));
-    const candidates = settings.grindGame === 'auto' ? G.GAME_KEYS : [settings.grindGame];
-    const plan = A.grindPlan(candidates, bets, player.level, stats.games, stats.betXp, unlocks, settings.grindExploreRounds);
+    const { lost, plan } = grindChoice();
     if (!plan) return false;
     const { game, bet } = plan;
     if (settings.grindLimit === 'balance') {
@@ -966,6 +975,9 @@
         th { color: #b5c99a; font-weight: 600; border-bottom: 1px solid #3d5420; }
         .pos { color: #a6e05a; }
         .neg { color: #ff8f7a; }
+        .xp-note { margin: 4px 0 0; }
+        tr.group td { text-align: left; padding-top: 6px; font-weight: 600; color: #e8f5c8; }
+        tr.pick td { color: #d4ff6a; font-weight: 700; }
       </style>
       <div class="panel" role="region">
         <div class="row">
@@ -996,10 +1008,18 @@
         <div class="status" role="status" aria-live="polite"></div>
         <div class="stats muted"></div>
         <div class="cost muted"></div>
-        <details>
+        <details class="profit">
           <summary></summary>
           <table>
             <thead><tr><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </details>
+        <details class="xp">
+          <summary></summary>
+          <p class="muted xp-note"></p>
+          <table>
+            <thead><tr><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th></tr></thead>
             <tbody></tbody>
           </table>
         </details>
@@ -1024,9 +1044,13 @@
       status: $('.status'),
       stats: $('.stats'),
       cost: $('.cost'),
-      summary: $('summary'),
-      head: [...shadow.querySelectorAll('th')],
-      body: $('tbody'),
+      summary: $('.profit summary'),
+      head: [...shadow.querySelectorAll('.profit th')],
+      body: $('.profit tbody'),
+      xpSummary: $('.xp summary'),
+      xpNote: $('.xp-note'),
+      xpHead: [...shadow.querySelectorAll('.xp th')],
+      xpBody: $('.xp tbody'),
     };
     ui.panel.setAttribute('aria-label', msg('extName'));
     ui.title.textContent = msg('extName');
@@ -1041,6 +1065,11 @@
     ui.gameLabel.textContent = msg('panelGames');
     ui.summary.textContent = msg('panelProfit');
     ['colGame', 'colRounds', 'colNet', 'colRtp'].forEach((key, i) => (ui.head[i].textContent = msg(key)));
+    ui.xpSummary.textContent = msg('panelXp');
+    ui.xpNote.textContent = msg('panelXpNote');
+    ['colBet', 'colRounds', 'colXpPerRound', 'colCostPerXp', 'colState'].forEach(
+      (key, i) => (ui.xpHead[i].textContent = msg(key)),
+    );
     for (const option of ui.type.options) option.textContent = msg(`type_${option.value}`);
     for (const game of G.GAME_KEYS) ui.game.add(new Option(msg(`game_${game}`), game));
     ui.autoToggle.addEventListener('click', () => {
@@ -1103,6 +1132,56 @@
     );
   }
 
+  // XP grinding measurements per game and bet level, with the grinder's pick.
+  function renderXp() {
+    if (!player) {
+      ui.xpBody.replaceChildren();
+      return;
+    }
+    const { levels, candidates, plan } = grindChoice();
+    const report = A.grindReport(candidates, levels, player.level, stats.games, stats.betXp, GRIND_UNLOCKS);
+    const rows = [];
+    for (const game of report) {
+      const head = document.createElement('tr');
+      head.className = 'group';
+      const td = cell(
+        game.locked
+          ? msg('xpLocked', [msg(`game_${game.game}`), String(game.unlock)])
+          : msg('xpGame', [
+              msg(`game_${game.game}`),
+              num.format(game.rounds),
+              game.edge === null ? '-' : pct.format(game.edge),
+              game.perRound === null ? '-' : decimal.format(game.perRound),
+            ]),
+      );
+      td.colSpan = 5;
+      head.append(td);
+      rows.push(head);
+      if (game.locked) continue;
+      if (game.rounds < settings.grindExploreRounds) {
+        const tr = document.createElement('tr');
+        const note = cell(msg('xpExploring', [num.format(game.rounds), num.format(settings.grindExploreRounds)]), 'muted');
+        note.colSpan = 5;
+        tr.append(note);
+        rows.push(tr);
+      }
+      for (const row of game.bets) {
+        const pick = plan?.game === game.game && plan.bet === row.bet;
+        const tr = document.createElement('tr');
+        if (pick) tr.className = 'pick';
+        tr.append(
+          cell(credits(row.bet)),
+          cell(row.rounds ? num.format(row.rounds) : '-'),
+          cell(row.perRound === null ? '-' : decimal.format(row.perRound)),
+          cell(row.cost === null ? '-' : decimal.format(row.cost)),
+          cell(pick ? msg('xpPick') : row.state ? msg(`xpState_${row.state}`) : ''),
+        );
+        rows.push(tr);
+      }
+    }
+    ui.xpBody.replaceChildren(...rows);
+  }
+
   // Rebuilt only when the list changes, so a render does not close an open dropdown.
   function renderAccounts() {
     const now = Date.now();
@@ -1163,6 +1242,7 @@
     const { usd: spent, calls } = stats.spend;
     ui.cost.textContent = msg('panelCost', [usd.format(spent), usd.format(calls ? spent / calls : 0)]);
     renderProfit();
+    renderXp();
   }
 
   // ---------- boot ----------

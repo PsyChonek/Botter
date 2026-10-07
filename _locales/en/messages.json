@@ -838,5 +838,77 @@
   },
   "colActions": {
     "message": "Actions"
+  },
+  "panelXp": {
+    "message": "XP per bet"
+  },
+  "panelXpNote": {
+    "message": "Loss per XP is the credits the game loses on average for one XP point at that bet. The highlighted row is what the grinder plays next."
+  },
+  "colBet": {
+    "message": "Bet"
+  },
+  "colXpPerRound": {
+    "message": "XP/round"
+  },
+  "colCostPerXp": {
+    "message": "Loss/XP"
+  },
+  "colState": {
+    "message": "State"
+  },
+  "xpGame": {
+    "message": "$GAME$: $ROUNDS$ rounds, edge $EDGE$, $XP$ XP/round",
+    "placeholders": {
+      "game": {
+        "content": "$1"
+      },
+      "rounds": {
+        "content": "$2"
+      },
+      "edge": {
+        "content": "$3"
+      },
+      "xp": {
+        "content": "$4"
+      }
+    }
+  },
+  "xpLocked": {
+    "message": "$GAME$: unlocks at level $LEVEL$",
+    "placeholders": {
+      "game": {
+        "content": "$1"
+      },
+      "level": {
+        "content": "$2"
+      }
+    }
+  },
+  "xpExploring": {
+    "message": "Exploring: $ROUNDS$ of $NEEDED$ rounds before bets are compared",
+    "placeholders": {
+      "rounds": {
+        "content": "$1"
+      },
+      "needed": {
+        "content": "$2"
+      }
+    }
+  },
+  "xpPick": {
+    "message": "playing"
+  },
+  "xpState_best": {
+    "message": "best"
+  },
+  "xpState_next": {
+    "message": "testing"
+  },
+  "xpState_worse": {
+    "message": "worse"
+  },
+  "xpState_skipped": {
+    "message": "skipped"
   }
 }

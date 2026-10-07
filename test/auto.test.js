@@ -193,3 +193,28 @@ test('pickAccount takes the most energy, only above the minimum and before the n
   assert.equal(A.pickAccount(accounts, today, 10), null);
   assert.equal(A.pickAccount([], today, 5), null);
 });
+
+test('grindReport shows XP per bet and where each level stands on the ladder', () => {
+  const unlocks = { blaze: 1, roulette: 15 };
+  const stats = { blaze: { rounds: 40, wagered: 2000, net: -100, xp: 120 } };
+  // 20 and 40 keep XP per credit, 100 drops off, so 200 is never tried.
+  const betXp = {
+    blaze: { 20: { rounds: 10, xp: 20 }, 40: { rounds: 10, xp: 40 }, 100: { rounds: 10, xp: 50 } },
+  };
+  const [blaze, roulette] = A.grindReport(['blaze', 'roulette'], [200, 100, 40, 20], 5, stats, betXp, unlocks);
+  assert.equal(blaze.locked, false);
+  assert.equal(blaze.edge, 0.05);
+  assert.equal(blaze.perRound, 3);
+  assert.deepEqual(
+    blaze.bets.map(({ bet, perRound, cost, state }) => [bet, perRound, cost, state]),
+    [
+      [20, 2, 0.5, null],
+      [40, 4, 0.5, 'best'],
+      [100, 5, 1, 'worse'],
+      [200, null, null, 'skipped'],
+    ],
+  );
+  assert.equal(roulette.locked, true);
+  assert.equal(roulette.edge, null);
+  assert.equal(roulette.bets[0].state, 'next');
+});

@@ -838,5 +838,77 @@
   },
   "colActions": {
     "message": "Akce"
+  },
+  "panelXp": {
+    "message": "XP podle sázky"
+  },
+  "panelXpNote": {
+    "message": "Ztráta/XP je průměrná ztráta kreditů za jeden bod XP při dané sázce. Zvýrazněný řádek bot hraje jako další."
+  },
+  "colBet": {
+    "message": "Sázka"
+  },
+  "colXpPerRound": {
+    "message": "XP/kolo"
+  },
+  "colCostPerXp": {
+    "message": "Ztráta/XP"
+  },
+  "colState": {
+    "message": "Stav"
+  },
+  "xpGame": {
+    "message": "$GAME$: $ROUNDS$ kol, výhoda kasina $EDGE$, $XP$ XP/kolo",
+    "placeholders": {
+      "game": {
+        "content": "$1"
+      },
+      "rounds": {
+        "content": "$2"
+      },
+      "edge": {
+        "content": "$3"
+      },
+      "xp": {
+        "content": "$4"
+      }
+    }
+  },
+  "xpLocked": {
+    "message": "$GAME$: odemkne se na úrovni $LEVEL$",
+    "placeholders": {
+      "game": {
+        "content": "$1"
+      },
+      "level": {
+        "content": "$2"
+      }
+    }
+  },
+  "xpExploring": {
+    "message": "Průzkum: $ROUNDS$ z $NEEDED$ kol, než se porovnají sázky",
+    "placeholders": {
+      "rounds": {
+        "content": "$1"
+      },
+      "needed": {
+        "content": "$2"
+      }
+    }
+  },
+  "xpPick": {
+    "message": "hraje"
+  },
+  "xpState_best": {
+    "message": "nejlepší"
+  },
+  "xpState_next": {
+    "message": "testuje"
+  },
+  "xpState_worse": {
+    "message": "horší"
+  },
+  "xpState_skipped": {
+    "message": "přeskočeno"
   }
 }

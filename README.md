@@ -83,6 +83,10 @@ progress shows at `chrome://on-device-internals`.
   from the win. The panel shows rounds, net and return rate per game; the settings
   Profit tab shows wagered, returned, net, return rate, net per round and XP, plus credits
   earned per work ticket. Crash bets are booked when they settle, from the round's bet list.
+- **XP per bet** (panel): for each game the tracked rounds, measured house edge and
+  average XP per round, then per bet level the sampled rounds, XP per round, credits lost
+  per XP point and the level's ladder state (testing, best, worse, skipped). The row the
+  grinder plays next is highlighted, so you can check it really tried every option.
 - A small panel in the bottom-left corner of the page has Start/Stop for work and
   for games, the ticket type, the game, accuracy per answer source, AI cost and
   the profit table. **Hide** collapses it to a small Botter button in the same corner
