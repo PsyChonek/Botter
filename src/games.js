@@ -92,7 +92,8 @@
   }
 
   // Profit of one game API response. Net is the credit change plus whatever the
-  // debt collector took from the win, because that still paid down the loan.
+  // debt collector took from the win, because that still paid down the loan,
+  // minus a level-up reward, which the same response pays but the game did not.
   function gameDelta(path, request, data, creditsBefore, prevStake = 0) {
     const game = PATH_GAME[path];
     if (!game || !data?.player || typeof creditsBefore !== 'number') return null;
@@ -113,7 +114,7 @@
       game,
       rounds,
       wagered,
-      net: data.player.credits - creditsBefore + (data.garnished ?? 0),
+      net: data.player.credits - creditsBefore + (data.garnished ?? 0) - (data.levelUp?.reward ?? 0),
       xp: data.xpGain ?? 0,
       stake: data.hand?.stake ?? prevStake,
     };

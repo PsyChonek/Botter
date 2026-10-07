@@ -254,7 +254,7 @@
     const { result } = data;
     if (typeof creditsBefore === 'number' && data.player) {
       stats.work.tickets += 1;
-      stats.work.net += data.player.credits - creditsBefore + (result.garnished ?? 0);
+      stats.work.net += data.player.credits - creditsBefore + (result.garnished ?? 0) - (data.levelUp?.reward ?? 0);
       stats.work.xp += result.xpGain ?? 0;
     }
     if (task && task.id === taskId && Number.isInteger(result.answer)) {

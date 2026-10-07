@@ -31,6 +31,10 @@ test('gameDelta books spins, roulette and garnished winnings', () => {
   const garnished = G.gameDelta('/api/skeleton/spin', { bet: 20 }, { player: { credits: 1010 }, garnished: 30 }, 1000);
   assert.equal(garnished.net, 40);
 
+  // A level-up reward lands in the same balance but is not a game win.
+  const levelUp = G.gameDelta('/api/slot/spin', { bet: 20 }, { player: { credits: 1480 }, levelUp: { to: 5, reward: 500 } }, 1000);
+  assert.equal(levelUp.net, -20);
+
   assert.equal(G.gameDelta('/api/work/submit', {}, { player: { credits: 1 } }, 0), null);
   assert.equal(G.gameDelta('/api/slot/spin', { bet: 20 }, { player: { credits: 1 } }, undefined), null);
 });
