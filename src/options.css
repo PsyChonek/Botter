@@ -135,7 +135,11 @@ button.danger { color: var(--neg); }
 button.danger:hover { border-color: var(--neg); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); column-gap: 12px; }
+/* Wide enough that select options are not clipped; narrow panels fall back to one column. */
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); column-gap: 12px; }
+/* Labels can wrap to different heights, so pin each control to the bottom of its cell to keep a row aligned. */
+.grid > div { display: flex; flex-direction: column; }
+.grid > div > :is(input, select) { margin-top: auto; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
 pre { white-space: pre-wrap; font: 0.85rem/1.5 ui-monospace, monospace; margin: 8px 0 0; }
 pre:empty { display: none; }
