@@ -61,10 +61,61 @@ test('parseAnswer reads structured output', () => {
   assert.throws(() => C.parseAnswer('two'));
 });
 
-test('nextType alternates unless a type is pinned', () => {
+test('nextType cycles through every type unless one is pinned', () => {
   assert.equal(C.nextType('alternate', null), 'bughunt');
   assert.equal(C.nextType('alternate', 'bughunt'), 'output');
+  assert.equal(C.nextType('alternate', 'output'), 'ticket');
+  assert.equal(C.nextType('alternate', 'ticket'), 'bughunt');
   assert.equal(C.nextType('output', 'output'), 'output');
+  assert.equal(C.nextType('ticket', 'bughunt'), 'ticket');
+});
+
+const ticket = {
+  id: '0abc1234',
+  type: 'ticket',
+  from: 'Jana z účtárny',
+  message: 'Od rána nejde nikomu ve firmě přihlásit do e-shopu, objednávky stojí.',
+};
+
+test('ticket answers cover every combination of type, priority and team', () => {
+  const all = C.choices(ticket);
+  assert.equal(all.length, 64);
+  assert.ok(all.includes(0) && all.includes(333) && all.includes(130));
+  assert.equal(C.isValidAnswer(ticket, 4), false);
+  assert.equal(C.isValidAnswer(ticket, 213), true);
+  assert.deepEqual(C.decodeTicket(213), [2, 1, 3]);
+  assert.deepEqual(C.decodeTicket(30), [0, 3, 0]);
+});
+
+test('ticket bank entry is keyed by sender and message', () => {
+  assert.equal(C.taskKey(ticket), C.taskKey({ ...ticket, id: 'ffff9999' }));
+  assert.notEqual(C.taskKey(ticket), C.taskKey({ ...ticket, from: 'Petr' }));
+  assert.match(C.taskKey(ticket), /^t:/);
+  assert.equal(C.answerFromBank(ticket, C.bankEntry(ticket, 30)), 30);
+  assert.equal(C.answerFromBank(ticket, C.bankEntry(output, 1)), null);
+});
+
+test('isBankEntry accepts every type and rejects mismatched keys', () => {
+  assert.equal(C.isBankEntry(C.taskKey(ticket), C.bankEntry(ticket, 30)), true);
+  assert.equal(C.isBankEntry(C.taskKey(bughunt), C.bankEntry(bughunt, 3)), true);
+  assert.equal(C.isBankEntry(C.taskKey(output), C.bankEntry(output, 1)), true);
+  assert.equal(C.isBankEntry(C.taskKey(output), C.bankEntry(ticket, 30)), false);
+  assert.equal(C.isBankEntry('t:x', { type: 'ticket', answer: '30' }), false);
+  assert.equal(C.isBankEntry('x:1', { type: 'other', text: 'a' }), false);
+  assert.equal(C.isBankEntry('b:1', null), false);
+});
+
+test('ticket prompt carries the message and the rules, and parses one index per field', () => {
+  const prompt = C.buildPrompt(ticket);
+  assert.match(prompt, /objednávky stojí/);
+  assert.match(prompt, /3: Kritická \(nefunguje to všem/);
+  assert.match(prompt, /"priority": <index>/);
+  assert.deepEqual(C.answerSchema(ticket).required, ['type', 'priority', 'team']);
+  assert.deepEqual(C.answerSchema(output).required, ['index']);
+  assert.equal(C.parseAnswer('{"type": 0, "priority": 3, "team": 0}', ticket), 30);
+  assert.equal(C.parseAnswer('```json\n{"team":2,"type":1,"priority":1}\n```', ticket), 112);
+  assert.throws(() => C.parseAnswer('{"type": 0, "priority": 4, "team": 0}', ticket));
+  assert.throws(() => C.parseAnswer('{"index": 2}', ticket));
 });
 
 test('ticketLabel matches the app header format', () => {

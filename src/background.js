@@ -4,7 +4,7 @@
 import './core.js';
 import './local-model.js';
 
-const { buildPrompt, parseAnswer, ANSWER_SCHEMA, SYSTEM_PROMPT, claudeCost, createLogger } = globalThis.BotterCore;
+const { buildPrompt, parseAnswer, answerSchema, SYSTEM_PROMPT, claudeCost, createLogger } = globalThis.BotterCore;
 const local = globalThis.BotterLocal;
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
@@ -50,7 +50,7 @@ async function solveClaude(task, settings, log) {
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: buildPrompt(task) }],
     output_config: {
-      format: { type: 'json_schema', schema: ANSWER_SCHEMA },
+      format: { type: 'json_schema', schema: answerSchema(task) },
       // Haiku 4.5 rejects effort; the current Opus/Sonnet use adaptive thinking driven by it.
       ...(isHaiku ? {} : { effort: settings.effort || DEFAULT_EFFORT }),
     },
@@ -79,7 +79,7 @@ async function solveClaude(task, settings, log) {
 
   const text = data.content?.find((block) => block.type === 'text')?.text;
   if (!text) throw new Error(`no_text (stop_reason: ${data.stop_reason})`);
-  const index = parseAnswer(text);
+  const index = parseAnswer(text, task);
   const cost = claudeCost(data.model ?? model, data.usage);
   log.info('ai_answer', {
     model: data.model,
@@ -116,7 +116,7 @@ async function solveOpenRouter(task, settings, log) {
       ],
       response_format: {
         type: 'json_schema',
-        json_schema: { name: 'answer', strict: true, schema: ANSWER_SCHEMA },
+        json_schema: { name: 'answer', strict: true, schema: answerSchema(task) },
       },
       usage: { include: true },
     }),
@@ -127,7 +127,7 @@ async function solveOpenRouter(task, settings, log) {
 
   const text = data.choices?.[0]?.message?.content;
   if (!text) throw new Error(`no_text (finish_reason: ${data.choices?.[0]?.finish_reason})`);
-  const index = parseAnswer(text);
+  const index = parseAnswer(text, task);
   const cost = typeof data.usage?.cost === 'number' ? data.usage.cost : null;
   log.info('ai_answer', {
     model: data.model,

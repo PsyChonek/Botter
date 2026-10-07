@@ -2,7 +2,7 @@
 // Classic script: loaded by the service worker (via import), the offscreen
 // document and the options page. Needs globalThis.BotterCore loaded first.
 (function (root) {
-  const { buildPrompt, parseAnswer, ANSWER_SCHEMA, SYSTEM_PROMPT } = root.BotterCore;
+  const { buildPrompt, parseAnswer, answerSchema, SYSTEM_PROMPT } = root.BotterCore;
 
   const OPTIONS = {
     expectedInputs: [{ type: 'text', languages: ['en'] }],
@@ -38,8 +38,8 @@
     // Clone so each ticket starts from the system prompt only.
     const session = await (await basePromise).clone();
     try {
-      const text = await session.prompt(buildPrompt(task), { responseConstraint: ANSWER_SCHEMA });
-      return parseAnswer(text);
+      const text = await session.prompt(buildPrompt(task), { responseConstraint: answerSchema(task) });
+      return parseAnswer(text, task);
     } finally {
       session.destroy();
     }

@@ -10,16 +10,21 @@ Chrome extension (Manifest V3) that solves the work tickets ("Práce") in
   and `/api/work/submit` to the content script. No auth token is read or reused.
 - `src/content.js` runs the loop: open the work screen, pick a ticket card,
   choose an answer, click the app's own button, dismiss the result with Escape, repeat.
+  There are three ticket types: bug hunt (click the buggy line), "Co to vypíše?"
+  (pick the printed output) and "Založ task" (read a help-desk message and pick type,
+  priority and team; the app submits it as one number, `type*100 + priority*10 + team`).
+  **Alternate** cycles through all three.
   When energy runs out it waits for the refill. It also dismisses the level-up
   and daily-bonus modals, which would otherwise block the screen.
 - The answer is chosen in this order:
   1. **Answer bank**: every submit response contains the correct answer
      (`result.answer`), so each ticket is learned the first time it is seen,
      whether the bot or you answered it. Output puzzles are stored by option text,
-     so a reshuffled copy of the same puzzle still matches.
+     so a reshuffled copy of the same puzzle still matches. "Založ task" tickets are
+     stored by sender and message.
   2. **AI solver**, chosen in settings:
      - **On-device AI** (default): Chrome's built-in Prompt API with Gemini Nano
-       (`src/local-model.js`), JSON-constrained to `{"index": n}`. Free, offline, no key.
+       (`src/local-model.js`), JSON-constrained to `{"index": n}` (one index per field for tickets). Free, offline, no key.
        It runs in the service worker if Chrome exposes `LanguageModel` there, otherwise
        in an offscreen document (`src/offscreen.html`). Requires Chrome 138+, about 22 GB
        free disk and a GPU with more than 4 GB VRAM or 16 GB RAM. The first download
@@ -102,7 +107,9 @@ press reload on the extension card in `chrome://extensions` and refresh the
 casino tab.
 
 Selectors the bot relies on (from the app bundle): `nav.views button` (2nd is
-Práce), `.work-screen`, `.work-pick .job-card` (bug hunt, then output),
+Práce), `.work-screen`, `.work-pick .job-card` (bug hunt, output, then ticket),
 `section.task`, `.ticket`, `ol.code.lines > li button`, `.options button`,
+`.ticket-field .ticket-options button` and `.ticket-submit` (the triage rules are
+copied into `TICKET_FIELDS` in `src/core.js`),
 `button.right` / `button.wrong` after a submit, `.modal .sheet.levelup`,
 `.modal .sheet.daily`. If the casino UI changes, start there.

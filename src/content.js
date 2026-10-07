@@ -316,6 +316,10 @@
     await sleep(Math.min(humanDelay() - (Date.now() - started), timeLeft));
     if (!workOn() || task?.id !== current.id) return;
 
+    if (current.type === 'ticket') {
+      await fileTicket(taskEl, current, index, source);
+      return;
+    }
     const button = answerButton(taskEl, current, index);
     if (!button || button.disabled) {
       log.warn('answer_button_missing', { ticket: C.ticketLabel(current.id), index });
@@ -323,6 +327,30 @@
     }
     pending = { taskId: current.id, source };
     button.click();
+  }
+
+  // A ticket is answered by picking one option per field, then submitting. React
+  // enables the submit button only after it re-renders with all three picks.
+  async function fileTicket(taskEl, current, index, source) {
+    const fields = taskEl.querySelectorAll('.ticket-field');
+    const digits = C.decodeTicket(index);
+    for (const [i, digit] of digits.entries()) {
+      const button = fields[i]?.querySelectorAll('.ticket-options button')[digit];
+      if (!button || button.disabled) {
+        log.warn('answer_button_missing', { ticket: C.ticketLabel(current.id), index, field: i });
+        return;
+      }
+      button.click();
+      await sleep(C.delayBetween(150, 400));
+      if (!workOn() || task?.id !== current.id) return;
+    }
+    const submit = taskEl.querySelector('.ticket-submit');
+    if (!submit || submit.disabled) {
+      log.warn('answer_button_missing', { ticket: C.ticketLabel(current.id), index, field: 'submit' });
+      return;
+    }
+    pending = { taskId: current.id, source };
+    submit.click();
   }
 
   const normDone = () => settings.stopAtNorm && player && player.work.paidToday >= player.work.norm;
@@ -665,6 +693,7 @@
             <option value="alternate"></option>
             <option value="bughunt"></option>
             <option value="output"></option>
+            <option value="ticket"></option>
           </select>
           <button type="button" class="work-toggle"></button>
         </div>

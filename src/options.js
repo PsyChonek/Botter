@@ -298,11 +298,7 @@ $('import').addEventListener('change', async (event) => {
   if (!file) return;
   try {
     const incoming = JSON.parse(await file.text());
-    const valid = Object.fromEntries(
-      Object.entries(incoming).filter(
-        ([key, entry]) => /^[bo]:/.test(key) && entry && typeof entry.text === 'string' && ['bughunt', 'output'].includes(entry.type),
-      ),
-    );
+    const valid = Object.fromEntries(Object.entries(incoming).filter(([key, entry]) => BotterCore.isBankEntry(key, entry)));
     const { bank = {} } = await chrome.storage.local.get('bank');
     const merged = { ...bank, ...valid };
     await chrome.storage.local.set({ bank: merged });
