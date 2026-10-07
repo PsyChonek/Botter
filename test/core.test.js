@@ -56,6 +56,8 @@ test('prompt lists every line or option with its index', () => {
 
 test('parseAnswer reads structured output', () => {
   assert.equal(C.parseAnswer('{"index": 2}'), 2);
+  assert.equal(C.parseAnswer('```json\n{"index": 3}\n```'), 3);
+  assert.equal(C.parseAnswer('The bug is on line 4.'), 4);
   assert.throws(() => C.parseAnswer('two'));
 });
 

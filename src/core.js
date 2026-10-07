@@ -87,7 +87,8 @@
 
   const SYSTEM_PROMPT =
     'You solve short programming puzzles from a code-review game. ' +
-    'Read the code carefully, reason about the exact runtime behaviour, and answer with the index only.';
+    'Read the code carefully, reason about the exact runtime behaviour, and answer with the index only. ' +
+    'Reply with JSON only, in the form {"index": <number>}.';
 
   const ANSWER_SCHEMA = {
     type: 'object',
@@ -96,9 +97,15 @@
     additionalProperties: false,
   };
 
+  // Structured output gives clean JSON; models without it may wrap it in prose or fences.
   function parseAnswer(text) {
-    const data = JSON.parse(text);
-    return data.index;
+    try {
+      const index = JSON.parse(text).index;
+      if (Number.isInteger(index)) return index;
+    } catch {}
+    const match = text.match(/"index"\s*:\s*(\d+)/) ?? text.match(/\d+/);
+    if (!match) throw new Error('unparseable_answer');
+    return Number(match[1] ?? match[0]);
   }
 
   function delayBetween(min, max, rand = Math.random) {

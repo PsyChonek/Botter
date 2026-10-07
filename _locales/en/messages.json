@@ -161,6 +161,27 @@
   "optionsClaudeHeading": {
     "message": "Claude API"
   },
+  "solver_openrouter": {
+    "message": "OpenRouter (needs a key, any model)"
+  },
+  "source_openrouter": {
+    "message": "OpenRouter"
+  },
+  "optionsOpenRouterHeading": {
+    "message": "OpenRouter"
+  },
+  "optionsOpenRouterKey": {
+    "message": "OpenRouter API key"
+  },
+  "optionsOpenRouterModel": {
+    "message": "Model ID"
+  },
+  "optionsOpenRouterHint": {
+    "message": "Any model ID from openrouter.ai/models, for example google/gemini-2.5-flash. Models with a :free suffix cost nothing but are rate limited."
+  },
+  "optionsLocalFlags": {
+    "message": "If the model is not supported or will not download: open chrome://flags, set \"Enables optimization guide on device\" to \"Enabled BypassPerfRequirement\" and \"Prompt API for Gemini Nano\" to \"Enabled\", relaunch Chrome, then press the download button again. Progress is visible at chrome://on-device-internals."
+  },
   "optionsApiKey": {
     "message": "Anthropic API key"
   },

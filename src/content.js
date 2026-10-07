@@ -19,6 +19,7 @@
     bank: { correct: 0, wrong: 0 },
     local: { correct: 0, wrong: 0 },
     claude: { correct: 0, wrong: 0 },
+    openrouter: { correct: 0, wrong: 0 },
     guess: { correct: 0, wrong: 0 },
     manual: { correct: 0, wrong: 0 },
   };

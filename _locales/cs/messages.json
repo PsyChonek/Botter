@@ -161,6 +161,27 @@
   "optionsClaudeHeading": {
     "message": "Claude API"
   },
+  "solver_openrouter": {
+    "message": "OpenRouter (potřebuje klíč, libovolný model)"
+  },
+  "source_openrouter": {
+    "message": "OpenRouter"
+  },
+  "optionsOpenRouterHeading": {
+    "message": "OpenRouter"
+  },
+  "optionsOpenRouterKey": {
+    "message": "OpenRouter API klíč"
+  },
+  "optionsOpenRouterModel": {
+    "message": "ID modelu"
+  },
+  "optionsOpenRouterHint": {
+    "message": "Libovolné ID modelu z openrouter.ai/models, třeba google/gemini-2.5-flash. Modely s příponou :free jsou zdarma, ale mají omezený počet volání."
+  },
+  "optionsLocalFlags": {
+    "message": "Pokud model není podporovaný nebo se nechce stáhnout: otevři chrome://flags, nastav \"Enables optimization guide on device\" na \"Enabled BypassPerfRequirement\" a \"Prompt API for Gemini Nano\" na \"Enabled\", restartuj Chrome a stiskni znovu tlačítko pro stažení. Průběh je vidět na chrome://on-device-internals."
+  },
   "optionsApiKey": {
     "message": "Anthropic API klíč"
   },

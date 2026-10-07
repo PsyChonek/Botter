@@ -28,6 +28,15 @@ Chrome extension (Manifest V3) that solves the work tickets ("Práce") in
        "what does it print" puzzles.
      - **Claude API**: `src/background.js` calls the Messages API with structured
        output. Default model `claude-opus-5-5` at `medium` effort. Needs an API key.
+     - **OpenRouter**: any model ID from openrouter.ai/models (default
+       `google/gemini-2.5-flash`). Sends a `json_schema` response format; models
+       that ignore it still work because the answer parser accepts a number in prose.
+
+If the on-device model reports "not supported" or "The feature flag gating model
+execution was disabled", open `chrome://flags`, set **Enables optimization guide on
+device** to **Enabled BypassPerfRequirement** and **Prompt API for Gemini Nano** to
+**Enabled**, relaunch Chrome and press **Download the model** again. Download
+progress shows at `chrome://on-device-internals`.
   3. **Guess** (optional): a random valid choice. A wrong answer costs energy
      but teaches the bank.
 - A small panel in the bottom-left corner of the page has Start/Stop, the

@@ -10,6 +10,8 @@ const local = globalThis.BotterLocal;
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const DEFAULT_MODEL = 'claude-opus-5-5';
 const DEFAULT_EFFORT = 'medium';
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const DEFAULT_OPENROUTER_MODEL = 'google/gemini-2.5-flash';
 const TIMEOUT_MS = 60_000;
 
 let offscreenPromise = null;
@@ -89,11 +91,58 @@ async function solveClaude(task, settings, log) {
   return index;
 }
 
+// OpenAI-compatible endpoint. json_schema is honoured by models that support it and
+// ignored by the rest, so parseAnswer also accepts a bare number in prose.
+async function solveOpenRouter(task, settings, log) {
+  const { openrouterKey } = await chrome.storage.local.get('openrouterKey');
+  if (!openrouterKey) throw new Error('no_api_key');
+  const model = settings.openrouterModel || DEFAULT_OPENROUTER_MODEL;
+
+  const started = Date.now();
+  const res = await fetch(OPENROUTER_URL, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${openrouterKey}`,
+      'X-Title': 'Botter',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: buildPrompt(task) },
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name: 'answer', strict: true, schema: ANSWER_SCHEMA },
+      },
+    }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error) throw new Error(`openrouter_${res.status}: ${data.error?.message ?? 'unknown error'}`);
+
+  const text = data.choices?.[0]?.message?.content;
+  if (!text) throw new Error(`no_text (finish_reason: ${data.choices?.[0]?.finish_reason})`);
+  const index = parseAnswer(text);
+  log.info('ai_answer', {
+    model: data.model,
+    type: task.type,
+    index,
+    ms: Date.now() - started,
+    inputTokens: data.usage?.prompt_tokens,
+    outputTokens: data.usage?.completion_tokens,
+  });
+  return index;
+}
+
+const SOLVERS = { local: solveLocal, claude: solveClaude, openrouter: solveOpenRouter };
+
 async function solve(task) {
   const { settings = {} } = await chrome.storage.local.get('settings');
   const log = createLogger(settings.logLevel);
   const started = Date.now();
-  const index = settings.aiSolver === 'claude' ? await solveClaude(task, settings, log) : await solveLocal(task);
+  const index = await (SOLVERS[settings.aiSolver] ?? solveLocal)(task, settings, log);
   log.debug('ai_solved', { solver: settings.aiSolver, type: task.type, index, ms: Date.now() - started });
   return index;
 }
