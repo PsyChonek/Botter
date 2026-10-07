@@ -65,9 +65,12 @@ progress shows at `chrome://on-device-internals`.
   default). Measured house edges: blackjack -12.4 %
   base to -2.9 % fully upgraded (exact solver in `src/blackjack.js`), roulette -7.7 %
   to -2.7 %, Blaze about 66 % RTP by simulation. Grinding explores each unlocked game
-  for 30 rounds, then sticks to the lowest measured loss per XP.
+  for 30 rounds, then sticks to the lowest measured loss per XP. The auto bet samples
+  the XP per round of each bet level (10 rounds) and only moves to the next level while
+  XP per credit wagered keeps up, so it settles on the bet with the lowest loss per XP;
+  under a daily budget it never bets more than what is left of it.
 - **Settings for the rest** (settings, Auto tab): XP grinding game (cheapest
-  per XP or a fixed game), bet and exploration rounds; automatic shop purchases from
+  per XP or a fixed game), bet (cheapest per XP or a fixed level) and exploration rounds; automatic shop purchases from
   a priority plan (`game:key` list, off by default) using the client's price and
   level formulas; a Blaze model check (`src/blaze.js`) that records every Blaze spin
   with its board and the server win, reports which scatter rule reproduces the

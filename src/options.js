@@ -12,8 +12,8 @@ const CHECKBOXES = [
   'captureDebug',
   'panelHidden',
 ];
-const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet', 'grindLimit', 'grindGame'];
-const INT_SELECTS = ['gameBet', 'crashBet', 'grindBet'];
+const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet', 'grindLimit', 'grindGame', 'grindBet'];
+const INT_SELECTS = ['gameBet', 'crashBet'];
 const TEXTS = ['openrouterModel', 'upgradePlan'];
 const NUMBERS = [
   'minDelayMs',
@@ -43,7 +43,7 @@ const DEFAULTS = {
   xpBudget: 0,
   grindMinBalance: 0,
   grindGame: 'auto',
-  grindBet: 20,
+  grindBet: 'auto',
   grindExploreRounds: 30,
   buyUpgrades: false,
   upgradePlan: 'crash:sla, blaze:star, blaze:lucky, blaze:wild',
@@ -83,6 +83,8 @@ for (const name of INT_SELECTS) {
 for (const key of G.ROULETTE_BETS) field('rouletteBet').add(new Option(msg(`roulette_${key}`), key));
 field('grindGame').add(new Option(msg('grind_auto'), 'auto'));
 for (const game of G.GAME_KEYS) field('grindGame').add(new Option(msg(`game_${game}`), game));
+field('grindBet').add(new Option(msg('grindBet_auto'), 'auto'));
+for (const bet of G.BET_LEVELS) field('grindBet').add(new Option(num.format(bet), String(bet)));
 
 async function load() {
   const { settings = {}, apiKey = '', openrouterKey = '', bank = {}, stats } = await chrome.storage.local.get([

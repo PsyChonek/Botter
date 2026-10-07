@@ -62,18 +62,91 @@ test('repayAmount keeps the reserve and never exceeds the debt', () => {
   assert.equal(A.repayAmount({ credits: 1000, loan: null }, 0), 0);
 });
 
-test('grindGame explores first, then picks the lowest loss per XP', () => {
+const xpCells = (perRound, bets) => Object.fromEntries(bets.map((bet) => [bet, { rounds: 10, xp: perRound(bet) * 10 }]));
+
+test('grindPlan explores each game first at the smallest bet', () => {
   const unlocks = { blaze: 1, skeleton: 5, blackjack: 10 };
   const games = Object.keys(unlocks);
-  assert.equal(A.grindGame(games, 1, {}, unlocks), 'blaze');
-  assert.equal(A.grindGame(games, 6, { blaze: { rounds: 40, net: -100, xp: 40 } }, unlocks), 'skeleton');
+  assert.deepEqual(A.grindPlan(games, [100, 20, 40], 1, {}, {}, unlocks), { game: 'blaze', bet: 20 });
+  const stats = { blaze: { rounds: 40, wagered: 800, net: -100, xp: 40 } };
+  assert.deepEqual(A.grindPlan(games, [20, 40], 6, stats, {}, unlocks), { game: 'skeleton', bet: 20 });
+  assert.equal(A.grindPlan(games, [20], 0, stats, {}, unlocks), null);
+  assert.equal(A.grindPlan(games, [], 12, stats, {}, unlocks), null);
+});
+
+test('grindPlan picks the game with the lowest loss per XP', () => {
+  const unlocks = { blaze: 1, skeleton: 5, blackjack: 10 };
+  const games = Object.keys(unlocks);
   const stats = {
-    blaze: { rounds: 40, net: -400, xp: 40 },
-    skeleton: { rounds: 40, net: -100, xp: 40 },
-    blackjack: { rounds: 40, net: -200, xp: 40 },
+    blaze: { rounds: 40, wagered: 800, net: -400, xp: 40 },
+    skeleton: { rounds: 40, wagered: 800, net: -100, xp: 40 },
+    blackjack: { rounds: 40, wagered: 800, net: -200, xp: 40 },
   };
-  assert.equal(A.grindGame(games, 12, stats, unlocks), 'skeleton');
-  assert.equal(A.grindGame(games, 0, stats, unlocks), null);
+  const flat = xpCells(() => 1, [20, 40]);
+  const betXp = { blaze: flat, skeleton: flat, blackjack: flat };
+  assert.deepEqual(A.grindPlan(games, [20, 40], 12, stats, betXp, unlocks), { game: 'skeleton', bet: 20 });
+  // A game whose first bet level has no XP sample yet is sampled before choosing.
+  assert.deepEqual(A.grindPlan(games, [20, 40], 12, stats, { blaze: flat, skeleton: flat }, unlocks), {
+    game: 'blackjack',
+    bet: 20,
+  });
+});
+
+test('grindPlan keeps the smallest bet when XP is per round', () => {
+  const unlocks = { blaze: 1 };
+  const stats = { blaze: { rounds: 40, wagered: 800, net: -100, xp: 40 } };
+  const levels = [20, 40, 100, 200];
+  // Only the next level gets sampled; XP per credit halves there, so the climb stops.
+  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: xpCells(() => 1, [20]) }, unlocks), {
+    game: 'blaze',
+    bet: 40,
+  });
+  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: xpCells(() => 1, [20, 40]) }, unlocks), {
+    game: 'blaze',
+    bet: 20,
+  });
+});
+
+test('grindPlan climbs to bigger bets while XP grows with the stake', () => {
+  const unlocks = { blaze: 1 };
+  const stats = { blaze: { rounds: 40, wagered: 800, net: -100, xp: 40 } };
+  const levels = [20, 40, 100, 200];
+  const linear = (bet) => bet / 20;
+  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: xpCells(linear, [20, 40]) }, unlocks), {
+    game: 'blaze',
+    bet: 100,
+  });
+  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: xpCells(linear, levels) }, unlocks), {
+    game: 'blaze',
+    bet: 200,
+  });
+  // XP per credit peaks at 100: the bet goes back there once 200 is measured.
+  const peaked = (bet) => (bet <= 100 ? bet / 20 : 5);
+  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: xpCells(peaked, levels) }, unlocks), {
+    game: 'blaze',
+    bet: 100,
+  });
+});
+
+test('grindPlan only climbs the ladder of the leading game', () => {
+  const unlocks = { blaze: 1, skeleton: 5 };
+  const stats = {
+    blaze: { rounds: 40, wagered: 800, net: -400, xp: 40 },
+    skeleton: { rounds: 40, wagered: 800, net: -100, xp: 40 },
+  };
+  const first = xpCells(() => 1, [20]);
+  assert.deepEqual(A.grindPlan(['blaze', 'skeleton'], [20, 40], 6, stats, { blaze: first, skeleton: first }, unlocks), {
+    game: 'skeleton',
+    bet: 40,
+  });
+});
+
+test('grindBets keeps a daily budget from being overshot by one round', () => {
+  const daily = { grindLimit: 'daily', xpBudget: 500, grindMinBalance: 0, reserve: 0 };
+  assert.deepEqual(A.grindBets(daily, 10_000, 0, [20, 40, 100, 200, 400, 1000]), [20, 40, 100, 200, 400]);
+  assert.deepEqual(A.grindBets(daily, 10_000, 450, [20, 40, 100]), [20, 40]);
+  const floor = { grindLimit: 'balance', xpBudget: 0, grindMinBalance: 1000, reserve: 0 };
+  assert.deepEqual(A.grindBets(floor, 1100, 0, [20, 40, 100, 200]), [20, 40, 100]);
 });
 
 test('dayKey is a local calendar date', () => {

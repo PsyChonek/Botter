@@ -37,7 +37,7 @@
     xpBudget: 0,
     grindMinBalance: 0,
     grindGame: 'auto',
-    grindBet: 20,
+    grindBet: 'auto',
     grindExploreRounds: 30,
     buyUpgrades: false,
     upgradePlan: 'crash:sla, blaze:star, blaze:lucky, blaze:wild',
@@ -59,6 +59,7 @@
     free: { daily: 0, bailout: 0 },
     crashBooked: [],
     grind: { day: '', net: 0 },
+    betXp: {}, // game -> bet -> { rounds, xp }, to find the cheapest bet per XP
     flags: { cleanDone: false, cleanTaken: false, boardsDay: '' },
     dwell: {}, // task type -> least ms open before a submit the server accepts
   };
@@ -89,6 +90,7 @@
   let submitTries = 0; // submits of the current task the server rejected
   let lastType = null;
   let bjStake = 0; // stake of the open blackjack hand, to book doubles
+  let bjBet = 0; // opening bet of that hand, to book its XP per bet level
   let sessionBase = 0; // total game net when the game bot was started
   const claimTried = {}; // kind -> last attempt, so a refused claim is not spammed
   let crashPolledAt = 0;
@@ -207,6 +209,9 @@
       if (delta) {
         bjStake = data.hand && !data.hand.done ? delta.stake : 0;
         G.addDelta(stats.games, delta);
+        if (path === '/api/blackjack/deal') bjBet = request?.bet ?? delta.wagered;
+        const bet = path === '/api/blackjack/action' ? bjBet : (request?.bet ?? delta.wagered);
+        if (bet > 0) G.addBetXp(stats.betXp, delta.game, bet, delta.rounds, delta.xp);
         if (stats.grind.day === A.dayKey()) stats.grind.net += delta.net;
         saveStats();
         log.debug('game_round', delta);
@@ -645,16 +650,21 @@
     const today = A.dayKey();
     if (stats.grind.day !== today) stats.grind = { day: today, net: 0 };
     const lost = Math.max(0, -stats.grind.net);
-    const bet = G.betFor(settings.grindBet, player.maxBet);
-    if (!A.grindAllowed(settings, player.credits, lost, bet)) return false;
+    const bets =
+      settings.grindBet === 'auto'
+        ? A.grindBets(settings, player.credits, lost, G.BET_LEVELS.filter((bet) => bet <= player.maxBet))
+        : [G.betFor(Number(settings.grindBet), player.maxBet)].filter((bet) =>
+            A.grindAllowed(settings, player.credits, lost, bet),
+          );
     const unlocks = Object.fromEntries(G.GAME_KEYS.map((game) => [game, G.GAMES[game].unlock]));
     const candidates = settings.grindGame === 'auto' ? G.GAME_KEYS : [settings.grindGame];
-    const game = A.grindGame(candidates, player.level, stats.games, unlocks, settings.grindExploreRounds);
-    if (!game) return false;
+    const plan = A.grindPlan(candidates, bets, player.level, stats.games, stats.betXp, unlocks, settings.grindExploreRounds);
+    if (!plan) return false;
+    const { game, bet } = plan;
     if (settings.grindLimit === 'balance') {
-      setStatus('statusGrindingFloor', [msg(`game_${game}`), credits(player.credits), credits(settings.grindMinBalance)]);
+      setStatus('statusGrindingFloor', [msg(`game_${game}`), credits(player.credits), credits(settings.grindMinBalance), credits(bet)]);
     } else {
-      setStatus('statusGrinding', [msg(`game_${game}`), credits(lost), credits(settings.xpBudget)]);
+      setStatus('statusGrinding', [msg(`game_${game}`), credits(lost), credits(settings.xpBudget), credits(bet)]);
     }
     const res = await playRound(game, bet);
     if (!res.ok) {

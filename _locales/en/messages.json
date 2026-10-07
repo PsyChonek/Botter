@@ -334,7 +334,7 @@
     }
   },
   "statusGrinding": {
-    "message": "Grinding XP on $P1$, lost $P2$ of $P3$ today",
+    "message": "Grinding XP on $P1$ at $P4$ a round, lost $P2$ of $P3$ today",
     "placeholders": {
       "p1": {
         "content": "$1"
@@ -344,6 +344,9 @@
       },
       "p3": {
         "content": "$3"
+      },
+      "p4": {
+        "content": "$4"
       }
     }
   },
@@ -387,7 +390,7 @@
     "message": "Stop grinding below this balance (0 = off)"
   },
   "statusGrindingFloor": {
-    "message": "Grinding XP on $P1$, balance $P2$, stops at $P3$",
+    "message": "Grinding XP on $P1$ at $P4$ a round, balance $P2$, stops at $P3$",
     "placeholders": {
       "p1": {
         "content": "$1"
@@ -397,10 +400,16 @@
       },
       "p3": {
         "content": "$3"
+      },
+      "p4": {
+        "content": "$4"
       }
     }
   },
   "grind_auto": {
+    "message": "Cheapest per XP (auto)"
+  },
+  "grindBet_auto": {
     "message": "Cheapest per XP (auto)"
   },
   "scatter_symbols": {
@@ -433,7 +442,7 @@
     "message": "Rounds to measure each game first"
   },
   "optionsGrindHint": {
-    "message": "Auto picks the unlocked game that has cost the fewest credits per XP, after measuring each one for the given number of rounds. A bigger bet loses more per round; it only pays off if the server gives XP per credit wagered rather than per round."
+    "message": "Auto game picks the unlocked game that has cost the fewest credits per XP, after measuring each one for the given number of rounds. Auto bet measures the XP each bet level gives per round and climbs to bigger bets only while the XP grows with the stake, so it settles on the bet with the lowest loss per XP. Under a daily budget it never bets more than is left of it."
   },
   "optionsShopHeading": {
     "message": "Shop upgrades"

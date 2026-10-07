@@ -128,6 +128,15 @@
     return games;
   }
 
+  // XP per bet level, so the grinder can find which stake buys XP cheapest.
+  // A blackjack action adds its XP to the hand's opening bet with no round.
+  function addBetXp(table, game, bet, rounds, xp) {
+    const cell = ((table[game] ??= {})[bet] ??= { rounds: 0, xp: 0 });
+    cell.rounds += rounds;
+    cell.xp += xp;
+    return table;
+  }
+
   function totalNet(games) {
     return Object.values(games).reduce((sum, row) => sum + row.net, 0);
   }
@@ -161,6 +170,7 @@
     energyNow,
     gameDelta,
     addDelta,
+    addBetXp,
     totalNet,
     profitRows,
   };

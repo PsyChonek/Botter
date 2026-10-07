@@ -70,19 +70,71 @@
     return Math.max(0, Math.floor(Math.min(debt, player.credits - reserve)));
   }
 
-  // Cheapest unlocked game per XP point. Games with fewer than minRounds
-  // tracked rounds are explored first so every candidate gets measured.
-  function grindGame(games, level, stats, unlocks, minRounds = 30) {
+  const XP_SAMPLE_ROUNDS = 10;
+  // The next bet level is still sampled while XP per credit wagered stays within
+  // this share of the best so far, so measurement noise does not end the climb.
+  const XP_LADDER_KEEP = 0.9;
+  // A bigger bet within this share of the best XP per credit is preferred: about
+  // the same loss per XP, but more XP per round.
+  const XP_BIGGER_BET_SLACK = 0.98;
+
+  // Measured bet ladder of one game: the best bet sampled so far and the next
+  // level still to sample (null once XP per credit drops off).
+  function betLadder(cells, levels) {
+    let best = null;
+    let top = 0;
+    for (const bet of levels) {
+      const cell = cells?.[bet];
+      if (!cell || cell.rounds < XP_SAMPLE_ROUNDS) return { best, next: bet };
+      const perRound = cell.xp / cell.rounds;
+      const perCredit = perRound / bet;
+      if (best && perCredit < top * XP_LADDER_KEEP) break;
+      top = Math.max(top, perCredit);
+      if (perCredit >= top * XP_BIGGER_BET_SLACK) best = { bet, perRound };
+    }
+    return { best, next: null };
+  }
+
+  // Cheapest game and bet per XP point. The loss per XP of a bet is the game's
+  // house edge times bet / XP per round: the edge is measured per game (it does
+  // not depend on the bet), XP per round per bet level, since the server's XP
+  // formula is unknown. Games with fewer than minRounds tracked rounds are
+  // explored first at the smallest bet. Then the leading game climbs its bet
+  // ladder while XP per credit wagered keeps up, so a flat XP per round costs
+  // only one sample at the next level. bets are the levels allowed right now;
+  // betXp is { game: { bet: { rounds, xp } } }.
+  function grindPlan(games, bets, level, stats, betXp, unlocks, minRounds = 30) {
     const unlocked = games.filter((game) => level >= unlocks[game]);
-    if (!unlocked.length) return null;
+    const levels = [...bets].sort((a, b) => a - b);
+    if (!unlocked.length || !levels.length) return null;
     const rounds = (game) => stats[game]?.rounds ?? 0;
     const unexplored = unlocked.filter((game) => rounds(game) < minRounds);
-    if (unexplored.length) return unexplored.reduce((a, b) => (rounds(b) < rounds(a) ? b : a));
-    const lossPerXp = (game) => {
+    if (unexplored.length) {
+      return { game: unexplored.reduce((a, b) => (rounds(b) < rounds(a) ? b : a)), bet: levels[0] };
+    }
+
+    const ladders = unlocked.map((game) => ({ game, ...betLadder(betXp?.[game], levels) }));
+    const unsampled = ladders.find((ladder) => !ladder.best);
+    if (unsampled) return { game: unsampled.game, bet: unsampled.next };
+
+    const cost = ({ game, best }) => {
       const row = stats[game];
-      return row.xp > 0 ? Math.max(0, -row.net) / row.xp : Infinity;
+      const edge = row.wagered > 0 ? Math.max(0, -row.net) / row.wagered : 0;
+      return best.perRound > 0 ? (edge * best.bet) / best.perRound : Infinity;
     };
-    return unlocked.reduce((a, b) => (lossPerXp(b) < lossPerXp(a) ? b : a));
+    const better = (a, b) => cost(b) < cost(a) || (cost(b) === cost(a) && b.best.perRound > a.best.perRound);
+    const lead = ladders.reduce((a, b) => (better(a, b) ? b : a));
+    return { game: lead.game, bet: lead.next ?? lead.best.bet };
+  }
+
+  // Bet levels XP grinding may use now: allowed by the limits, and under a daily
+  // budget no bigger than what is left of it, so one lost round cannot overshoot.
+  function grindBets(settings, credits, lostToday, levels) {
+    return levels.filter(
+      (bet) =>
+        grindAllowed(settings, credits, lostToday, bet) &&
+        (settings.grindLimit === 'balance' || bet <= settings.xpBudget - lostToday),
+    );
   }
 
   // Whether XP grinding may place another bet. The limit is either a daily loss
@@ -101,7 +153,7 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
-  const api = { CRASH_PLANNED_MULT, crashMult, bestCrashTarget, crashStake, repayAmount, grindGame, grindAllowed, dayKey };
+  const api = { CRASH_PLANNED_MULT, crashMult, bestCrashTarget, crashStake, repayAmount, grindPlan, grindBets, grindAllowed, dayKey };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BotterAuto = api;
 })(globalThis);

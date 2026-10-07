@@ -42,6 +42,11 @@ test('gameDelta books a doubled blackjack hand as one round', () => {
   assert.deepEqual(games.blackjack, { rounds: 1, wagered: 200, net: 200, xp: 0 });
 });
 
+test('addBetXp books XP per bet level, blackjack actions without a round', () => {
+  const table = G.addBetXp(G.addBetXp(G.addBetXp({}, 'blaze', 20, 1, 2), 'blaze', 20, 1, 3), 'blackjack', 100, 0, 4);
+  assert.deepEqual(table, { blaze: { 20: { rounds: 2, xp: 5 } }, blackjack: { 100: { rounds: 0, xp: 4 } } });
+});
+
 test('profitRows computes return rate and net per round', () => {
   const [row] = G.profitRows({ blaze: { rounds: 10, wagered: 200, net: -40, xp: 5 }, roulette: { rounds: 0, wagered: 0, net: 0, xp: 0 } });
   assert.equal(row.game, 'blaze');

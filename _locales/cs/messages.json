@@ -334,7 +334,7 @@
     }
   },
   "statusGrinding": {
-    "message": "Farmím XP na $P1$, dnes ztráta $P2$ z $P3$",
+    "message": "Farmím XP na $P1$ se sázkou $P4$, dnes ztráta $P2$ z $P3$",
     "placeholders": {
       "p1": {
         "content": "$1"
@@ -344,6 +344,9 @@
       },
       "p3": {
         "content": "$3"
+      },
+      "p4": {
+        "content": "$4"
       }
     }
   },
@@ -387,7 +390,7 @@
     "message": "Nefarmit pod tento zůstatek (0 = vypnuto)"
   },
   "statusGrindingFloor": {
-    "message": "Farmím XP na $P1$, zůstatek $P2$, konec na $P3$",
+    "message": "Farmím XP na $P1$ se sázkou $P4$, zůstatek $P2$, konec na $P3$",
     "placeholders": {
       "p1": {
         "content": "$1"
@@ -397,10 +400,16 @@
       },
       "p3": {
         "content": "$3"
+      },
+      "p4": {
+        "content": "$4"
       }
     }
   },
   "grind_auto": {
+    "message": "Nejlevnější za XP (auto)"
+  },
+  "grindBet_auto": {
     "message": "Nejlevnější za XP (auto)"
   },
   "scatter_symbols": {
@@ -433,7 +442,7 @@
     "message": "Kol na změření každé hry"
   },
   "optionsGrindHint": {
-    "message": "Auto vybere odemčenou hru, která stála nejméně kreditů za XP, poté co každou změří zadaným počtem kol. Vyšší sázka prodělává víc za kolo; vyplatí se jen tehdy, když server dává XP podle vsazených kreditů, a ne za kolo."
+    "message": "Auto hra vybere odemčenou hru, která stála nejméně kreditů za XP, poté co každou změří zadaným počtem kol. Auto sázka změří, kolik XP za kolo dává každá výše sázky, a k vyšším sázkám přejde jen dokud XP roste se vsazenou částkou, takže skončí u sázky s nejmenší ztrátou za XP. Při denním rozpočtu nikdy nevsadí víc, než z něj zbývá."
   },
   "optionsShopHeading": {
     "message": "Vylepšení z obchodu"
