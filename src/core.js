@@ -195,6 +195,22 @@
     return Math.round(min + rand() * Math.max(0, max - min));
   }
 
+  const MAX_DWELL_MS = 60_000;
+
+  // Least time a task stays open before the bot submits it: what a quick reader
+  // needs for a "Založ task" message, or the minimum the server proved to enforce
+  // by rejecting a faster submit, whichever is longer.
+  function minDwellMs(task, learned = 0) {
+    const read = task.type === 'ticket' ? 2000 + 25 * (task.message?.length ?? 0) : 0;
+    return Math.max(read, learned);
+  }
+
+  // New minimum after the server rejected a submit made `rejectedAfterMs` after
+  // the task opened: comfortably above both, so one rejection is usually enough.
+  function slowerDwell(learned = 0, rejectedAfterMs = 0) {
+    return Math.min(MAX_DWELL_MS, Math.round(Math.max(learned, rejectedAfterMs) * 1.5) + 1000);
+  }
+
   function nextType(preference, lastType) {
     if (TYPES.includes(preference)) return preference;
     return TYPES[(TYPES.indexOf(lastType) + 1) % TYPES.length];
@@ -259,3 +275,5 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BotterCore = api;
 })(globalThis);
+    minDwellMs,
+    slowerDwell,

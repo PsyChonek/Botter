@@ -130,6 +130,19 @@ test('claudeCost prices input and output tokens per model', () => {
   assert.equal(C.claudeCost('claude-sonnet-5-5', undefined), null);
 });
 
+test('minDwellMs gives tickets a reading time and honours a learned minimum', () => {
+  assert.equal(C.minDwellMs({ type: 'output' }), 0);
+  assert.equal(C.minDwellMs({ type: 'ticket', message: 'x'.repeat(200) }), 7000);
+  assert.equal(C.minDwellMs({ type: 'ticket', message: 'short' }, 12_000), 12_000);
+  assert.equal(C.minDwellMs({ type: 'bughunt' }, 3000), 3000);
+});
+
+test('slowerDwell grows past the rejected submit and stays capped', () => {
+  assert.equal(C.slowerDwell(0, 4000), 7000);
+  assert.equal(C.slowerDwell(10_000, 4000), 16_000);
+  assert.equal(C.slowerDwell(50_000, 50_000), 60_000);
+});
+
 test('delayBetween stays within bounds', () => {
   assert.equal(C.delayBetween(100, 200, () => 0), 100);
   assert.equal(C.delayBetween(100, 200, () => 0.999999), 200);

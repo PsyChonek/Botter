@@ -58,7 +58,9 @@
     crashBooked: [],
     grind: { day: '', net: 0 },
     flags: { cleanDone: false, cleanTaken: false, boardsDay: '' },
+    dwell: {}, // task type -> least ms open before a submit the server accepts
   };
+  const MAX_SUBMIT_TRIES = 3;
   const CRASH_UNLOCK = 3;
   const CRASH_POLL_MS = 60_000;
   const LEADERBOARDS = ['level', 'credits', 'biggest', 'losers', 'debtors'];
@@ -81,6 +83,8 @@
   let task = null; // current task as returned by /api/work/start
   let answeredTaskId = null; // task the bot already clicked an answer for
   let pending = null; // { taskId, source } of the bot's last answer
+  let taskOpenedAt = 0; // local time the current task was started
+  let submitTries = 0; // submits of the current task the server rejected
   let lastType = null;
   let bjStake = 0; // stake of the open blackjack hand, to book doubles
   let sessionBase = 0; // total game net when the game bot was started
@@ -179,12 +183,17 @@
       capture = [...capture, { at: Date.now(), path, ok, request, data }].slice(-MAX_CAPTURE);
       chrome.storage.local.set({ capture });
     }
-    if (!ok) return;
+    if (!ok) {
+      if (path === '/api/work/submit') onSubmitRejected(request?.id, data);
+      return;
+    }
     if (data?.crash) bookCrash(data.crash);
     if (path === '/api/slot/spin' && data.result) recordSpin(request, data);
 
     if (path === '/api/work/start' && data.task) {
       task = data.task;
+      taskOpenedAt = Date.now();
+      submitTries = 0;
       log.debug('task_started', { id: task.id, type: task.type });
     } else if (path === '/api/work/submit' && data.result) {
       onResult(request?.id, data, before);
@@ -251,6 +260,29 @@
     chrome.storage.local.set({ bank, stats });
   }
 
+  // The app only toasts a rejected submit and leaves the task open, so without
+  // this the bot would wait on it forever. A submit the server found too fast is
+  // retried after a longer, remembered minimum; expired tasks the app closes itself.
+  function onSubmitRejected(taskId, data) {
+    if (!task || task.id !== taskId) return;
+    pending = null;
+    const fields = { ticket: C.ticketLabel(task.id), type: task.type, code: data?.code, error: data?.error };
+    if (data?.code === 'expired' || data?.code === 'already_solved') {
+      log.warn('submit_rejected', fields);
+      return;
+    }
+    const openMs = Date.now() - taskOpenedAt;
+    stats.dwell[task.type] = C.slowerDwell(stats.dwell[task.type], openMs);
+    saveStats();
+    submitTries += 1;
+    log.warn('submit_rejected', { ...fields, openMs, nextDwellMs: stats.dwell[task.type], tries: submitTries });
+    if (submitTries >= MAX_SUBMIT_TRIES) {
+      pressKey('Escape');
+      return;
+    }
+    answeredTaskId = null;
+  }
+
   // Every AI call is billed, even when its answer turns out unusable.
   function recordSpend(cost) {
     if (typeof cost !== 'number') return;
@@ -314,7 +346,8 @@
 
     setStatus('statusAnswering', [C.ticketLabel(current.id), msg(`source_${source}`)]);
     const timeLeft = current.expiresAt - Date.now() - 2000;
-    await sleep(Math.min(humanDelay() - (Date.now() - started), timeLeft));
+    const dwellLeft = C.minDwellMs(current, stats.dwell[current.type]) - (Date.now() - taskOpenedAt);
+    await sleep(Math.min(Math.max(humanDelay() - (Date.now() - started), dwellLeft), timeLeft));
     if (!workOn() || task?.id !== current.id) return;
 
     if (current.type === 'ticket') {
