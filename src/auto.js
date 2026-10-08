@@ -167,22 +167,36 @@
   // the same loss per XP, but more XP per round.
   const XP_BIGGER_BET_SLACK = 0.98;
 
-  // Measured bet ladder of one game: the best bet sampled so far, the next
-  // level still to sample (null once XP per credit drops off) and the level
-  // where it dropped off (null while the climb goes on).
+  // Bets above this are not sampled: XP per round looks proportional to the bet
+  // there, so it is scaled up from the biggest sampled level.
+  const XP_SAMPLE_MAX_BET = 100;
+
+  // Measured bet ladder of one game: the best bet so far, the next level still
+  // to sample (null once XP per credit drops off), the level where it dropped
+  // off (null while the climb goes on) and XP per round per level reached,
+  // measured up to XP_SAMPLE_MAX_BET and scaled with the bet above it.
   function betLadder(cells, levels) {
     let best = null;
     let top = 0;
+    let last = null;
+    const rates = {};
     for (const bet of levels) {
-      const cell = cells?.[bet];
-      if (!cell || cell.rounds < XP_SAMPLE_ROUNDS) return { best, next: bet, stop: null };
-      const perRound = cell.xp / cell.rounds;
+      let perRound;
+      if (bet > XP_SAMPLE_MAX_BET && last) {
+        perRound = (last.perRound * bet) / last.bet;
+      } else {
+        const cell = cells?.[bet];
+        if (!cell || cell.rounds < XP_SAMPLE_ROUNDS) return { best, next: bet, stop: null, rates };
+        perRound = cell.xp / cell.rounds;
+        last = { bet, perRound };
+      }
+      rates[bet] = perRound;
       const perCredit = perRound / bet;
-      if (best && perCredit < top * XP_LADDER_KEEP) return { best, next: null, stop: bet };
+      if (best && perCredit < top * XP_LADDER_KEEP) return { best, next: null, stop: bet, rates };
       top = Math.max(top, perCredit);
       if (perCredit >= top * XP_BIGGER_BET_SLACK) best = { bet, perRound };
     }
-    return { best, next: null, stop: null };
+    return { best, next: null, stop: null, rates };
   }
 
   // House edge of a game measured from its tracked rounds (0 when it is ahead).
@@ -227,8 +241,8 @@
 
   // What the XP grinder has measured, per game, for the panel: the measured
   // and the modelled edge, the average XP per round and, per bet level, the
-  // sampled rounds, XP per round, credits lost per XP point (from the edge the
-  // grinder plans with) and where the level stands on the bet ladder: 'best',
+  // sampled rounds, XP per round (scaled up above XP_SAMPLE_MAX_BET), credits
+  // lost per XP point (from the edge the grinder plans with) and where the level stands on the bet ladder: 'best',
   // 'next' (being sampled), 'worse' (XP per credit dropped off there),
   // 'skipped' (above that, never tried) or null.
   function grindReport(games, levels, level, stats, betXp, unlocks, edges = {}) {
@@ -240,7 +254,7 @@
       const bets = sorted.map((bet) => {
         const cell = betXp?.[game]?.[bet];
         const rounds = cell?.rounds ?? 0;
-        const perRound = rounds > 0 ? cell.xp / rounds : null;
+        const perRound = ladder.rates[bet] ?? (rounds > 0 ? cell.xp / rounds : null);
         const cost = edge !== null && perRound > 0 ? (edge * bet) / perRound : null;
         let state = null;
         if (bet === ladder.best?.bet) state = 'best';
