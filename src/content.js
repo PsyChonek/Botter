@@ -74,7 +74,8 @@
   const MAX_SUBMIT_TRIES = 3;
   const CRASH_UNLOCK = 3;
   const CRASH_POLL_MS = 60_000;
-  const LEADERBOARDS = ['level', 'credits', 'biggest', 'losers', 'debtors'];
+  const LEADERBOARDS = ['sprint', 'level', 'credits', 'biggest', 'losers', 'debtors'];
+  const SPRINT_MAX_AGE_MS = 10 * 60_000;
   const CLEAN_LOAN = 500;
   const MAX_SPINS = 2000;
   const MAX_CAPTURE = 40;
@@ -130,6 +131,7 @@
   let sessionBase = 0; // total game net when the game bot was started
   const claimTried = {}; // kind -> last attempt, so a refused claim is not spammed
   let crashPolledAt = 0;
+  let sprint = null; // { rank, score, endAt, at } of this account in the weekly sprint
   let spins = []; // recorded Blaze spins for the model check
   let capture = []; // raw responses of rarely seen endpoints, for debugging
   let unsavedSpins = 0;
@@ -260,6 +262,7 @@
     }
     bookRewards(data);
     if (data?.crash) bookCrash(data.crash);
+    if (data?.by === 'sprint' && Array.isArray(data.entries)) readSprint(data);
     if (path === '/api/slot/spin' && data.result) recordSpin(request, data);
 
     if (path === '/api/work/start' && data.task) {
@@ -342,6 +345,13 @@
       saveStats();
       log.info('crash_settled', { stake: bet.stake, payout: bet.payout ?? 0, status: bet.status });
     }
+  }
+
+  // The account's place in the weekly sprint, from the sprint leaderboard. An
+  // account missing from the board is off the podium.
+  function readSprint(data) {
+    const me = data.entries.find((entry) => entry.me);
+    sprint = { rank: me?.rank ?? Infinity, score: me?.value ?? 0, endAt: data.sprint?.endAt ?? 0, at: Date.now() };
   }
 
   function onResult(taskId, data, creditsBefore) {
@@ -836,17 +846,39 @@
   const limits = () =>
     bankruptPlanned() ? { ...settings, reserve: 0, grindLimit: 'balance', grindMinBalance: 1 } : settings;
 
+  // The account's sprint standing, fetched again once it is older than ten
+  // minutes or its sprint has ended. Null while it cannot be read.
+  async function sprintStanding() {
+    const now = Date.now();
+    const stale = !sprint || now - sprint.at > SPRINT_MAX_AGE_MS || now >= sprint.endAt;
+    if (stale && now - (claimTried.sprint ?? 0) > CRASH_POLL_MS) {
+      claimTried.sprint = now;
+      await api('/api/leaderboard?by=sprint');
+    }
+    return sprint && Date.now() < sprint.endAt ? sprint : null;
+  }
+
   // Personal bankruptcy once it is planned and execution allows it, after the
   // shop and the grinder have spent the credits the reset would wipe, and
-  // unless finishing the current level first costs less than losing its XP.
+  // unless finishing the current level first costs less than losing its XP. On
+  // a sprint podium it waits for the sprint to end, so the prize is paid and
+  // the bankruptcy lands on the new sprint's first points.
   async function bankruptStep() {
     if (!player.loan?.execution || !bankruptPlanned()) return false;
     if (Date.now() - (claimTried.bankrupt ?? 0) < CLAIM_RETRY_MS) return false;
     if (shopOffer() || grindReady()) return false;
     const price = xpPrice();
     if (A.waitForLevel(player, price, workPerXp())) return false;
+    const standing = await sprintStanding();
+    if (!standing || A.sprintHold(standing)) return false;
     claimTried.bankrupt = Date.now();
-    const terms = { debt: player.loan.debt, credits: player.credits, xpLost: player.xpInto ?? 0, xpPrice: price };
+    const terms = {
+      debt: player.loan.debt,
+      credits: player.credits,
+      xpLost: player.xpInto ?? 0,
+      xpPrice: price,
+      sprintScore: standing.score,
+    };
     setStatus('statusBankrupt', [credits(terms.debt)]);
     const res = await api('/api/loan/bankrupt', {});
     if (!res.ok) log.warn('bankrupt_failed', { ...terms, status: res.status, error: res.data?.error });
@@ -872,8 +904,9 @@
 
   // A loan taken to be dropped by bankruptcy at execution, when the expected
   // XP lost then (BotterAuto.loanCycle) is worth less than the loan. Waits for
-  // the clean-loan achievement, which needs a loan of its own. The loan is
-  // booked as free income, since it is never paid back.
+  // the clean-loan achievement, which needs a loan of its own, and on a sprint
+  // podium for the last 12 hours of the sprint, so the bankruptcy comes after
+  // the prize. The loan is booked as free income, since it is never paid back.
   async function loanCycleStep() {
     if (!player.loan && stats.flags.cycleLoan) {
       stats.flags.cycleLoan = false;
@@ -889,6 +922,8 @@
       log.info('loan_cycle_skip', { amount, credits: player.credits, xpNeed: player.xpNeed, value: plan?.value ?? null });
       return false;
     }
+    const standing = await sprintStanding();
+    if (!standing || !A.loanSprintSafe(standing)) return false;
     setStatus('statusLoanCycle', [credits(amount)]);
     const res = await api('/api/loan/take', { amount });
     if (!res.ok) {

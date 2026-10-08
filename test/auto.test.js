@@ -513,3 +513,25 @@ test('standupPlan skips quests that cost more than they pay or cannot be played'
   assert.equal(A.standupPlan([{ key: 'a', text: 'Zatoč si 5× Blaze', progress: 0, target: 5, reward: 480 }], { ...ctx, levels: [] }, broke), null);
   assert.equal(broke[0].reason, 'noCredits');
 });
+
+test('sprint prize at stake only on the podium with points', () => {
+  assert.equal(A.sprintAtStake({ rank: 1, score: 900 }), 10_000);
+  assert.equal(A.sprintAtStake({ rank: 3, score: 900 }), 2_500);
+  assert.equal(A.sprintAtStake({ rank: 4, score: 900 }), 0);
+  assert.equal(A.sprintAtStake({ rank: 1, score: 0 }), 0);
+  assert.equal(A.sprintAtStake(null), 0);
+});
+
+test('bankruptcy waits for the sprint end on the podium, loans start 12 hours before it', () => {
+  const hour = 60 * 60 * 1000;
+  const endAt = 100 * hour;
+  const podium = { rank: 2, score: 500, endAt };
+  const off = { rank: 7, score: 500, endAt };
+  assert.equal(A.sprintHold(podium, endAt - 1), true);
+  assert.equal(A.sprintHold(podium, endAt), false);
+  assert.equal(A.sprintHold(off, endAt - 1), false);
+  // Execution comes 12 hours after the loan, so the bankruptcy lands after the end.
+  assert.equal(A.loanSprintSafe(podium, endAt - 13 * hour), false);
+  assert.equal(A.loanSprintSafe(podium, endAt - 12 * hour), true);
+  assert.equal(A.loanSprintSafe(off, 0), true);
+});

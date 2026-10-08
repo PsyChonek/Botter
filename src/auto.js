@@ -105,6 +105,30 @@
     return into * xpPrice > GARNISH * left * workPerXp;
   }
 
+  // Weekly sprint: story points are the XP earned since Monday 9:00, and when it
+  // ends the top three are paid these prizes. Bankruptcy wipes the week's points.
+  const SPRINT_PRIZES = [10_000, 5_000, 2_500];
+  // From taking a loan until its debt hits the cap and execution starts.
+  const LOAN_EXECUTION_MS = 12 * 60 * 60 * 1000;
+
+  // Prize a bankruptcy now would throw away: the one for the account's place in
+  // the sprint (sprint = { rank, score }), 0 off the podium, where the points
+  // are only this week's progress.
+  function sprintAtStake(sprint) {
+    if (!sprint || !(sprint.score > 0)) return 0;
+    return SPRINT_PRIZES[sprint.rank - 1] ?? 0;
+  }
+
+  // Whether a bankruptcy should wait for the sprint to end: the account holds a
+  // podium place, and the prize is paid when the sprint ends, after which the
+  // new sprint's points are close to nothing. sprint.endAt is that moment.
+  const sprintHold = (sprint, now = Date.now()) => sprintAtStake(sprint) > 0 && now < sprint.endAt;
+
+  // Whether a loan taken now for the bankruptcy cycle keeps the sprint prize:
+  // off the podium, or the sprint ends before execution allows the bankruptcy.
+  const loanSprintSafe = (sprint, now = Date.now()) =>
+    sprintAtStake(sprint) === 0 || now + LOAN_EXECUTION_MS >= sprint.endAt;
+
   // The shark lends in steps of 500.
   const loanAmount = (limit) => Math.floor(Math.max(0, limit ?? 0) / 500) * 500;
 
@@ -463,6 +487,9 @@
     repayAmount,
     bankruptWorth,
     waitForLevel,
+    sprintAtStake,
+    sprintHold,
+    loanSprintSafe,
     loanAmount,
     loanCycle,
     wheelReady,

@@ -123,8 +123,15 @@ progress shows at `chrome://on-device-internals`.
     it or waiting for the level, plus the account's credits above 500, which go with
     it. A test checks the formula against a Monte Carlo run. At most once a week,
     because of the block. The loan is booked as free income.
-  - Sprint points are not valued, so turn it off if an account is chasing the weekly
-    sprint. Each bankruptcy shows 🏚️ next to the name on the leaderboards for a week.
+  - **Sprint**: story points are the XP earned since Monday 9:00, and the top three
+    are paid 10,000 / 5,000 / 2,500 when the sprint ends. Bankruptcy wipes the week's
+    points. Off the podium that is only this week's progress, so it is ignored. On the
+    podium (read from the sprint leaderboard, refreshed every 10 minutes) the
+    bankruptcy waits for the sprint to end and lands on the new sprint's first
+    points, and a cycle loan is taken only in the last 12 hours of the sprint, so its
+    execution comes after the prize. Each bankruptcy marks the name on the
+    leaderboards for a week. The sprint board is also opened with the others for the
+    podium achievement.
 - **Settings for the rest** (settings, Auto tab): XP grinding game (cheapest
   per XP or a fixed game), bet (cheapest per XP or a fixed level) and exploration rounds; automatic shop purchases from
   a priority plan (`game:key` list, off by default) using the client's price and
