@@ -1266,6 +1266,7 @@
     if (!player) return loadPlayer();
     if (await bankruptStep()) return;
     if (await claimFreebies()) return;
+    if (await rotateStep(true)) return;
     if (await repayStep()) return;
     if (await loanTrickStep()) return;
     if (await loanCycleStep()) return;
@@ -1273,7 +1274,6 @@
     if (await leaderboardStep()) return;
     if (await crashStep()) return;
     if (await standupStep()) return;
-    if (await rotateStep(true)) return;
     if (workAvailable()) return workStep();
     if (await grindStep()) return;
     if (await rotateStep()) return;
@@ -1283,6 +1283,8 @@
   async function step() {
     if (settings.autoMode) return autoStep();
     if (await claimFreebies()) return;
+    // The game bot would gamble the other account's credits, so only the work bot leaves.
+    if (settings.enabled && !settings.gamesEnabled && (await rotateStep(true))) return;
     if (settings.enabled && workAvailable()) return workStep();
     if (settings.gamesEnabled) return gameStep();
     if (settings.enabled && (await rotateStep())) return;
