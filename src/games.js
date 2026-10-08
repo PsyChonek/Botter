@@ -162,42 +162,6 @@
     return games;
   }
 
-  // XP per game and bet level, so the grinder can find which game buys XP
-  // cheapest. A blackjack action adds its XP to the hand's opening bet with no round.
-  function addBetXp(table, game, bet, rounds, xp, now = Date.now()) {
-    const cell = ((table[game] ??= {})[bet] ??= { rounds: 0, xp: 0, at: now });
-    cell.rounds += rounds;
-    cell.xp += xp;
-    return table;
-  }
-
-  // XP samples expire, so the grinder measures every game again, the ones it
-  // ruled out included: the server's XP per round can change, and a game ruled
-  // out on 10 noisy rounds deserves another try.
-  const BET_XP_TTL_MS = 3 * 24 * 60 * 60 * 1000;
-
-  // Drops XP samples older than ttl, and undated ones from before samples expired.
-  function expireBetXp(table, now = Date.now(), ttl = BET_XP_TTL_MS) {
-    for (const [game, cells] of Object.entries(table)) {
-      for (const [bet, cell] of Object.entries(cells)) {
-        if (cell.at === undefined || now - cell.at >= ttl) delete cells[bet];
-      }
-      if (!Object.keys(cells).length) delete table[game];
-    }
-    return table;
-  }
-
-  // Upgrades change XP per round, so a game's XP samples are dropped when its
-  // upgrades differ from the ones they were taken with. seen is { game: key }.
-  // Samples from before keys were kept are adopted as they are.
-  function syncBetXp(table, seen, game, upgrades) {
-    const own = upgrades?.[game] ?? {};
-    const key = JSON.stringify(Object.keys(own).sort().map((name) => [name, own[name]]));
-    if (seen[game] !== undefined && seen[game] !== key) delete table[game];
-    seen[game] = key;
-    return table;
-  }
-
   function totalNet(games) {
     return Object.values(games).reduce((sum, row) => sum + row.net, 0);
   }
@@ -234,9 +198,6 @@
     rewardTotal,
     gameDelta,
     addDelta,
-    addBetXp,
-    expireBetXp,
-    syncBetXp,
     totalNet,
     profitRows,
   };

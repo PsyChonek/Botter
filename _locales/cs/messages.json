@@ -980,24 +980,13 @@
     "message": "XP podle hry"
   },
   "panelXpNote": {
-    "message": "Ztráta/XP je průměrná ztráta kreditů za jeden bod XP, při každé sázce stejná. Zvýrazněný řádek bot hraje jako další."
-  },
-  "panelXpRetest": {
-    "message": "Znovu otestovat všechny hry"
+    "message": "Ztráta/XP je průměrná ztráta kreditů za jeden bod XP, při každé sázce stejná. Bot hraje hru s nejnižší simulovanou výhodou kasina (zvýrazněná)."
   },
   "colEdge": {
     "message": "Výhoda"
   },
   "colXpPerCredit": {
     "message": "XP/100"
-  },
-  "xpSampling": {
-    "message": "měří XP $ROUNDS$/10",
-    "placeholders": {
-      "rounds": {
-        "content": "$1"
-      }
-    }
   },
   "colCostPerXp": {
     "message": "Ztráta/XP"

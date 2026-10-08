@@ -82,12 +82,11 @@ progress shows at `chrome://on-device-internals`.
   Skeleton Slots about 71 % to 94 %, Blaze about 63 % to 95 % (or 67 % to 108 % if the
   star scatter counts symbols; the Blaze model check decides once 50 spins are
   recorded, until then the lower rule is used). Games without a model (none today)
-  are explored for 30 rounds and use the measured edge. Loss per XP is the edge over
-  XP per credit wagered; XP per round is proportional to the bet, so every bet level
-  costs the same per XP and the bet is simply the one picked in the settings. XP per
-  credit is measured per game (10 rounds), a game's samples are dropped when its
-  upgrades change, because upgrades lower XP per round, and every sample expires after
-  3 days, so games that were ruled out get measured again. Near a limit the grinder
+  are explored for 30 rounds and use the measured edge. XP per round is proportional
+  to the bet the same way in every game, so the grinder plays the unlocked game with the
+  lowest simulated edge, every bet level costs the same per XP and the bet is simply the
+  one picked in the settings. The panel shows each game's XP per credit and loss per XP
+  measured from its tracked rounds, for information only. Near a limit the grinder
   steps down to a smaller bet; under a daily budget it never bets more than what is
   left of it.
 - **Daily standup** (Dnešní standup, settings Auto tab, on by default): three quests a

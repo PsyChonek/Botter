@@ -980,24 +980,13 @@
     "message": "XP per game"
   },
   "panelXpNote": {
-    "message": "Loss per XP is the credits the game loses on average for one XP point, the same at every bet. The highlighted row is what the grinder plays next."
-  },
-  "panelXpRetest": {
-    "message": "Re-test all games"
+    "message": "Loss per XP is the credits the game loses on average for one XP point, the same at every bet. The grinder plays the game with the lowest simulated edge (highlighted)."
   },
   "colEdge": {
     "message": "Edge"
   },
   "colXpPerCredit": {
     "message": "XP/100"
-  },
-  "xpSampling": {
-    "message": "measuring XP $ROUNDS$/10",
-    "placeholders": {
-      "rounds": {
-        "content": "$1"
-      }
-    }
   },
   "colCostPerXp": {
     "message": "Loss/XP"

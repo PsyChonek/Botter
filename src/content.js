@@ -69,8 +69,6 @@
     free: { daily: 0, bailout: 0 },
     crashBooked: [],
     grind: { day: '', net: 0 },
-    betXp: {}, // game -> bet -> { rounds, xp, at }, to find the cheapest game per XP
-    betXpUpgrades: {}, // game -> upgrades the betXp samples were taken with
     flags: { cleanDone: false, cleanTaken: false, boardsDay: '' },
     dwell: {}, // task type -> least ms open before a submit the server accepts
   };
@@ -137,7 +135,6 @@
   let lastType = null;
   let workRun = false; // energy went above WORK_MIN_ENERGY and is being worked down
   let bjStake = 0; // stake of the open blackjack hand, to book doubles
-  let bjBet = 0; // opening bet of that hand, to book its XP per bet level
   let sessionBase = 0; // total game net when the game bot was started
   const claimTried = {}; // kind -> last attempt, so a refused claim is not spammed
   let crashPolledAt = 0;
@@ -337,12 +334,6 @@
       if (delta) {
         bjStake = data.hand && !data.hand.done ? delta.stake : 0;
         G.addDelta(stats.games, delta);
-        if (path === '/api/blackjack/deal') bjBet = request?.bet ?? delta.wagered;
-        const bet = path === '/api/blackjack/action' ? bjBet : (request?.bet ?? delta.wagered);
-        if (bet > 0) {
-          G.syncBetXp(stats.betXp, stats.betXpUpgrades, delta.game, data.player.upgrades);
-          G.addBetXp(stats.betXp, delta.game, bet, delta.rounds, delta.xp);
-        }
         if (stats.grind.day === A.dayKey()) stats.grind.net += delta.net;
         saveStats();
         log.debug('game_round', delta);
@@ -975,15 +966,12 @@
 
   // ---------- auto mode ----------
 
-  // Credits the grinder pays per XP point: the cheapest measured game it may
-  // pick, or null before any game has been measured.
+  // Credits the grinder pays per XP point on the game it plays, or null before
+  // that game has earned any XP.
   function xpPrice() {
     const { candidates, edges } = grindModel();
-    const costs = candidates
-      .filter((game) => player.level >= GRIND_UNLOCKS[game])
-      .map((game) => A.xpCost(game, stats.games, stats.betXp, edges))
-      .filter((cost) => cost !== null);
-    return costs.length ? Math.min(...costs) : null;
+    const game = A.cheapestGame(candidates, player.level, stats.games, GRIND_UNLOCKS, edges);
+    return game ? A.xpCost(game, stats.games, edges) : null;
   }
 
   // Credits a work ticket pays per XP point, or null before any ticket.
@@ -1154,7 +1142,6 @@
     return A.upgradeVerdict(offer, {
       games: candidates.filter((game) => player.level >= GRIND_UNLOCKS[game]),
       upgrades: player.upgrades,
-      betXp: stats.betXp,
       edge: (game, upgrades) => O.edges([game], upgrades, mode)[game] ?? null,
       rest: (keys, upTo) => G.upgradeRest(player.upgrades, offer.game, keys, upTo),
       maxLevels: Object.fromEntries(Object.entries(G.SHOP[offer.game]).map(([key, [max]]) => [key, max])),
@@ -1368,7 +1355,6 @@
   // edges at the current upgrades, and its pick.
   // Bet levels, candidate games and their modelled edges, before any limit.
   function grindModel() {
-    G.expireBetXp(stats.betXp);
     const levels = G.BET_LEVELS.filter((bet) => bet <= player.maxBet);
     const candidates = settings.grindGame === 'auto' ? G.GAME_KEYS : [settings.grindGame];
     const edges = O.edges(candidates, player.upgrades, blazeMode());
@@ -1391,7 +1377,7 @@
     const { levels, candidates, edges } = grindModel();
     const wanted = Number(settings.grindBet) || G.BET_LEVELS[0];
     const bet = A.grindBet(grindLimits(saving), player.credits, lost, levels, wanted);
-    const plan = A.grindPlan(candidates, bet, player.level, stats.games, stats.betXp, GRIND_UNLOCKS, edges, settings.grindExploreRounds);
+    const plan = A.grindPlan(candidates, bet, player.level, stats.games, GRIND_UNLOCKS, edges, settings.grindExploreRounds);
     return { lost, levels, candidates, edges, plan };
   }
 
@@ -1521,7 +1507,6 @@
         .pos { color: #a6e05a; }
         .neg { color: #ff8f7a; }
         .xp-note { margin: 4px 0 0; }
-        .xp-retest { margin-top: 4px; }
         tr.group td { text-align: left; padding-top: 6px; font-weight: 600; color: #e8f5c8; }
         tr.pick td { color: #d4ff6a; font-weight: 700; }
       </style>
@@ -1568,7 +1553,6 @@
         <details class="xp">
           <summary></summary>
           <p class="muted xp-note"></p>
-          <button type="button" class="xp-retest"></button>
           <table>
             <thead><tr><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th></tr></thead>
             <tbody></tbody>
@@ -1610,7 +1594,6 @@
       body: $('.profit tbody'),
       xpSummary: $('.xp summary'),
       xpNote: $('.xp-note'),
-      xpRetest: $('.xp-retest'),
       xpHead: [...shadow.querySelectorAll('.xp th')],
       xpBody: $('.xp tbody'),
       shop: $('.shop'),
@@ -1635,7 +1618,6 @@
     ['colGame', 'colRounds', 'colNet', 'colRtp'].forEach((key, i) => (ui.head[i].textContent = msg(key)));
     ui.xpSummary.textContent = msg('panelXp');
     ui.xpNote.textContent = msg('panelXpNote');
-    ui.xpRetest.textContent = msg('panelXpRetest');
     ['colGame', 'colEdge', 'colXpPerCredit', 'colCostPerXp', 'colState'].forEach(
       (key, i) => (ui.xpHead[i].textContent = msg(key)),
     );
@@ -1660,7 +1642,6 @@
     ui.screenToggle.addEventListener('click', () => saveSettings({ playOnScreen: !settings.playOnScreen }));
     ui.type.addEventListener('change', () => saveSettings({ taskType: ui.type.value }));
     ui.game.addEventListener('change', () => saveSettings({ game: ui.game.value }));
-    ui.xpRetest.addEventListener('click', retestGames);
     document.documentElement.appendChild(host);
     render();
   }
@@ -1709,15 +1690,6 @@
     );
   }
 
-  // Forgets the measured XP, so the grinder samples every unlocked game again
-  // before it picks one.
-  function retestGames() {
-    stats.betXp = {};
-    saveStats();
-    log.info('xp_retest');
-    render();
-  }
-
   // XP grinding measurements per game, with the grinder's pick.
   function renderXp() {
     if (!player) {
@@ -1725,7 +1697,7 @@
       return;
     }
     const { candidates, edges, plan } = grindChoice();
-    const report = A.grindReport(candidates, player.level, stats.games, stats.betXp, GRIND_UNLOCKS, edges);
+    const report = A.grindReport(candidates, player.level, stats.games, GRIND_UNLOCKS, edges);
     ui.xpBody.replaceChildren(
       ...report.map((game) => {
         let state = '';
@@ -1733,7 +1705,7 @@
         else if (plan?.game === game.game) state = msg('xpPick', [credits(plan.bet)]);
         else if (game.modelEdge === null && game.rounds < settings.grindExploreRounds) {
           state = msg('xpExploring', [num.format(game.rounds), num.format(settings.grindExploreRounds)]);
-        } else if (game.rate === null) state = msg('xpSampling', [num.format(game.samples)]);
+        }
         const tr = document.createElement('tr');
         if (plan?.game === game.game) tr.className = 'pick';
         tr.append(

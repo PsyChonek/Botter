@@ -46,22 +46,6 @@ test('gameDelta books a doubled blackjack hand as one round', () => {
   assert.deepEqual(games.blackjack, { rounds: 1, wagered: 200, net: 200, xp: 0 });
 });
 
-test('addBetXp books XP per bet level, blackjack actions without a round', () => {
-  const table = G.addBetXp(G.addBetXp(G.addBetXp({}, 'blaze', 20, 1, 2, 7), 'blaze', 20, 1, 3, 8), 'blackjack', 100, 0, 4, 9);
-  assert.deepEqual(table, { blaze: { 20: { rounds: 2, xp: 5, at: 7 } }, blackjack: { 100: { rounds: 0, xp: 4, at: 9 } } });
-});
-
-test('expireBetXp drops old and undated XP samples so they are measured again', () => {
-  const day = 24 * 60 * 60 * 1000;
-  const now = 10 * day;
-  const table = {
-    blaze: { 20: { rounds: 10, xp: 5, at: now - day }, 40: { rounds: 10, xp: 5, at: now - 3 * day } },
-    skeleton: { 20: { rounds: 10, xp: 5 } },
-  };
-  G.expireBetXp(table, now);
-  assert.deepEqual(table, { blaze: { 20: { rounds: 10, xp: 5, at: now - day } } });
-});
-
 test('profitRows computes return rate and net per round', () => {
   const [row] = G.profitRows({ blaze: { rounds: 10, wagered: 200, net: -40, xp: 5 }, roulette: { rounds: 0, wagered: 0, net: 0, xp: 0 } });
   assert.equal(row.game, 'blaze');
@@ -105,18 +89,6 @@ test('shopQueue follows the plan order and level gates', () => {
   assert.equal(goal(next).key, 'star');
   assert.deepEqual(G.shopQueue(plan, { level: 50, upgrades: { crash: { sla: 3 } } }).map((o) => o.key), ['star', 'lucky']);
   assert.deepEqual(G.shopQueue([], { level: 50, upgrades: {} }), []);
-});
-
-test('syncBetXp drops a game\'s XP samples when its upgrades change', () => {
-  const table = { skeleton: { 20: { rounds: 10, xp: 10 } }, blaze: { 20: { rounds: 10, xp: 5 } } };
-  const seen = {};
-  G.syncBetXp(table, seen, 'skeleton', { skeleton: { team: 1 } });
-  assert.ok(table.skeleton, 'samples from before keys were kept are adopted');
-  G.syncBetXp(table, seen, 'skeleton', { skeleton: { team: 1 } });
-  assert.ok(table.skeleton);
-  G.syncBetXp(table, seen, 'skeleton', { skeleton: { team: 2 } });
-  assert.equal(table.skeleton, undefined);
-  assert.ok(table.blaze);
 });
 
 test('shopQueue keeps the reason the skip check gives', () => {

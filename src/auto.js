@@ -159,24 +159,11 @@
   const wheelReady = (wheelNextAt, now = Date.now()) =>
     wheelNextAt !== undefined && (wheelNextAt === null || wheelNextAt <= now);
 
-  // Rounds a game's XP is sampled for before its cost per XP is trusted.
-  const XP_SAMPLE_ROUNDS = 10;
-
-  // XP per credit wagered on one game from its samples ({ bet: { rounds, xp } }),
-  // or null under XP_SAMPLE_ROUNDS rounds. XP per round is proportional to the
-  // bet, so XP per credit is the same at every bet level and the samples of all
-  // levels add up.
-  function xpRate(cells) {
-    let rounds = 0;
-    let wagered = 0;
-    let xp = 0;
-    for (const [bet, cell] of Object.entries(cells ?? {})) {
-      rounds += cell.rounds;
-      wagered += Number(bet) * cell.rounds;
-      xp += cell.xp;
-    }
-    return rounds >= XP_SAMPLE_ROUNDS && wagered > 0 ? xp / wagered : null;
-  }
+  // XP per credit wagered on a game, measured from its tracked rounds, or null
+  // before it has earned any. Shown on the panel and used to price XP, never to
+  // pick a game: XP per round is proportional to the bet the same way in every
+  // game, so the simulated edge alone decides.
+  const xpRate = (row) => (row?.wagered > 0 && row.xp > 0 ? row.xp / row.wagered : null);
 
   // House edge of a game measured from its tracked rounds (0 when it is ahead).
   const gameEdge = (row) => (row?.wagered > 0 ? Math.max(0, -row.net) / row.wagered : null);
@@ -188,36 +175,38 @@
 
   // Credits lost per XP point on a game: house edge over XP per credit wagered.
   // It does not depend on the bet, so the bet only sets the pace.
-  function xpCost(game, stats, betXp, edges) {
+  function xpCost(game, stats, edges) {
     const edge = planEdge(game, stats, edges);
-    const rate = xpRate(betXp?.[game]);
+    const rate = xpRate(stats[game]);
     return edge !== null && rate > 0 ? edge / rate : null;
   }
 
-  // Cheapest game per XP point at the given bet (null when no bet is allowed).
-  // Games without a modelled edge and fewer than minRounds tracked rounds are
-  // explored first, then every game is sampled for XP_SAMPLE_ROUNDS rounds,
-  // then the one with the lowest loss per XP is played.
-  // betXp is { game: { bet: { rounds, xp } } }.
-  function grindPlan(games, bet, level, stats, betXp, unlocks, edges = {}, minRounds = 30) {
+  // Unlocked game with the lowest house edge the grinder plans with, or null.
+  function cheapestGame(games, level, stats, unlocks, edges = {}) {
+    const unlocked = games.filter((game) => level >= unlocks[game]);
+    const edge = (game) => planEdge(game, stats, edges) ?? Infinity;
+    return unlocked.length ? unlocked.reduce((a, b) => (edge(b) < edge(a) ? b : a)) : null;
+  }
+
+  // Game to grind at the given bet (null when no bet is allowed). Games without
+  // a modelled edge and fewer than minRounds tracked rounds are explored first,
+  // then the one with the lowest house edge is played: XP per credit is the
+  // same in every game, so the lowest edge is the lowest loss per XP.
+  function grindPlan(games, bet, level, stats, unlocks, edges = {}, minRounds = 30) {
     const unlocked = games.filter((game) => level >= unlocks[game]);
     if (!unlocked.length || !(bet > 0)) return null;
     const rounds = (game) => stats[game]?.rounds ?? 0;
     const unexplored = unlocked.filter((game) => edges?.[game] === undefined && rounds(game) < minRounds);
     if (unexplored.length) return { game: unexplored.reduce((a, b) => (rounds(b) < rounds(a) ? b : a)), bet };
-    const sampling = unlocked.find((game) => xpRate(betXp?.[game]) === null);
-    if (sampling) return { game: sampling, bet };
-    const cost = (game) => xpCost(game, stats, betXp, edges) ?? Infinity;
-    return { game: unlocked.reduce((a, b) => (cost(b) < cost(a) ? b : a)), bet };
+    return { game: cheapestGame(unlocked, level, stats, unlocks, edges), bet };
   }
 
-  // What the XP grinder has measured, per game, for the panel: the measured
-  // and the modelled edge, the edge it plans with, the XP sample rounds, XP per
-  // credit wagered and credits lost per XP point.
-  function grindReport(games, level, stats, betXp, unlocks, edges = {}) {
+  // What the XP grinder knows per game, for the panel: the measured and the
+  // modelled edge, the edge it plans with, XP per credit wagered and credits
+  // lost per XP point.
+  function grindReport(games, level, stats, unlocks, edges = {}) {
     return games.map((game) => {
       const row = stats[game];
-      const samples = Object.values(betXp?.[game] ?? {}).reduce((sum, cell) => sum + cell.rounds, 0);
       return {
         game,
         locked: level < unlocks[game],
@@ -226,9 +215,8 @@
         edge: planEdge(game, stats, edges),
         measuredEdge: gameEdge(row),
         modelEdge: edges?.[game] ?? null,
-        samples,
-        rate: xpRate(betXp?.[game]),
-        cost: xpCost(game, stats, betXp, edges),
+        rate: xpRate(row),
+        cost: xpCost(game, stats, edges),
       };
     });
   }
@@ -251,7 +239,7 @@
   }
 
   // Why an upgrade from the shop plan is not worth its price, or null when it is.
-  // ctx: games (unlocked games the grinder may pick), upgrades, betXp,
+  // ctx: games (unlocked games the grinder may pick), upgrades,
   // edge(game, upgrades) (modelled house edge or null), rest(keys, upTo)
   // ({ price, upgrades } after buying those upgrades of the offer's game up to
   // level upTo, default max), maxLevels ({ key: max } of the game) and volume (see
@@ -274,16 +262,12 @@
     if (gainPerCredit([offer.key]) < UPGRADE_MIN_GAIN) return 'tooSmall';
     const keys = Object.keys(ctx.maxLevels);
 
-    // XP per credit wagered of each game. Until every game has one, costs
-    // compare by edge alone (same XP per credit everywhere).
-    const rates = Object.fromEntries(ctx.games.map((g) => [g, xpRate(ctx.betXp?.[g])]));
-    const useRates = Object.values(rates).every((r) => r > 0);
-    const cost = (g, edge) => (useRates ? edge / rates[g] : edge);
-    const before = Math.min(...ctx.games.map((g) => (now(g) === null ? Infinity : cost(g, now(g)))));
+    // XP per credit is the same in every game, so costs compare by edge alone.
+    const before = Math.min(...ctx.games.map((g) => now(g) ?? Infinity));
     const maxed = ctx.rest(keys.filter((key) => gainPerCredit([key]) >= UPGRADE_MIN_GAIN));
-    if (cost(game, ctx.edge(game, maxed.upgrades)) >= before) return 'neverBest';
+    if (ctx.edge(game, maxed.upgrades) >= before) return 'neverBest';
     const pays = (rest) => {
-      const after = Math.min(before, cost(game, ctx.edge(game, rest.upgrades)));
+      const after = Math.min(before, ctx.edge(game, rest.upgrades));
       if (after <= 0) return true; // the player is ahead: it pays for itself
       return (ctx.volume - rest.price) / after > ctx.volume / before;
     };
@@ -592,6 +576,7 @@
     wheelReady,
     grindPlan,
     grindReport,
+    cheapestGame,
     xpCost,
     grindBets,
     grindBet,
