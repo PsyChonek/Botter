@@ -19,8 +19,8 @@ const CHECKBOXES = [
   'rotateAccounts',
   'playOnScreen',
 ];
-const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet', 'grindLimit', 'grindGame', 'grindBet'];
-const INT_SELECTS = ['gameBet', 'crashBet'];
+const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet', 'grindLimit', 'grindGame'];
+const INT_SELECTS = ['gameBet', 'crashBet', 'grindBet'];
 const TEXTS = ['openrouterModel'];
 const NUMBERS = [
   'minDelayMs',
@@ -54,7 +54,7 @@ const DEFAULTS = {
   xpBudget: 0,
   grindMinBalance: 0,
   grindGame: 'auto',
-  grindBet: 'auto',
+  grindBet: 20,
   grindExploreRounds: 30,
   buyUpgrades: false,
   saveForUpgrades: true,
@@ -108,8 +108,6 @@ for (const name of INT_SELECTS) {
 for (const key of G.ROULETTE_BETS) field('rouletteBet').add(new Option(msg(`roulette_${key}`), key));
 field('grindGame').add(new Option(msg('grind_auto'), 'auto'));
 for (const game of G.GAME_KEYS) field('grindGame').add(new Option(msg(`game_${game}`), game));
-field('grindBet').add(new Option(msg('grindBet_auto'), 'auto'));
-for (const bet of G.BET_LEVELS) field('grindBet').add(new Option(num.format(bet), String(bet)));
 
 async function load() {
   const { settings = {}, apiKey = '', openrouterKey = '', bank = {} } = await chrome.storage.local.get([
@@ -118,7 +116,10 @@ async function load() {
     'openrouterKey',
     'bank',
   ]);
-  fill({ ...DEFAULTS, ...settings });
+  const values = { ...DEFAULTS, ...settings };
+  // The grind bet used to have an 'auto' choice, which is gone.
+  if (!G.BET_LEVELS.includes(values.grindBet)) values.grindBet = DEFAULTS.grindBet;
+  fill(values);
   $('apiKey').value = apiKey;
   $('openrouterKey').value = openrouterKey;
   showBankSize(bank);

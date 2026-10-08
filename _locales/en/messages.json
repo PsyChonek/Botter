@@ -552,9 +552,6 @@
   "grind_auto": {
     "message": "Cheapest per XP (auto)"
   },
-  "grindBet_auto": {
-    "message": "Cheapest per XP (auto)"
-  },
   "scatter_symbols": {
     "message": "stars counted per symbol"
   },
@@ -585,7 +582,7 @@
     "message": "Rounds to measure each game first"
   },
   "optionsGrindHint": {
-    "message": "Auto game picks the unlocked game that has cost the fewest credits per XP, after measuring each one for the given number of rounds. Auto bet measures the XP each bet level gives per round and climbs to bigger bets only while the XP grows with the stake, so it settles on the bet with the lowest loss per XP. Under a daily budget it never bets more than is left of it."
+    "message": "Auto game picks the unlocked game that has cost the fewest credits per XP, after measuring each one for the given number of rounds. XP per round is proportional to the bet, so every bet level costs the same per XP: the bet only sets how fast XP comes in and how much rides on one round. Near a limit the grinder steps down to a smaller bet, and under a daily budget it never bets more than is left of it."
   },
   "optionsShopHeading": {
     "message": "Shop upgrades"
@@ -594,7 +591,7 @@
     "message": "Buy upgrades automatically when they are worth it"
   },
   "optionsUpgradeHint": {
-    "message": "Priority order: Blaze star, Skeleton team, Blaze lucky, Blaze wild, Skeleton wild, Slotingi gulas, Skeleton deploy, Slotingi crown, Roulette zeros, Blackjack ties and blackjack pay, Crash SLA, global bets. Auto buys the next level of the first upgrade that is worth its price, is not maxed and is allowed at your level, as soon as it fits above the reserve; later ones wait. Skipped as not worth it: upgrades that add less than 0.5 % return per 10,000 credits (blackjack:hint/double/soft17, slotingi:mint), upgrades of a game the XP grinder would not pick even fully upgraded, a game's upgrades when spending the price on plain XP grinding gives more XP (over 14 days of the daily budget, or down to the minimum balance), global:bets unless a bigger bet would buy XP cheaper (XP per round grows with the bet, so above 100 it never does) or a fixed grind or crash bet is set above your max bet, and crash:sla while crash betting is off. Maxing any game also pays a one-time 5000 achievement, which the check does not count. Every 10 minutes, and whenever your level or upgrades change, the whole plan is judged again; the first upgrade worth buying becomes the goal, shown in the panel under Upgrade queue. With saving on, the XP grinder leaves the goal's price untouched on top of the reserve, so work pay builds up to it, and once it is bought the next goal is bought right away if it fits too. Saving pauses past a planned bankruptcy, which would wipe the savings."
+    "message": "Priority order: Blaze star, Skeleton team, Blaze lucky, Blaze wild, Skeleton wild, Slotingi gulas, Skeleton deploy, Slotingi crown, Roulette zeros, Blackjack ties and blackjack pay, Crash SLA. Global bets (higher max bet) are never bought: XP per round grows with the bet, so a bigger bet never buys XP cheaper. Auto buys the next level of the first upgrade that is worth its price, is not maxed and is allowed at your level, as soon as it fits above the reserve; later ones wait. Skipped as not worth it: upgrades that add less than 0.5 % return per 10,000 credits (blackjack:hint/double/soft17, slotingi:mint), upgrades of a game the XP grinder would not pick even fully upgraded, a game's upgrades when spending the price on plain XP grinding gives more XP (over 14 days of the daily budget, or down to the minimum balance), and crash:sla while crash betting is off. Maxing any game also pays a one-time 5000 achievement, which the check does not count. Every 10 minutes, and whenever your level or upgrades change, the whole plan is judged again; the first upgrade worth buying becomes the goal, shown in the panel under Upgrade queue. With saving on, the XP grinder leaves the goal's price untouched on top of the reserve, so work pay builds up to it, and once it is bought the next goal is bought right away if it fits too. Saving pauses past a planned bankruptcy, which would wipe the savings."
   },
   "optionsModelHeading": {
     "message": "Blaze model check"
@@ -980,19 +977,27 @@
     "message": "Actions"
   },
   "panelXp": {
-    "message": "XP per bet"
+    "message": "XP per game"
   },
   "panelXpNote": {
-    "message": "Loss per XP is the credits the game loses on average for one XP point at that bet. The highlighted row is what the grinder plays next."
+    "message": "Loss per XP is the credits the game loses on average for one XP point, the same at every bet. The highlighted row is what the grinder plays next."
   },
   "panelXpRetest": {
     "message": "Re-test all games"
   },
-  "colBet": {
-    "message": "Bet"
+  "colEdge": {
+    "message": "Edge"
   },
-  "colXpPerRound": {
-    "message": "XP/round"
+  "colXpPerCredit": {
+    "message": "XP/100"
+  },
+  "xpSampling": {
+    "message": "measuring XP $ROUNDS$/10",
+    "placeholders": {
+      "rounds": {
+        "content": "$1"
+      }
+    }
   },
   "colCostPerXp": {
     "message": "Loss/XP"
@@ -1000,39 +1005,16 @@
   "colState": {
     "message": "State"
   },
-  "xpGame": {
-    "message": "$GAME$: $ROUNDS$ rounds, house edge $EDGE$ (model at your upgrades), measured $MEASURED$, $XP$ XP/round",
-    "placeholders": {
-      "game": {
-        "content": "$1"
-      },
-      "rounds": {
-        "content": "$2"
-      },
-      "edge": {
-        "content": "$3"
-      },
-      "measured": {
-        "content": "$4"
-      },
-      "xp": {
-        "content": "$5"
-      }
-    }
-  },
   "xpLocked": {
-    "message": "$GAME$: unlocks at level $LEVEL$",
+    "message": "level $LEVEL$",
     "placeholders": {
-      "game": {
-        "content": "$1"
-      },
       "level": {
-        "content": "$2"
+        "content": "$1"
       }
     }
   },
   "xpExploring": {
-    "message": "Exploring: $ROUNDS$ of $NEEDED$ rounds before bets are compared",
+    "message": "exploring $ROUNDS$/$NEEDED$",
     "placeholders": {
       "rounds": {
         "content": "$1"
@@ -1043,19 +1025,12 @@
     }
   },
   "xpPick": {
-    "message": "playing"
-  },
-  "xpState_best": {
-    "message": "best"
-  },
-  "xpState_next": {
-    "message": "testing"
-  },
-  "xpState_worse": {
-    "message": "worse"
-  },
-  "xpState_skipped": {
-    "message": "skipped"
+    "message": "playing at $BET$",
+    "placeholders": {
+      "bet": {
+        "content": "$1"
+      }
+    }
   },
   "statusWaitEnergy": {
     "message": "Waiting for more than $P1$ energy before working ($P2$ now).",
@@ -1124,9 +1099,6 @@
   },
   "shopState_queued": {
     "message": "queued"
-  },
-  "shopState_noBetGain": {
-    "message": "bigger bet gives no XP"
   },
   "shopState_crashOff": {
     "message": "crash off"

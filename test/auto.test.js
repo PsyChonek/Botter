@@ -64,14 +64,14 @@ test('repayAmount keeps the reserve and never exceeds the debt', () => {
 
 const xpCells = (perRound, bets) => Object.fromEntries(bets.map((bet) => [bet, { rounds: 10, xp: perRound(bet) * 10 }]));
 
-test('grindPlan explores each game first at the smallest bet', () => {
+test('grindPlan explores each game first at the chosen bet', () => {
   const unlocks = { blaze: 1, skeleton: 5, blackjack: 10 };
   const games = Object.keys(unlocks);
-  assert.deepEqual(A.grindPlan(games, [100, 20, 40], 1, {}, {}, unlocks), { game: 'blaze', bet: 20 });
+  assert.deepEqual(A.grindPlan(games, 100, 1, {}, {}, unlocks), { game: 'blaze', bet: 100 });
   const stats = { blaze: { rounds: 40, wagered: 800, net: -100, xp: 40 } };
-  assert.deepEqual(A.grindPlan(games, [20, 40], 6, stats, {}, unlocks), { game: 'skeleton', bet: 20 });
-  assert.equal(A.grindPlan(games, [20], 0, stats, {}, unlocks), null);
-  assert.equal(A.grindPlan(games, [], 12, stats, {}, unlocks), null);
+  assert.deepEqual(A.grindPlan(games, 20, 6, stats, {}, unlocks), { game: 'skeleton', bet: 20 });
+  assert.equal(A.grindPlan(games, 20, 0, stats, {}, unlocks), null);
+  assert.equal(A.grindPlan(games, null, 12, stats, {}, unlocks), null);
 });
 
 test('grindPlan picks the game with the lowest loss per XP', () => {
@@ -82,117 +82,38 @@ test('grindPlan picks the game with the lowest loss per XP', () => {
     skeleton: { rounds: 40, wagered: 800, net: -100, xp: 40 },
     blackjack: { rounds: 40, wagered: 800, net: -200, xp: 40 },
   };
-  const flat = xpCells(() => 1, [20, 40]);
+  const flat = xpCells(() => 1, [20]);
   const betXp = { blaze: flat, skeleton: flat, blackjack: flat };
-  assert.deepEqual(A.grindPlan(games, [20, 40], 12, stats, betXp, unlocks), { game: 'skeleton', bet: 20 });
-  // A game whose first bet level has no XP sample yet is sampled before choosing.
-  assert.deepEqual(A.grindPlan(games, [20, 40], 12, stats, { blaze: flat, skeleton: flat }, unlocks), {
+  assert.deepEqual(A.grindPlan(games, 40, 12, stats, betXp, unlocks), { game: 'skeleton', bet: 40 });
+  // A game with no XP sample yet is sampled before choosing.
+  assert.deepEqual(A.grindPlan(games, 40, 12, stats, { blaze: flat, skeleton: flat }, unlocks), {
     game: 'blackjack',
-    bet: 20,
-  });
-});
-
-test('grindPlan keeps the smallest bet when XP is per round', () => {
-  const unlocks = { blaze: 1 };
-  const stats = { blaze: { rounds: 40, wagered: 800, net: -100, xp: 40 } };
-  const levels = [20, 40, 100, 200];
-  // Only the next level gets sampled; XP per credit halves there, so the climb stops.
-  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: xpCells(() => 1, [20]) }, unlocks), {
-    game: 'blaze',
-    bet: 40,
-  });
-  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: xpCells(() => 1, [20, 40]) }, unlocks), {
-    game: 'blaze',
-    bet: 20,
-  });
-});
-
-test('grindPlan climbs to bigger bets while XP grows with the stake', () => {
-  const unlocks = { blaze: 1 };
-  const stats = { blaze: { rounds: 40, wagered: 800, net: -100, xp: 40 } };
-  const levels = [20, 40, 100, 200];
-  const linear = (bet) => bet / 20;
-  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: xpCells(linear, [20, 40]) }, unlocks), {
-    game: 'blaze',
-    bet: 100,
-  });
-  // XP per credit grows up to 100 and is scaled flat above it, so 100 wins.
-  const steep = (bet) => (bet / 20) ** 1.5;
-  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: xpCells(steep, levels) }, unlocks), {
-    game: 'blaze',
-    bet: 100,
-  });
-  // XP per credit peaks at 40: the bet goes back there once 100 is measured.
-  const peaked = (bet) => (bet <= 40 ? (bet / 20) ** 1.5 : 2);
-  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: xpCells(peaked, levels) }, unlocks), {
-    game: 'blaze',
     bet: 40,
   });
 });
 
-test('grindPlan prefers the smallest bet when XP per credit is similar', () => {
-  const unlocks = { blaze: 1 };
-  const stats = { blaze: { rounds: 40, wagered: 800, net: -100, xp: 40 } };
-  const levels = [20, 40, 100];
-  // XP grows with the stake, so every bet loses the same per XP point.
-  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: xpCells((bet) => bet / 20, levels) }, unlocks), {
-    game: 'blaze',
-    bet: 20,
-  });
-  // 40 is 3% better per credit, close enough to keep the smaller bet.
-  const slight = { ...xpCells((bet) => bet / 20, [20, 100]), 40: { rounds: 10, xp: 20.6 } };
-  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: slight }, unlocks), { game: 'blaze', bet: 20 });
-  // 40 is 10% better per credit: worth the bigger bet.
-  const clear = { ...xpCells((bet) => bet / 20, [20, 100]), 40: { rounds: 10, xp: 22 } };
-  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: clear }, unlocks), { game: 'blaze', bet: 40 });
-});
-
-test('grindPlan samples bets up to 100 and scales XP with the bet above that', () => {
-  const unlocks = { blaze: 1 };
-  const stats = { blaze: { rounds: 40, wagered: 800, net: -100, xp: 40 } };
-  const levels = [20, 40, 100, 200, 400];
-  const linear = (bet) => bet / 20;
-  // 200 and 400 are never sampled: XP per credit stays that of 100, so the
-  // smallest of those bets wins.
-  const steep = (bet) => (bet / 20) ** 1.5;
-  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: xpCells(steep, [20, 40, 100]) }, unlocks), {
-    game: 'blaze',
-    bet: 100,
-  });
-  // A weak measurement at 200 is ignored for the scaled rate.
-  const betXp = { blaze: { ...xpCells(linear, [20, 40, 100]), 200: { rounds: 10, xp: 10 } } };
-  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, betXp, unlocks), { game: 'blaze', bet: 20 });
-  const report = A.grindReport(['blaze'], levels, 1, stats, betXp, unlocks);
-  assert.deepEqual(
-    report[0].bets.map((row) => row.perRound),
-    [1, 2, 5, 10, 20],
-  );
-  // While the sampled levels are still being tested, the levels above them are not listed.
-  const testing = A.grindReport(['blaze'], levels, 1, stats, { blaze: xpCells(linear, [20]) }, unlocks);
-  assert.deepEqual(
-    testing[0].bets.map((row) => row.bet),
-    [20, 40, 100],
-  );
-});
-
-test('grindPlan climbs every ladder before comparing games at their best bets', () => {
+test('grindPlan compares games by XP per credit, whatever bet it was sampled at', () => {
   const unlocks = { blaze: 1, skeleton: 5 };
   const games = Object.keys(unlocks);
   const stats = {
-    blaze: { rounds: 40, wagered: 800, net: -160, xp: 40 },
-    skeleton: { rounds: 40, wagered: 800, net: -100, xp: 40 },
+    blaze: { rounds: 40, wagered: 800, net: -80, xp: 40 },
+    skeleton: { rounds: 40, wagered: 800, net: -80, xp: 40 },
   };
-  const levels = [20, 40, 100];
-  const linear = (bet) => bet / 20;
-  // Skeleton leads at 20 and has climbed to 100; Blaze still has to sample 40.
-  const betXp = { blaze: xpCells(() => 1, [20]), skeleton: xpCells(linear, levels) };
-  assert.deepEqual(A.grindPlan(games, levels, 6, stats, betXp, unlocks), { game: 'blaze', bet: 40 });
-  // Blaze's XP grows faster with the stake, so at its best bet it is cheaper.
-  const steep = (bet) => (bet / 20) ** 1.5;
-  assert.deepEqual(A.grindPlan(games, levels, 6, stats, { ...betXp, blaze: xpCells(steep, levels) }, unlocks), {
-    game: 'blaze',
-    bet: 100,
-  });
+  // Same edge; Blaze gives 2 XP per 20 credits at 20, Skeleton 5 XP per 100 at 100.
+  const betXp = { blaze: xpCells((bet) => bet / 10, [20]), skeleton: xpCells((bet) => bet / 20, [100]) };
+  assert.deepEqual(A.grindPlan(games, 20, 6, stats, betXp, unlocks), { game: 'blaze', bet: 20 });
+});
+
+test('grindBet plays the chosen bet and steps down near a limit', () => {
+  const levels = [20, 40, 100, 200];
+  const daily = { grindLimit: 'daily', xpBudget: 500, grindMinBalance: 0, reserve: 0 };
+  assert.equal(A.grindBet(daily, 10_000, 0, levels, 100), 100);
+  assert.equal(A.grindBet(daily, 10_000, 450, levels, 100), 40);
+  assert.equal(A.grindBet(daily, 10_000, 500, levels, 100), null);
+  const off = { grindLimit: 'off', xpBudget: 0, grindMinBalance: 0, reserve: 0 };
+  assert.equal(A.grindBet(off, 150, 0, levels, 200), 100);
+  // A bet above the max bet plays the max bet.
+  assert.equal(A.grindBet(off, 10_000, 0, [20, 40], 1000), 40);
 });
 
 test('grindBets keeps a daily budget from being overshot by one round', () => {
@@ -279,28 +200,21 @@ test('pickAccount moves to the richest account that can grind when none has ener
   assert.equal(A.pickAccount(accounts.map((a) => ({ ...a, canGrind: false })), today, 15), null);
 });
 
-test('grindReport shows XP per bet and where each level stands on the ladder', () => {
+test('grindReport shows XP per credit and loss per XP for every game', () => {
   const unlocks = { blaze: 1, roulette: 15 };
   const stats = { blaze: { rounds: 40, wagered: 2000, net: -100, xp: 120 } };
-  // 20 and 40 keep XP per credit, 100 drops off, so 200 is never tried and not listed.
-  const betXp = {
-    blaze: { 20: { rounds: 10, xp: 20 }, 40: { rounds: 10, xp: 40 }, 100: { rounds: 10, xp: 50 } },
-  };
-  const [blaze, roulette] = A.grindReport(['blaze', 'roulette'], [200, 100, 40, 20], 5, stats, betXp, unlocks);
+  // 20 XP over 10 rounds at 20 and 40 XP over 10 rounds at 40: 0.1 XP per credit.
+  const betXp = { blaze: { 20: { rounds: 10, xp: 20 }, 40: { rounds: 10, xp: 40 } } };
+  const [blaze, roulette] = A.grindReport(['blaze', 'roulette'], 5, stats, betXp, unlocks);
   assert.equal(blaze.locked, false);
   assert.equal(blaze.edge, 0.05);
-  assert.equal(blaze.perRound, 3);
-  assert.deepEqual(
-    blaze.bets.map(({ bet, perRound, cost, state }) => [bet, perRound, cost, state]),
-    [
-      [20, 2, 0.5, 'best'],
-      [40, 4, 0.5, null],
-      [100, 5, 1, 'worse'],
-    ],
-  );
+  assert.equal(blaze.samples, 20);
+  assert.equal(blaze.rate, 0.1);
+  assert.equal(blaze.cost, 0.5);
   assert.equal(roulette.locked, true);
   assert.equal(roulette.edge, null);
-  assert.equal(roulette.bets[0].state, 'next');
+  assert.equal(roulette.rate, null);
+  assert.equal(roulette.cost, null);
 });
 
 test('grindPlan uses modelled edges over measured ones and skips edge exploration', () => {
@@ -308,17 +222,17 @@ test('grindPlan uses modelled edges over measured ones and skips edge exploratio
   const games = Object.keys(unlocks);
   // Skeleton ran lucky (measured edge 0), the model knows better.
   const stats = { skeleton: { rounds: 40, wagered: 800, net: 50, xp: 40 }, roulette: { rounds: 40, wagered: 800, net: -60, xp: 40 } };
-  const flat = xpCells(() => 1, [20, 40]);
+  const flat = xpCells(() => 1, [20]);
   const betXp = { skeleton: flat, roulette: flat };
-  assert.deepEqual(A.grindPlan(games, [20, 40], 15, stats, betXp, unlocks), { game: 'skeleton', bet: 20 });
+  assert.deepEqual(A.grindPlan(games, 20, 15, stats, betXp, unlocks), { game: 'skeleton', bet: 20 });
   const edges = { skeleton: 0.29, roulette: 0.077 };
-  assert.deepEqual(A.grindPlan(games, [20, 40], 15, stats, betXp, unlocks, edges), { game: 'roulette', bet: 20 });
-  assert.deepEqual(A.grindPlan(games, [20, 40], 15, stats, betXp, unlocks, { skeleton: 0.05, roulette: 0.077 }), {
+  assert.deepEqual(A.grindPlan(games, 20, 15, stats, betXp, unlocks, edges), { game: 'roulette', bet: 20 });
+  assert.deepEqual(A.grindPlan(games, 20, 15, stats, betXp, unlocks, { skeleton: 0.05, roulette: 0.077 }), {
     game: 'skeleton',
     bet: 20,
   });
   // A game with a model is not held back for the measured-edge exploration rounds.
-  assert.deepEqual(A.grindPlan(games, [20, 40], 15, { skeleton: stats.skeleton }, { skeleton: flat }, unlocks, edges), {
+  assert.deepEqual(A.grindPlan(games, 20, 15, { skeleton: stats.skeleton }, { skeleton: flat }, unlocks, edges), {
     game: 'roulette',
     bet: 20,
   });
@@ -326,10 +240,10 @@ test('grindPlan uses modelled edges over measured ones and skips edge exploratio
 
 test('grindReport shows the modelled and the measured edge', () => {
   const stats = { skeleton: { rounds: 40, wagered: 800, net: -80, xp: 40 } };
-  const [row] = A.grindReport(['skeleton'], [20], 5, stats, { skeleton: xpCells(() => 2, [20]) }, { skeleton: 5 }, { skeleton: 0.3 });
+  const [row] = A.grindReport(['skeleton'], 5, stats, { skeleton: xpCells(() => 2, [20]) }, { skeleton: 5 }, { skeleton: 0.3 });
   assert.equal(row.modelEdge, 0.3);
   assert.equal(row.measuredEdge, 0.1);
-  assert.equal(row.bets[0].cost, 3);
+  assert.ok(Math.abs(row.cost - 3) < 1e-9);
 });
 
 // Upgrade verdict context with a toy edge model: each level of a key cuts the
@@ -347,7 +261,6 @@ function verdictCtx(overrides = {}) {
     games: ['skeleton'],
     upgrades,
     betXp: {},
-    levels: [20],
     edge,
     rest: (keys, upTo = 4) => {
       const own = Object.fromEntries(keys.map((key) => [key, Math.min(4, upTo)]));
@@ -355,8 +268,6 @@ function verdictCtx(overrides = {}) {
     },
     maxLevels: { team: 4, wild: 4, hint: 1 },
     volume: 1_000_000,
-    betGame: null,
-    betWanted: false,
     crashOn: true,
     ...overrides,
   };
@@ -388,25 +299,9 @@ test('upgradeVerdict prefers plain XP grinding when the volume is too small to p
   assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), verdictCtx({ volume: 0 })), 'xpFarmingBetter');
 });
 
-test('upgradeVerdict judges bets and crash upgrades by their own use', () => {
-  assert.equal(A.upgradeVerdict(offer('global', 'bets'), verdictCtx()), 'noBetGain');
-  assert.equal(A.upgradeVerdict(offer('global', 'bets'), verdictCtx({ betWanted: true })), null);
+test('upgradeVerdict judges crash upgrades by their own use', () => {
   assert.equal(A.upgradeVerdict(offer('crash', 'sla'), verdictCtx()), null);
   assert.equal(A.upgradeVerdict(offer('crash', 'sla'), verdictCtx({ crashOn: false })), 'crashOff');
-});
-
-test('upgradeVerdict buys bigger bets only while XP per credit still rises at the max bet', () => {
-  const xp = (perRound) => Object.fromEntries(Object.entries(perRound).map(([bet, x]) => [bet, { rounds: 10, xp: x * 10 }]));
-  const ctx = (levels, perRound) => verdictCtx({ betGame: 'skeleton', levels, betXp: { skeleton: xp(perRound) } });
-  const bets = offer('global', 'bets');
-  // XP per round proportional to the bet: the max bet is no cheaper per XP.
-  assert.equal(A.upgradeVerdict(bets, ctx([20, 40, 100], { 20: 2, 40: 4, 100: 10 })), 'noBetGain');
-  // Still rising at a max bet of 40: the next level may be cheaper.
-  assert.equal(A.upgradeVerdict(bets, ctx([20, 40], { 20: 2, 40: 6 })), null);
-  // Rising up to 100, but above it XP per round only scales with the bet.
-  assert.equal(A.upgradeVerdict(bets, ctx([20, 40, 100], { 20: 2, 40: 6, 100: 20 })), 'noBetGain');
-  // The ladder is still sampling the max bet: nothing to judge yet.
-  assert.equal(A.upgradeVerdict(bets, ctx([20, 40], { 20: 2 })), 'noBetGain');
 });
 
 test('grindVolume is the budget over the horizon or what is above the floor', () => {

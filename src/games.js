@@ -57,10 +57,11 @@
   }
 
   // Shop upgrades in priority order: the next level of the first one that is
-  // worth its price is bought, later ones wait.
+  // worth its price is bought, later ones wait. global:bets is left out: XP per
+  // round is proportional to the bet, so a bigger max bet never buys XP cheaper.
   const UPGRADE_PLAN = [
     'blaze:star', 'skeleton:team', 'blaze:lucky', 'blaze:wild', 'skeleton:wild', 'slotingi:gulas', 'skeleton:deploy',
-    'slotingi:crown', 'roulette:zeros', 'blackjack:ties', 'blackjack:bjpay', 'crash:sla', 'global:bets',
+    'slotingi:crown', 'roulette:zeros', 'blackjack:ties', 'blackjack:bjpay', 'crash:sla',
   ].map((entry) => {
     const [game, key] = entry.split(':');
     return { game, key };
@@ -159,8 +160,8 @@
     return games;
   }
 
-  // XP per bet level, so the grinder can find which stake buys XP cheapest.
-  // A blackjack action adds its XP to the hand's opening bet with no round.
+  // XP per game and bet level, so the grinder can find which game buys XP
+  // cheapest. A blackjack action adds its XP to the hand's opening bet with no round.
   function addBetXp(table, game, bet, rounds, xp, now = Date.now()) {
     const cell = ((table[game] ??= {})[bet] ??= { rounds: 0, xp: 0, at: now });
     cell.rounds += rounds;
@@ -168,9 +169,9 @@
     return table;
   }
 
-  // XP samples expire, so the grinder measures every game and bet level again,
-  // the ones it ruled out included: the server's XP per round can change, and
-  // a level ruled out on 10 noisy rounds deserves another try.
+  // XP samples expire, so the grinder measures every game again, the ones it
+  // ruled out included: the server's XP per round can change, and a game ruled
+  // out on 10 noisy rounds deserves another try.
   const BET_XP_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 
   // Drops XP samples older than ttl, and undated ones from before samples expired.

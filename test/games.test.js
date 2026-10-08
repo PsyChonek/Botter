@@ -81,6 +81,10 @@ test('upgradeOffer prices the next level like the shop does', () => {
 
 const goal = (queue) => queue.find((offer) => !offer.reason) ?? null;
 
+test('the upgrade plan never buys a bigger max bet', () => {
+  assert.equal(G.UPGRADE_PLAN.some((o) => o.game === 'global'), false);
+});
+
 test('shopQueue follows the plan order and level gates', () => {
   const plan = [
     { game: 'crash', key: 'sla' },

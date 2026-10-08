@@ -82,13 +82,14 @@ progress shows at `chrome://on-device-internals`.
   Skeleton Slots about 71 % to 94 %, Blaze about 63 % to 95 % (or 67 % to 108 % if the
   star scatter counts symbols; the Blaze model check decides once 50 spins are
   recorded, until then the lower rule is used). Games without a model (none today)
-  are explored for 30 rounds and use the measured edge. Loss per XP is the edge times
-  bet / XP per round; XP per round is measured per bet level (10 rounds each), and a
-  game's samples are dropped when its upgrades change, because upgrades lower XP per
-  round, and every sample expires after 3 days, so games and bet levels that were
-  ruled out get measured again. The auto bet only moves to the next level while XP per credit wagered keeps
-  up, so it settles on the bet with the lowest loss per XP; under a daily budget it
-  never bets more than what is left of it.
+  are explored for 30 rounds and use the measured edge. Loss per XP is the edge over
+  XP per credit wagered; XP per round is proportional to the bet, so every bet level
+  costs the same per XP and the bet is simply the one picked in the settings. XP per
+  credit is measured per game (10 rounds), a game's samples are dropped when its
+  upgrades change, because upgrades lower XP per round, and every sample expires after
+  3 days, so games that were ruled out get measured again. Near a limit the grinder
+  steps down to a smaller bet; under a daily budget it never bets more than what is
+  left of it.
 - **Daily standup** (Dnešní standup, settings Auto tab, on by default): three quests a
   day in `player.quests`, such as spinning a game 25 times, wagering 2,500 credits or
   finishing 10 rounds ahead. The server tracks the progress and pays each reward (about
@@ -158,7 +159,7 @@ progress shows at `chrome://on-device-internals`.
     leaderboards for a week. The sprint board is also opened with the others for the
     podium achievement.
 - **Settings for the rest** (settings, Auto tab): XP grinding game (cheapest
-  per XP or a fixed game), bet (cheapest per XP or a fixed level) and exploration rounds; automatic shop purchases from
+  per XP or a fixed game), bet (a fixed level, 20 by default) and exploration rounds; automatic shop purchases from
   a priority plan (`game:key` list, off by default) using the client's price and
   level formulas. A plan entry is skipped when it is not worth its price
   (`upgradeVerdict` in `src/auto.js`): it adds less than 0.5 % return per 10,000
@@ -166,11 +167,9 @@ progress shows at `chrome://on-device-internals`.
   pick the game even fully upgraded, or spending the price on plain grinding gives
   more XP than grinding the rest at the cheaper cost (volume: 14 days of the daily
   budget, or the credits above the minimum balance; judged for the next levels alone
-  and for the game's useful upgrades maxed together). `global:bets` is bought only
-  when a bigger bet would buy XP cheaper (the grinder's bet ladder settled on the max
-  bet below 100; from 100 up XP per round is proportional to the bet, so it never
-  does) or a fixed grind or crash bet is set above the max bet, `crash:sla` only while crash betting is
-  on. The whole plan is judged again every 10 minutes and as soon as the level, the
+  and for the game's useful upgrades maxed together). `crash:sla` is bought only while
+  crash betting is on. `global:bets` (higher max bet) is not in the plan: XP per round
+  is proportional to the bet, so a bigger bet never buys XP cheaper. The whole plan is judged again every 10 minutes and as soon as the level, the
   upgrades or the max bet change (`G.shopQueue` with `reviewShop` in `src/content.js`);
   the first entry worth buying at the current level is the goal, logged as
   `upgrade_goal`. With **Save for the next upgrade** (on by default) the grinder keeps
@@ -188,7 +187,7 @@ progress shows at `chrome://on-device-internals`.
   Profit tab shows wagered, returned, net, return rate, net per round and XP, plus credits
   earned per work ticket. Crash bets are booked when they settle, from the round's bet list.
   A profile reset (Začít úplně od nuly, `/api/profile/reset`) wipes the account on the
-  server, so its stats start over too: profit, XP per bet, free income and the
+  server, so its stats start over too: profit, XP per game, free income and the
   achievement flags, so the clean-loan trick and the podium run again. Only the submit
   dwell times are kept.
 - **Odds per upgrade** (settings, Games tab): for every game and every combination of
@@ -196,10 +195,10 @@ progress shows at `chrome://on-device-internals`.
   bet) and the chance that 1,000 rounds end ahead, all from the simulation in
   `scripts/odds.mjs`. Roulette is an even-money bet, blackjack the bot's own strategy,
   Blaze is listed per scatter rule. The current account's upgrades are marked.
-- **XP per bet** (panel): for each game the tracked rounds, measured house edge and
-  average XP per round, then per bet level the sampled rounds, XP per round, credits lost
-  per XP point and the level's ladder state (testing, best, worse, skipped). The row the
-  grinder plays next is highlighted, so you can check it really tried every option.
+- **XP per game** (panel): for each game the house edge the grinder plans with, XP per
+  100 credits wagered, credits lost per XP point and its state (locked, exploring,
+  measuring XP, or playing at the chosen bet). The row the grinder plays next is
+  highlighted, so you can check it really tried every game.
 - A small panel in the bottom-left corner of the page has Start/Stop for work and
   for games, the ticket type, the game, accuracy per answer source, AI cost and
   the profit table. **Hide** collapses it to a small Botter button in the same corner

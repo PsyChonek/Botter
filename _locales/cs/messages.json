@@ -552,9 +552,6 @@
   "grind_auto": {
     "message": "Nejlevnější za XP (auto)"
   },
-  "grindBet_auto": {
-    "message": "Nejlevnější za XP (auto)"
-  },
   "scatter_symbols": {
     "message": "hvězdy počítané po symbolech"
   },
@@ -585,7 +582,7 @@
     "message": "Kol na změření každé hry"
   },
   "optionsGrindHint": {
-    "message": "Auto hra vybere odemčenou hru, která stála nejméně kreditů za XP, poté co každou změří zadaným počtem kol. Auto sázka změří, kolik XP za kolo dává každá výše sázky, a k vyšším sázkám přejde jen dokud XP roste se vsazenou částkou, takže skončí u sázky s nejmenší ztrátou za XP. Při denním rozpočtu nikdy nevsadí víc, než z něj zbývá."
+    "message": "Auto hra vybere odemčenou hru, která stála nejméně kreditů za XP, poté co každou změří zadaným počtem kol. XP za kolo roste přímo úměrně sázce, takže každá výše sázky stojí za XP stejně: sázka určuje jen to, jak rychle XP přibývá a kolik je v jednom kole ve hře. U limitu grinder přejde na menší sázku a při denním rozpočtu nikdy nevsadí víc, než z něj zbývá."
   },
   "optionsShopHeading": {
     "message": "Vylepšení z obchodu"
@@ -594,7 +591,7 @@
     "message": "Kupovat vylepšení automaticky, když se vyplatí"
   },
   "optionsUpgradeHint": {
-    "message": "Pořadí priority: Blaze hvězdy, Skeleton tým, Blaze štěstí, Blaze wild, Skeleton wild, Slotingi guláš, Skeleton deploy, Slotingi koruna, Ruleta nuly, Blackjack remízy a výplata blackjacku, Crash SLA, globální sázky. Auto koupí další úroveň prvního vylepšení, které se vyplatí, není na maximu a je povolená na tvém levelu, jakmile se vejde nad rezervu; další čekají. Přeskočí, co se nevyplatí: vylepšení, která přidají méně než 0,5 % výnosu na 10 000 kreditů (blackjack:hint/double/soft17, slotingi:mint), vylepšení hry, kterou by grinder XP nevybral ani plně vylepšenou, vylepšení hry, když by stejné kredity prostě protočené na XP daly víc XP (za 14 dní denního rozpočtu, nebo až po minimální zůstatek), global:bets, pokud by vyšší sázka nekoupila XP levněji (XP za kolo roste se sázkou, takže nad 100 nikdy) a pevná sázka grinderu ani crashe není nad maximální sázkou, a crash:sla při vypnutých sázkách na crash. Vymaxování libovolné hry dává jednorázově achievement 5000, se kterým kontrola nepočítá. Každých 10 minut, a hned když se změní level nebo vylepšení, se znovu posoudí celý plán; první vylepšení, které se vyplatí, se stane cílem a je vidět v panelu pod Fronta vylepšení. Se zapnutým šetřením nechá grinder XP cenu cíle nad rezervou nedotčenou, takže na něj našetří výplata z práce, a po koupi hned koupí i další cíl, pokud se vejde. Šetření se vypíná před plánovanou insolvencí, která by úspory smazala."
+    "message": "Pořadí priority: Blaze hvězdy, Skeleton tým, Blaze štěstí, Blaze wild, Skeleton wild, Slotingi guláš, Skeleton deploy, Slotingi koruna, Ruleta nuly, Blackjack remízy a výplata blackjacku, Crash SLA. Vyšší sázky (globální vylepšení) se nekupují nikdy: XP za kolo roste se sázkou, takže vyšší sázka XP nikdy nezlevní. Auto koupí další úroveň prvního vylepšení, které se vyplatí, není na maximu a je povolené na tvém levelu, jakmile se vejde nad rezervu; další čekají. Přeskočí, co se nevyplatí: vylepšení, která přidají méně než 0,5 % výnosu na 10 000 kreditů (blackjack:hint/double/soft17, slotingi:mint), vylepšení hry, kterou by grinder XP nevybral ani plně vylepšenou, vylepšení hry, když by stejné kredity prostě protočené na XP daly víc XP (za 14 dní denního rozpočtu, nebo až po minimální zůstatek), a crash:sla při vypnutých sázkách na crash. Vymaxování libovolné hry dává jednorázový achievement 5000, se kterým kontrola nepočítá. Každých 10 minut, a hned když se změní level nebo vylepšení, se znovu posoudí celý plán; první vylepšení, které se vyplatí, se stane cílem a je vidět v panelu pod Fronta vylepšení. Se zapnutým šetřením nechá grinder XP cenu cíle nad rezervou nedotčenou, takže na něj našetří výplata z práce, a po koupi hned koupí i další cíl, pokud se vejde. Šetření se vypíná před plánovanou insolvencí, která by úspory smazala."
   },
   "optionsModelHeading": {
     "message": "Kontrola modelu Blaze"
@@ -980,19 +977,27 @@
     "message": "Akce"
   },
   "panelXp": {
-    "message": "XP podle sázky"
+    "message": "XP podle hry"
   },
   "panelXpNote": {
-    "message": "Ztráta/XP je průměrná ztráta kreditů za jeden bod XP při dané sázce. Zvýrazněný řádek bot hraje jako další."
+    "message": "Ztráta/XP je průměrná ztráta kreditů za jeden bod XP, při každé sázce stejná. Zvýrazněný řádek bot hraje jako další."
   },
   "panelXpRetest": {
     "message": "Znovu otestovat všechny hry"
   },
-  "colBet": {
-    "message": "Sázka"
+  "colEdge": {
+    "message": "Výhoda"
   },
-  "colXpPerRound": {
-    "message": "XP/kolo"
+  "colXpPerCredit": {
+    "message": "XP/100"
+  },
+  "xpSampling": {
+    "message": "měří XP $ROUNDS$/10",
+    "placeholders": {
+      "rounds": {
+        "content": "$1"
+      }
+    }
   },
   "colCostPerXp": {
     "message": "Ztráta/XP"
@@ -1000,39 +1005,16 @@
   "colState": {
     "message": "Stav"
   },
-  "xpGame": {
-    "message": "$GAME$: $ROUNDS$ kol, výhoda kasina $EDGE$ (model s tvými upgrady), naměřeno $MEASURED$, $XP$ XP/kolo",
-    "placeholders": {
-      "game": {
-        "content": "$1"
-      },
-      "rounds": {
-        "content": "$2"
-      },
-      "edge": {
-        "content": "$3"
-      },
-      "measured": {
-        "content": "$4"
-      },
-      "xp": {
-        "content": "$5"
-      }
-    }
-  },
   "xpLocked": {
-    "message": "$GAME$: odemkne se na úrovni $LEVEL$",
+    "message": "level $LEVEL$",
     "placeholders": {
-      "game": {
-        "content": "$1"
-      },
       "level": {
-        "content": "$2"
+        "content": "$1"
       }
     }
   },
   "xpExploring": {
-    "message": "Průzkum: $ROUNDS$ z $NEEDED$ kol, než se porovnají sázky",
+    "message": "průzkum $ROUNDS$/$NEEDED$",
     "placeholders": {
       "rounds": {
         "content": "$1"
@@ -1043,19 +1025,12 @@
     }
   },
   "xpPick": {
-    "message": "hraje"
-  },
-  "xpState_best": {
-    "message": "nejlepší"
-  },
-  "xpState_next": {
-    "message": "testuje"
-  },
-  "xpState_worse": {
-    "message": "horší"
-  },
-  "xpState_skipped": {
-    "message": "přeskočeno"
+    "message": "hraje se sázkou $BET$",
+    "placeholders": {
+      "bet": {
+        "content": "$1"
+      }
+    }
   },
   "statusWaitEnergy": {
     "message": "Čekám na víc než $P1$ energie, pak začnu pracovat (teď $P2$).",
@@ -1124,9 +1099,6 @@
   },
   "shopState_queued": {
     "message": "ve frontě"
-  },
-  "shopState_noBetGain": {
-    "message": "vyšší sázka nepřidá XP"
   },
   "shopState_crashOff": {
     "message": "crash vypnutý"

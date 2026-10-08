@@ -159,61 +159,23 @@
   const wheelReady = (wheelNextAt, now = Date.now()) =>
     wheelNextAt !== undefined && (wheelNextAt === null || wheelNextAt <= now);
 
+  // Rounds a game's XP is sampled for before its cost per XP is trusted.
   const XP_SAMPLE_ROUNDS = 10;
-  // The next bet level is still sampled while XP per credit wagered stays within
-  // this share of the best so far, so measurement noise does not end the climb.
-  const XP_LADDER_KEEP = 0.9;
-  // The smallest bet within this share of the best XP per credit is preferred:
-  // about the same loss per XP, with less riding on each round.
-  const XP_SIMILAR = 0.95;
 
-  // Bets above this are not sampled: XP per round looks proportional to the bet
-  // there, so it is scaled up from the biggest sampled level.
-  const XP_SAMPLE_MAX_BET = 100;
-
-  // Measured bet ladder of one game: the best bet so far (the smallest within
-  // XP_SIMILAR of the top XP per credit), the next level still to sample (null
-  // once XP per credit drops off), the level where it dropped off (null while
-  // the climb goes on) and XP per round per level reached, measured up to
-  // XP_SAMPLE_MAX_BET and scaled with the bet above it.
-  function betLadder(cells, levels) {
-    const reached = [];
-    let top = 0;
-    let last = null;
-    const rates = {};
-    const ladder = (next, stop) => {
-      const pick = reached.find((r) => r.perRound / r.bet >= top * XP_SIMILAR);
-      const best = pick ? { bet: pick.bet, perRound: pick.perRound } : null;
-      return { best, next, stop, rates };
-    };
-    for (const bet of levels) {
-      let perRound;
-      if (bet > XP_SAMPLE_MAX_BET && last) {
-        perRound = (last.perRound * bet) / last.bet;
-      } else {
-        const cell = cells?.[bet];
-        if (!cell || cell.rounds < XP_SAMPLE_ROUNDS) return ladder(bet, null);
-        perRound = cell.xp / cell.rounds;
-        last = { bet, perRound };
-      }
-      rates[bet] = perRound;
-      const perCredit = perRound / bet;
-      if (reached.length && perCredit < top * XP_LADDER_KEEP) return ladder(null, bet);
-      top = Math.max(top, perCredit);
-      reached.push({ bet, perRound });
+  // XP per credit wagered on one game from its samples ({ bet: { rounds, xp } }),
+  // or null under XP_SAMPLE_ROUNDS rounds. XP per round is proportional to the
+  // bet, so XP per credit is the same at every bet level and the samples of all
+  // levels add up.
+  function xpRate(cells) {
+    let rounds = 0;
+    let wagered = 0;
+    let xp = 0;
+    for (const [bet, cell] of Object.entries(cells ?? {})) {
+      rounds += cell.rounds;
+      wagered += Number(bet) * cell.rounds;
+      xp += cell.xp;
     }
-    return ladder(null, null);
-  }
-
-  // Whether a bigger max bet would buy XP cheaper on this game: its bet ladder
-  // is done and settled on the biggest allowed level, so XP per credit was still
-  // rising there. From XP_SAMPLE_MAX_BET up XP per round is proportional to the
-  // bet, so a bigger bet costs the same per XP and only risks more per round.
-  function biggerBetPays(cells, levels) {
-    const top = levels.at(-1);
-    if (top === undefined || top >= XP_SAMPLE_MAX_BET) return false;
-    const ladder = betLadder(cells, levels);
-    return ladder.next === null && ladder.stop === null && ladder.best?.bet === top;
+    return rounds >= XP_SAMPLE_ROUNDS && wagered > 0 ? xp / wagered : null;
   }
 
   // House edge of a game measured from its tracked rounds (0 when it is ahead).
@@ -224,75 +186,49 @@
   // a slot say little about its edge, otherwise the measured one.
   const planEdge = (game, stats, edges) => edges?.[game] ?? gameEdge(stats[game]);
 
-  // Cheapest game and bet per XP point. The loss per XP of a bet is the game's
-  // house edge times bet / XP per round: the edge does not depend on the bet,
-  // XP per round is measured per bet level, since the server's XP formula is
-  // unknown. Games without a modelled edge and fewer than minRounds tracked
-  // rounds are explored first at the smallest bet. Then every game climbs its
-  // bet ladder while XP per credit wagered keeps up, so a flat XP per round
-  // costs only one sample at the next level, and games are compared at their
-  // best bets: one measured at 20 and another at 100 would not compare fairly.
-  // bets are the levels allowed right now; betXp is { game: { bet: { rounds, xp } } }.
-  function grindPlan(games, bets, level, stats, betXp, unlocks, edges = {}, minRounds = 30) {
+  // Credits lost per XP point on a game: house edge over XP per credit wagered.
+  // It does not depend on the bet, so the bet only sets the pace.
+  function xpCost(game, stats, betXp, edges) {
+    const edge = planEdge(game, stats, edges);
+    const rate = xpRate(betXp?.[game]);
+    return edge !== null && rate > 0 ? edge / rate : null;
+  }
+
+  // Cheapest game per XP point at the given bet (null when no bet is allowed).
+  // Games without a modelled edge and fewer than minRounds tracked rounds are
+  // explored first, then every game is sampled for XP_SAMPLE_ROUNDS rounds,
+  // then the one with the lowest loss per XP is played.
+  // betXp is { game: { bet: { rounds, xp } } }.
+  function grindPlan(games, bet, level, stats, betXp, unlocks, edges = {}, minRounds = 30) {
     const unlocked = games.filter((game) => level >= unlocks[game]);
-    const levels = [...bets].sort((a, b) => a - b);
-    if (!unlocked.length || !levels.length) return null;
+    if (!unlocked.length || !(bet > 0)) return null;
     const rounds = (game) => stats[game]?.rounds ?? 0;
     const unexplored = unlocked.filter((game) => edges?.[game] === undefined && rounds(game) < minRounds);
-    if (unexplored.length) {
-      return { game: unexplored.reduce((a, b) => (rounds(b) < rounds(a) ? b : a)), bet: levels[0] };
-    }
-
-    const ladders = unlocked.map((game) => ({ game, ...betLadder(betXp?.[game], levels) }));
-    const climbing = ladders.find((ladder) => ladder.next !== null);
-    if (climbing) return { game: climbing.game, bet: climbing.next };
-
-    const cost = ({ game, best }) => {
-      const edge = planEdge(game, stats, edges) ?? 0;
-      return best.perRound > 0 ? (edge * best.bet) / best.perRound : Infinity;
-    };
-    const better = (a, b) => cost(b) < cost(a) || (cost(b) === cost(a) && b.best.bet < a.best.bet);
-    const lead = ladders.reduce((a, b) => (better(a, b) ? b : a));
-    return { game: lead.game, bet: lead.best.bet };
+    if (unexplored.length) return { game: unexplored.reduce((a, b) => (rounds(b) < rounds(a) ? b : a)), bet };
+    const sampling = unlocked.find((game) => xpRate(betXp?.[game]) === null);
+    if (sampling) return { game: sampling, bet };
+    const cost = (game) => xpCost(game, stats, betXp, edges) ?? Infinity;
+    return { game: unlocked.reduce((a, b) => (cost(b) < cost(a) ? b : a)), bet };
   }
 
   // What the XP grinder has measured, per game, for the panel: the measured
-  // and the modelled edge, the average XP per round and, per bet level, the
-  // sampled rounds, XP per round (scaled up above XP_SAMPLE_MAX_BET), credits
-  // lost per XP point (from the edge the grinder plans with) and where the level stands on the bet ladder: 'best',
-  // 'next' (being sampled), 'worse' (XP per credit dropped off there),
-  // 'skipped' (above that, never tried) or null.
-  function grindReport(games, levels, level, stats, betXp, unlocks, edges = {}) {
-    const sorted = [...levels].sort((a, b) => a - b);
+  // and the modelled edge, the edge it plans with, the XP sample rounds, XP per
+  // credit wagered and credits lost per XP point.
+  function grindReport(games, level, stats, betXp, unlocks, edges = {}) {
     return games.map((game) => {
       const row = stats[game];
-      const edge = planEdge(game, stats, edges);
-      const ladder = betLadder(betXp?.[game], sorted);
-      // Levels above the sampled ones are listed once the ladder has scaled them.
-      const shown = sorted.filter((bet) => bet <= XP_SAMPLE_MAX_BET || ladder.rates[bet] !== undefined);
-      const bets = shown.map((bet) => {
-        const cell = betXp?.[game]?.[bet];
-        const rounds = cell?.rounds ?? 0;
-        const perRound = ladder.rates[bet] ?? (rounds > 0 ? cell.xp / rounds : null);
-        const cost = edge !== null && perRound > 0 ? (edge * bet) / perRound : null;
-        let state = null;
-        if (bet === ladder.best?.bet) state = 'best';
-        else if (bet === ladder.next) state = 'next';
-        else if (bet === ladder.stop) state = 'worse';
-        else if (ladder.stop !== null && bet > ladder.stop) state = 'skipped';
-        return { bet, rounds, perRound, cost, state };
-      });
-      const rounds = row?.rounds ?? 0;
+      const samples = Object.values(betXp?.[game] ?? {}).reduce((sum, cell) => sum + cell.rounds, 0);
       return {
         game,
         locked: level < unlocks[game],
         unlock: unlocks[game],
-        rounds,
-        edge,
+        rounds: row?.rounds ?? 0,
+        edge: planEdge(game, stats, edges),
         measuredEdge: gameEdge(row),
         modelEdge: edges?.[game] ?? null,
-        perRound: rounds > 0 ? row.xp / rounds : null,
-        bets,
+        samples,
+        rate: xpRate(betXp?.[game]),
+        cost: xpCost(game, stats, betXp, edges),
       };
     });
   }
@@ -315,13 +251,11 @@
   }
 
   // Why an upgrade from the shop plan is not worth its price, or null when it is.
-  // ctx: games (unlocked games the grinder may pick), upgrades, betXp, levels
-  // (bet levels allowed now), edge(game, upgrades) (modelled house edge or null),
-  // rest(keys, upTo) ({ price, upgrades } after buying those upgrades of the
-  // offer's game up to level upTo, default max), maxLevels ({ key: max } of the
-  // game), volume (see grindVolume), betGame (the game the grinder plays, or
-  // null), betWanted (a fixed grind or crash bet asks for more than the max bet)
-  // and crashOn (crash betting is on).
+  // ctx: games (unlocked games the grinder may pick), upgrades, betXp,
+  // edge(game, upgrades) (modelled house edge or null), rest(keys, upTo)
+  // ({ price, upgrades } after buying those upgrades of the offer's game up to
+  // level upTo, default max), maxLevels ({ key: max } of the game), volume (see
+  // grindVolume) and crashOn (crash betting is on).
   // Credits spent on upgrades are not there to grind with, so they are bought
   // only if the XP from the remaining volume at the cheaper cost beats the XP
   // from the whole volume at today's best cost. That is checked for the next
@@ -329,10 +263,6 @@
   // and for every worthwhile upgrade of the game maxed together.
   function upgradeVerdict(offer, ctx) {
     const { game } = offer;
-    if (game === 'global') {
-      const pays = ctx.betWanted || (ctx.betGame !== null && biggerBetPays(ctx.betXp?.[ctx.betGame], ctx.levels));
-      return pays ? null : 'noBetGain';
-    }
     if (game === 'crash') return ctx.crashOn ? null : 'crashOff';
     const now = (g) => ctx.edge(g, ctx.upgrades);
     if (now(game) === null) return null;
@@ -345,15 +275,10 @@
     if (gainPerCredit([offer.key]) < UPGRADE_MIN_GAIN) return 'tooSmall';
     const keys = Object.keys(ctx.maxLevels);
 
-    // XP per credit wagered of each game's best measured bet. Until every game
-    // has one, costs compare by edge alone (same XP per credit everywhere).
-    const rates = Object.fromEntries(
-      ctx.games.map((g) => {
-        const best = betLadder(ctx.betXp?.[g], ctx.levels).best;
-        return [g, best && best.perRound > 0 ? best.perRound / best.bet : null];
-      }),
-    );
-    const useRates = Object.values(rates).every((r) => r !== null);
+    // XP per credit wagered of each game. Until every game has one, costs
+    // compare by edge alone (same XP per credit everywhere).
+    const rates = Object.fromEntries(ctx.games.map((g) => [g, xpRate(ctx.betXp?.[g])]));
+    const useRates = Object.values(rates).every((r) => r > 0);
     const cost = (g, edge) => (useRates ? edge / rates[g] : edge);
     const before = Math.min(...ctx.games.map((g) => (now(g) === null ? Infinity : cost(g, now(g)))));
     const maxed = ctx.rest(keys.filter((key) => gainPerCredit([key]) >= UPGRADE_MIN_GAIN));
@@ -376,6 +301,13 @@
         grindAllowed(settings, credits, lostToday, bet) &&
         (settings.grindLimit !== 'daily' || bet <= settings.xpBudget - lostToday),
     );
+  }
+
+  // Bet XP grinding plays: the chosen level, or the biggest smaller one the
+  // limits still allow, so the grinder steps down near a limit instead of
+  // stopping. Null when not even the smallest level is allowed.
+  function grindBet(settings, credits, lostToday, levels, wanted) {
+    return grindBets(settings, credits, lostToday, levels.filter((bet) => bet <= wanted)).at(-1) ?? null;
   }
 
   // Whether XP grinding may place another bet. The limit is a daily loss
@@ -661,7 +593,9 @@
     wheelReady,
     grindPlan,
     grindReport,
+    xpCost,
     grindBets,
+    grindBet,
     grindAllowed,
     workDue,
     grindVolume,

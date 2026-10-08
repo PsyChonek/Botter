@@ -45,7 +45,7 @@
     xpBudget: 0,
     grindMinBalance: 0,
     grindGame: 'auto',
-    grindBet: 'auto',
+    grindBet: 20,
     grindExploreRounds: 30,
     buyUpgrades: false,
     saveForUpgrades: true,
@@ -69,7 +69,7 @@
     free: { daily: 0, bailout: 0 },
     crashBooked: [],
     grind: { day: '', net: 0 },
-    betXp: {}, // game -> bet -> { rounds, xp, at }, to find the cheapest bet per XP
+    betXp: {}, // game -> bet -> { rounds, xp, at }, to find the cheapest game per XP
     betXpUpgrades: {}, // game -> upgrades the betXp samples were taken with
     flags: { cleanDone: false, cleanTaken: false, boardsDay: '' },
     dwell: {}, // task type -> least ms open before a submit the server accepts
@@ -975,14 +975,14 @@
 
   // ---------- auto mode ----------
 
-  // Credits the grinder pays per XP point: the cheapest best bet measured over
-  // the games it may pick, or null before any game has one.
+  // Credits the grinder pays per XP point: the cheapest measured game it may
+  // pick, or null before any game has been measured.
   function xpPrice() {
-    const { levels, candidates, edges } = grindModel();
-    const costs = A.grindReport(candidates, levels, player.level, stats.games, stats.betXp, GRIND_UNLOCKS, edges)
-      .flatMap((row) => row.bets)
-      .filter((cell) => cell.state === 'best' && cell.cost !== null)
-      .map((cell) => cell.cost);
+    const { candidates, edges } = grindModel();
+    const costs = candidates
+      .filter((game) => player.level >= GRIND_UNLOCKS[game])
+      .map((game) => A.xpCost(game, stats.games, stats.betXp, edges))
+      .filter((cost) => cost !== null);
     return costs.length ? Math.min(...costs) : null;
   }
 
@@ -1148,24 +1148,17 @@
   }
 
   // Why an upgrade from the plan is skipped (see BotterAuto.upgradeVerdict), or null.
-  // The grinder is judged as if it were not saving, or saving for global:bets
-  // would stop the grinder, uncap its bet and drop the goal again.
   function upgradeSkip(offer) {
-    const { levels, candidates, plan } = grindChoice(false);
+    const { candidates } = grindModel();
     const mode = blazeMode();
     return A.upgradeVerdict(offer, {
       games: candidates.filter((game) => player.level >= GRIND_UNLOCKS[game]),
       upgrades: player.upgrades,
       betXp: stats.betXp,
-      levels,
       edge: (game, upgrades) => O.edges([game], upgrades, mode)[game] ?? null,
       rest: (keys, upTo) => G.upgradeRest(player.upgrades, offer.game, keys, upTo),
       maxLevels: Object.fromEntries(Object.entries(G.SHOP[offer.game]).map(([key, [max]]) => [key, max])),
       volume: A.grindVolume(limits(), player.credits),
-      betGame: plan?.game ?? null,
-      betWanted:
-        (settings.grindBet !== 'auto' && Number(settings.grindBet) > player.maxBet) ||
-        (settings.crashEnabled && settings.crashBet > player.maxBet),
       crashOn: settings.crashEnabled,
     });
   }
@@ -1175,7 +1168,7 @@
   // worth buying at this level. Changes are logged, not every review.
   function reviewShop() {
     if (!settings.buyUpgrades || !player) return (shopReview = null);
-    const key = JSON.stringify([accountId, player.level, player.maxBet, player.upgrades, bankruptPlanned(), settings.crashEnabled]);
+    const key = JSON.stringify([accountId, player.level, player.upgrades, bankruptPlanned(), settings.crashEnabled]);
     if (shopReview?.key === key && Date.now() - shopReview.at < SHOP_REVIEW_MS) return shopReview;
     const queue = G.shopQueue(G.UPGRADE_PLAN, player, upgradeSkip);
     const goal = queue.find((offer) => !offer.reason) ?? null;
@@ -1391,17 +1384,15 @@
     return goal ? { ...limit, reserve: limit.reserve + goal.price } : limit;
   }
 
+  // The bet is the one picked in the settings: XP per round is proportional to
+  // the bet, so every level costs the same per XP and the bet only sets the pace.
+  // A setting from before the bet was picked by hand ('auto') starts at the smallest.
   function grindChoice(saving = true) {
     const lost = Math.max(0, -(stats.grind.day === A.dayKey() ? stats.grind.net : 0));
     const { levels, candidates, edges } = grindModel();
-    const limit = grindLimits(saving);
-    const bets =
-      settings.grindBet === 'auto'
-        ? A.grindBets(limit, player.credits, lost, levels)
-        : [G.betFor(Number(settings.grindBet), player.maxBet)].filter((bet) =>
-            A.grindAllowed(limit, player.credits, lost, bet),
-          );
-    const plan = A.grindPlan(candidates, bets, player.level, stats.games, stats.betXp, GRIND_UNLOCKS, edges, settings.grindExploreRounds);
+    const wanted = Number(settings.grindBet) || G.BET_LEVELS[0];
+    const bet = A.grindBet(grindLimits(saving), player.credits, lost, levels, wanted);
+    const plan = A.grindPlan(candidates, bet, player.level, stats.games, stats.betXp, GRIND_UNLOCKS, edges, settings.grindExploreRounds);
     return { lost, levels, candidates, edges, plan };
   }
 
@@ -1646,7 +1637,7 @@
     ui.xpSummary.textContent = msg('panelXp');
     ui.xpNote.textContent = msg('panelXpNote');
     ui.xpRetest.textContent = msg('panelXpRetest');
-    ['colBet', 'colRounds', 'colXpPerRound', 'colCostPerXp', 'colState'].forEach(
+    ['colGame', 'colEdge', 'colXpPerCredit', 'colCostPerXp', 'colState'].forEach(
       (key, i) => (ui.xpHead[i].textContent = msg(key)),
     );
     ui.shopSummary.textContent = msg('panelShop');
@@ -1719,8 +1710,8 @@
     );
   }
 
-  // Forgets the measured XP per bet, so the grinder samples every unlocked game
-  // and bet level again before it picks one.
+  // Forgets the measured XP, so the grinder samples every unlocked game again
+  // before it picks one.
   function retestGames() {
     stats.betXp = {};
     saveStats();
@@ -1728,55 +1719,34 @@
     render();
   }
 
-  // XP grinding measurements per game and bet level, with the grinder's pick.
+  // XP grinding measurements per game, with the grinder's pick.
   function renderXp() {
     if (!player) {
       ui.xpBody.replaceChildren();
       return;
     }
-    const { levels, candidates, edges, plan } = grindChoice();
-    const report = A.grindReport(candidates, levels, player.level, stats.games, stats.betXp, GRIND_UNLOCKS, edges);
-    const rows = [];
-    for (const game of report) {
-      const head = document.createElement('tr');
-      head.className = 'group';
-      const td = cell(
-        game.locked
-          ? msg('xpLocked', [msg(`game_${game.game}`), String(game.unlock)])
-          : msg('xpGame', [
-              msg(`game_${game.game}`),
-              num.format(game.rounds),
-              game.modelEdge === null ? '-' : pct.format(game.modelEdge),
-              game.measuredEdge === null ? '-' : pct.format(game.measuredEdge),
-              game.perRound === null ? '-' : decimal.format(game.perRound),
-            ]),
-      );
-      td.colSpan = 5;
-      head.append(td);
-      rows.push(head);
-      if (game.locked) continue;
-      if (game.modelEdge === null && game.rounds < settings.grindExploreRounds) {
+    const { candidates, edges, plan } = grindChoice();
+    const report = A.grindReport(candidates, player.level, stats.games, stats.betXp, GRIND_UNLOCKS, edges);
+    ui.xpBody.replaceChildren(
+      ...report.map((game) => {
+        let state = '';
+        if (game.locked) state = msg('xpLocked', [String(game.unlock)]);
+        else if (plan?.game === game.game) state = msg('xpPick', [credits(plan.bet)]);
+        else if (game.modelEdge === null && game.rounds < settings.grindExploreRounds) {
+          state = msg('xpExploring', [num.format(game.rounds), num.format(settings.grindExploreRounds)]);
+        } else if (game.rate === null) state = msg('xpSampling', [num.format(game.samples)]);
         const tr = document.createElement('tr');
-        const note = cell(msg('xpExploring', [num.format(game.rounds), num.format(settings.grindExploreRounds)]), 'muted');
-        note.colSpan = 5;
-        tr.append(note);
-        rows.push(tr);
-      }
-      for (const row of game.bets) {
-        const pick = plan?.game === game.game && plan.bet === row.bet;
-        const tr = document.createElement('tr');
-        if (pick) tr.className = 'pick';
+        if (plan?.game === game.game) tr.className = 'pick';
         tr.append(
-          cell(credits(row.bet)),
-          cell(row.rounds ? num.format(row.rounds) : '-'),
-          cell(row.perRound === null ? '-' : decimal.format(row.perRound)),
-          cell(row.cost === null ? '-' : decimal.format(row.cost)),
-          cell(pick ? msg('xpPick') : row.state ? msg(`xpState_${row.state}`) : ''),
+          cell(msg(`game_${game.game}`)),
+          cell(game.edge === null ? '-' : pct.format(game.edge)),
+          cell(game.rate === null ? '-' : decimal.format(game.rate * 100)),
+          cell(game.cost === null ? '-' : decimal.format(game.cost)),
+          cell(state, game.locked ? 'muted' : undefined),
         );
-        rows.push(tr);
-      }
-    }
-    ui.xpBody.replaceChildren(...rows);
+        return tr;
+      }),
+    );
   }
 
   // The shop queue from the last review: the goal with the savings toward it,
