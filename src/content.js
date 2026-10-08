@@ -9,6 +9,7 @@
   const A = globalThis.BotterAuto;
   const O = globalThis.BotterOdds;
   const Z = globalThis.BotterBlaze;
+  const S = globalThis.BotterScreen;
   const msg = (key, subs) => chrome.i18n.getMessage(key, subs) || key;
 
   const DEFAULT_SETTINGS = {
@@ -27,6 +28,7 @@
     takeProfit: 0,
     reserve: 0,
     gameDelayMs: 800,
+    playOnScreen: false,
     autoClaim: true,
     autoMode: false,
     repayDebt: true,
@@ -234,6 +236,27 @@
     });
   }
 
+  // Rounds played on the game screen are sent by the app, so their result is
+  // the next response the page sees on that path.
+  const screenWaiters = new Set();
+  function waitResponse(path) {
+    return new Promise((resolve) => {
+      const waiter = { path, resolve };
+      screenWaiters.add(waiter);
+      setTimeout(() => {
+        if (screenWaiters.delete(waiter)) resolve({ ok: false, status: 0, data: { error: 'timeout' } });
+      }, API_TIMEOUT_MS);
+    });
+  }
+
+  function resolveScreenWaiters({ path, ok, status, data }) {
+    for (const waiter of screenWaiters) {
+      if (waiter.path !== path) continue;
+      screenWaiters.delete(waiter);
+      waiter.resolve({ ok, status, data });
+    }
+  }
+
   window.addEventListener('message', (event) => {
     if (event.source !== window || event.data?.source !== 'botter-hook') return;
     if (event.data.kind === 'api-result') {
@@ -246,6 +269,7 @@
     // to the right account's stats instead of an empty placeholder.
     if (early) early.push(event.data);
     else onResponse(event.data);
+    resolveScreenWaiters(event.data);
   });
 
   // Every /api/ response the page sees, from the app or from the bot.
@@ -509,7 +533,6 @@
   // Detaches the current session and reloads to the login screen. The app's own
   // log out would revoke the session on the server, and with it the saved copy.
   async function addAccount() {
-      upgrades: player.upgrades,
     if (switching) return;
     switching = true;
     await saveAccount(true);
@@ -750,9 +773,18 @@
 
   const credits = (n) => num.format(n);
 
+  const screenPlay = S.create({
+    waitResponse,
+    dismissModal,
+    active: gamesOn,
+    decide: (hand, data) =>
+      BJ.decide(hand, BJ.rulesFromUpgrades(player.upgrades?.blackjack), data?.player?.credits ?? player.credits),
+  });
+
   async function playBlackjack(bet) {
     const open = player.blackjack && !player.blackjack.done ? player.blackjack : null;
     if (open) bjStake = open.stake ?? bjStake;
+    if (settings.playOnScreen) return screenPlay.blackjack(bet, open);
     let res = open ? { ok: true, data: { hand: open, player } } : await api('/api/blackjack/deal', { bet });
     while (res.ok && res.data.hand && !res.data.hand.done && gamesOn()) {
       await sleep(settings.gameDelayMs / 2);
@@ -765,6 +797,7 @@
 
   function playRound(game, bet) {
     if (game === 'blackjack') return playBlackjack(bet);
+    if (settings.playOnScreen) return game === 'roulette' ? screenPlay.roulette(settings.rouletteBet, bet) : screenPlay.slot(game, bet);
     if (game === 'roulette') return api('/api/roulette/spin', { bets: { [settings.rouletteBet]: bet } });
     return api(G.GAMES[game].path, { bet });
   }
@@ -1167,7 +1200,6 @@
   function grindModel() {
     G.expireBetXp(stats.betXp);
     const levels = G.BET_LEVELS.filter((bet) => bet <= player.maxBet);
-        wins: O.winRates(G.GAME_KEYS, player.upgrades, blazeMode()),
     const candidates = settings.grindGame === 'auto' ? G.GAME_KEYS : [settings.grindGame];
     const edges = O.edges(candidates, player.upgrades, blazeMode());
     return { levels, candidates, edges };
@@ -1345,6 +1377,10 @@
           <select id="game"></select>
           <button type="button" class="games-toggle"></button>
         </div>
+        <div class="row">
+          <span class="muted grow screen-label"></span>
+          <button type="button" class="screen-toggle"></button>
+        </div>
         <div class="status" role="status" aria-live="polite"></div>
         <div class="stats muted"></div>
         <div class="cost muted"></div>
@@ -1390,6 +1426,8 @@
       gameLabel: $('label[for="game"]'),
       game: $('#game'),
       gamesToggle: $('.games-toggle'),
+      screenLabel: $('.screen-label'),
+      screenToggle: $('.screen-toggle'),
       status: $('.status'),
       stats: $('.stats'),
       cost: $('.cost'),
@@ -1418,6 +1456,7 @@
     ui.addAccount.setAttribute('aria-label', msg('panelAddAccountLabel'));
     ui.typeLabel.textContent = msg('panelWork');
     ui.gameLabel.textContent = msg('panelGames');
+    ui.screenLabel.textContent = msg('panelOnScreen');
     ui.summary.textContent = msg('panelProfit');
     ['colGame', 'colRounds', 'colNet', 'colRtp'].forEach((key, i) => (ui.head[i].textContent = msg(key)));
     ui.xpSummary.textContent = msg('panelXp');
@@ -1444,6 +1483,7 @@
     ui.show.addEventListener('click', () => setPanelHidden(false));
     ui.workToggle.addEventListener('click', () => (settings.enabled ? stopWork() : startWork()));
     ui.gamesToggle.addEventListener('click', () => (settings.gamesEnabled ? stopGames() : startGames()));
+    ui.screenToggle.addEventListener('click', () => saveSettings({ playOnScreen: !settings.playOnScreen }));
     ui.type.addEventListener('change', () => saveSettings({ taskType: ui.type.value }));
     ui.game.addEventListener('change', () => saveSettings({ game: ui.game.value }));
     ui.xpRetest.addEventListener('click', retestGames);
@@ -1633,6 +1673,10 @@
     setToggle(ui.gamesToggle, settings.gamesEnabled);
     ui.workToggle.setAttribute('aria-label', `${msg('panelWork')}: ${ui.workToggle.textContent}`);
     ui.gamesToggle.setAttribute('aria-label', `${msg('panelGames')}: ${ui.gamesToggle.textContent}`);
+    ui.screenToggle.textContent = msg(settings.playOnScreen ? 'panelOn' : 'panelOff');
+    ui.screenToggle.classList.toggle('on', settings.playOnScreen);
+    ui.screenToggle.setAttribute('aria-pressed', String(settings.playOnScreen));
+    ui.screenToggle.setAttribute('aria-label', msg('panelOnScreen'));
     renderAccounts();
     ui.type.value = settings.taskType;
     ui.game.value = settings.game;

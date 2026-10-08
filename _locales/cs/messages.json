@@ -254,6 +254,12 @@
   "optionsGameDelay": {
     "message": "Prodleva mezi koly (ms)"
   },
+  "panelOnScreen": {
+    "message": "Hrát na obrazovce hry"
+  },
+  "optionsPlayOnScreen": {
+    "message": "Hrát na obrazovce hry: bot otevře hru a mačká její tlačítka, takže každé kolo je vidět. Pomalejší než hraní přes API."
+  },
   "optionsProfitHeading": {
     "message": "Zisk podle hry"
   },
@@ -1064,43 +1070,3 @@
     "message": "grind vynese víc"
   }
 }
-  },
-  "optionsOddsHeading": {
-    "message": "Šance podle vylepšení"
-  },
-  "optionsOddsHint": {
-    "message": "Simulováno pro každou hru a každou kombinaci jejích vylepšení z obchodu: návratnost, podíl kol, která vrátí víc než sázku, a podíl sérií po 1 000 kolech, které skončí v plusu. Ruleta je sázka 1:1, blackjack strategie bota. Vylepšení aktuálního účtu jsou označená."
-  },
-  "oddsGame": {
-    "message": "$GAME$, $COUNT$ kombinací",
-    "placeholders": {
-      "game": {
-        "content": "$1"
-      },
-      "count": {
-        "content": "$2"
-      }
-    }
-  },
-  "oddsGameRule": {
-    "message": "$GAME$ ($RULE$), $COUNT$ kombinací",
-    "placeholders": {
-      "game": {
-        "content": "$1"
-      },
-      "rule": {
-        "content": "$2"
-      },
-      "count": {
-        "content": "$3"
-      }
-    }
-  },
-  "colUpgrades": {
-    "message": "Vylepšení"
-  },
-  "colRoundWon": {
-    "message": "Vyhraná kola"
-  },
-  "colAhead1000": {
-    "message": "V plusu po 1 000"

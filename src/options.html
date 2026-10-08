@@ -187,6 +187,7 @@
         <section class="card" aria-labelledby="games-heading">
           <h2 id="games-heading" data-i18n="optionsGamesHeading"></h2>
           <p class="hint" data-i18n="optionsGamesHint"></p>
+          <label class="check"><span data-i18n="optionsPlayOnScreen"></span><input type="checkbox" role="switch" name="playOnScreen" /></label>
           <div class="grid">
             <div>
               <label for="gameBet" data-i18n="optionsGameBet"></label>
@@ -215,12 +216,6 @@
           </div>
         </section>
       </div>
-
-        <section class="card" aria-labelledby="odds-heading">
-          <h2 id="odds-heading" data-i18n="optionsOddsHeading"></h2>
-          <p class="hint" data-i18n="optionsOddsHint"></p>
-          <div id="oddsTables"></div>
-        </section>
 
       <div role="tabpanel" id="panel-profit" aria-labelledby="tab-profit" tabindex="0" hidden>
         <section class="card" aria-labelledby="accounts-heading">
@@ -310,9 +305,6 @@
     <script src="games.js"></script>
     <script src="blaze.js"></script>
     <script src="local-model.js"></script>
-    <script src="blackjack.js"></script>
-    <script src="odds-table.js"></script>
-    <script src="odds.js"></script>
     <script src="options.js"></script>
   </body>
 </html>

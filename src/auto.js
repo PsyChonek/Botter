@@ -439,13 +439,11 @@
     return questGame(quest) ? 'rounds' : null;
   }
 
-  // Chance that one round ends ahead: the simulated one from wins when given
-  // (BotterOdds.winRates). Without it, an even-money roulette bet wins 18 of
-  // the 36 / rtp numbers, so half its return; basic-strategy blackjack wins
-  // about 42 % of hands; the slots pay often but mostly less than the bet, so
-  // 25 % is a rough guess.
-  const winChance = (game, edge, wins) => {
-    if (wins?.[game] > 0) return wins[game];
+  // Chance that one round ends ahead. An even-money roulette bet wins 18 of the
+  // 36 / rtp numbers, so half its return; basic-strategy blackjack wins about
+  // 42 % of hands. The slots pay often but mostly less than the bet; 25 % is a
+  // rough guess, so a "rounds ahead" quest goes to roulette or blackjack first.
+  const winChance = (game, edge) => {
     if (game === 'roulette') return (1 - edge) / 2;
     if (game === 'blackjack') return 0.42;
     return 0.25;
@@ -455,14 +453,14 @@
   // levels are the affordable bet levels, ascending. Rounds and wins go at the
   // smallest bet; a wager quest costs the same at any bet, so it goes at the
   // biggest one that does not overshoot what is left.
-  function questCost(kind, game, left, edge, levels, wins) {
+  function questCost(kind, game, left, edge, levels) {
     const house = Math.max(0, edge);
     const min = levels[0];
     if (kind === 'wager') {
       const bet = [...levels].reverse().find((b) => b <= left) ?? min;
       return { bet, cost: left * house };
     }
-    if (kind === 'wins') return { bet: min, cost: (left / winChance(game, edge, wins)) * min * house };
+    if (kind === 'wins') return { bet: min, cost: (left / winChance(game, edge)) * min * house };
     return { bet: min, cost: left * min * house };
   }
 
@@ -470,9 +468,8 @@
   // played only when its expected loss is below its reward, on the game where
   // that loss is smallest. The bonus for all three and the standup achievement
   // are left out, so a quest that pays only with them is skipped. ctx: level,
-  // unlocks ({ game: level }), edges ({ game: house edge }), wins ({ game:
-  // share of rounds that end ahead }, optional) and levels (bet levels
-  // affordable now). skipped collects the quests that are not worth it.
+  // unlocks ({ game: level }), edges ({ game: house edge }) and levels (bet
+  // levels affordable now). skipped collects the quests that are not worth it.
   function standupPlan(quests, ctx, skipped = []) {
     const levels = [...(ctx.levels ?? [])].sort((a, b) => a - b);
     let best = null;
@@ -489,7 +486,7 @@
         continue;
       }
       const plan = games
-        .map((game) => ({ game, ...questCost(kind, game, left, ctx.edges[game], levels, ctx.wins) }))
+        .map((game) => ({ game, ...questCost(kind, game, left, ctx.edges[game], levels) }))
         .reduce((a, b) => (b.cost < a.cost ? b : a));
       if (plan.cost >= quest.reward) {
         skipped.push({ key: quest.key, reason: 'tooCostly', cost: Math.round(plan.cost), reward: quest.reward });

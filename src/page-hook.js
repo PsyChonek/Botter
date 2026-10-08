@@ -83,7 +83,7 @@
         response
           .clone()
           .json()
-          .then((data) => post({ kind: 'response', path: url.pathname, ok: response.ok, request, data, uid }))
+          .then((data) => post({ kind: 'response', path: url.pathname, ok: response.ok, status: response.status, request, data, uid }))
           .catch(() => {});
       }
     } catch {}

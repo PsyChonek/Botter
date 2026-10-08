@@ -254,6 +254,12 @@
   "optionsGameDelay": {
     "message": "Delay between rounds (ms)"
   },
+  "panelOnScreen": {
+    "message": "Play on the game screen"
+  },
+  "optionsPlayOnScreen": {
+    "message": "Play on the game screen: the bot opens the game and presses its buttons, so every round animates. Slower than playing through the API."
+  },
   "optionsProfitHeading": {
     "message": "Profit per game"
   },
@@ -1064,43 +1070,3 @@
     "message": "grinding pays more"
   }
 }
-  },
-  "optionsOddsHeading": {
-    "message": "Odds per upgrade"
-  },
-  "optionsOddsHint": {
-    "message": "Simulated for every game and every combination of its shop upgrades: the return to player, the share of rounds that pay more than the bet, and the share of 1,000-round sessions that end ahead. Roulette is an even-money bet, blackjack the bot's own strategy. The current account's upgrades are marked."
-  },
-  "oddsGame": {
-    "message": "$GAME$, $COUNT$ combinations",
-    "placeholders": {
-      "game": {
-        "content": "$1"
-      },
-      "count": {
-        "content": "$2"
-      }
-    }
-  },
-  "oddsGameRule": {
-    "message": "$GAME$ ($RULE$), $COUNT$ combinations",
-    "placeholders": {
-      "game": {
-        "content": "$1"
-      },
-      "rule": {
-        "content": "$2"
-      },
-      "count": {
-        "content": "$3"
-      }
-    }
-  },
-  "colUpgrades": {
-    "message": "Upgrades"
-  },
-  "colRoundWon": {
-    "message": "Rounds won"
-  },
-  "colAhead1000": {
-    "message": "Ahead after 1,000"

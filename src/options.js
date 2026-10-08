@@ -16,6 +16,7 @@ const CHECKBOXES = [
   'captureDebug',
   'panelHidden',
   'rotateAccounts',
+  'playOnScreen',
 ];
 const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet', 'grindLimit', 'grindGame', 'grindBet'];
 const INT_SELECTS = ['gameBet', 'crashBet'];
@@ -59,6 +60,7 @@ const DEFAULTS = {
   captureDebug: false,
   panelHidden: false,
   rotateAccounts: true,
+  playOnScreen: false,
   model: 'claude-opus-5-5',
   openrouterModel: 'google/gemini-2.5-flash',
   effort: 'medium',
@@ -418,7 +420,6 @@ async function showAccounts() {
   showAccountRows(accounts);
 
   profitStats = byPrefix(stored, STATS_PREFIX);
-  markOdds(accounts);
   if (stored.stats) profitStats[''] = stored.stats;
   const label = (id) => (id === '' ? msg('accountLegacy') : (accounts[id]?.login ?? id.slice(0, 8)));
   const choices = [[ALL_ACCOUNTS, msg('optionsProfitAll')], ...Object.keys(profitStats).map((id) => [id, label(id)])];
@@ -435,67 +436,6 @@ async function showAccounts() {
 
 $('profitAccount').addEventListener('change', (event) => {
   profitChoice = event.target.value;
-// Odds of every game and upgrade combination (BotterOdds.table), built once.
-// Rows matching the upgrades of the account seen last are marked.
-const O = globalThis.BotterOdds;
-const oddsRows = [];
-
-function buildOdds() {
-  const groups = [];
-  for (const game of G.GAME_KEYS.filter((g) => O.UPGRADES[g])) {
-    for (const mode of game === 'blaze' ? Z.SCATTER_MODES : [undefined]) {
-      const rows = O.table(game, mode);
-      const details = document.createElement('details');
-      const summary = document.createElement('summary');
-      summary.textContent = mode
-        ? msg('oddsGameRule', [msg(`game_${game}`), msg(`scatter_${mode}`), num.format(rows.length)])
-        : msg('oddsGame', [msg(`game_${game}`), num.format(rows.length)]);
-      const head = document.createElement('tr');
-      for (const key of ['colUpgrades', 'colRtp', 'colRoundWon', 'colAhead1000']) {
-        const th = document.createElement('th');
-        th.scope = 'col';
-        th.textContent = msg(key);
-        head.append(th);
-      }
-      const thead = document.createElement('thead');
-      thead.append(head);
-      const tbody = document.createElement('tbody');
-      for (const row of rows) {
-        const tr = document.createElement('tr');
-        tr.append(
-          cell(Object.entries(row.upgrades).map(([name, level]) => `${name} ${level}`).join(', ')),
-          cell(row.rtp === null ? '-' : pct2.format(row.rtp)),
-          cell(row.win === undefined ? '-' : pct2.format(row.win)),
-          cell(row.ahead === undefined ? '-' : pct2.format(row.ahead)),
-        );
-        tbody.append(tr);
-        oddsRows.push({ game, upgrades: row.upgrades, tr });
-      }
-      const table = document.createElement('table');
-      table.append(thead, tbody);
-      const wrap = document.createElement('div');
-      wrap.className = 'table-wrap';
-      wrap.append(table);
-      details.append(summary, wrap);
-      groups.push(details);
-    }
-  }
-  $('oddsTables').replaceChildren(...groups);
-}
-
-function markOdds(accounts) {
-  const last = Object.values(accounts).reduce((a, b) => ((b.seenAt ?? 0) > (a?.seenAt ?? 0) ? b : a), null);
-  for (const { game, upgrades, tr } of oddsRows) {
-    const own = last?.upgrades?.[game] ?? {};
-    const max = Object.fromEntries(O.UPGRADES[game]);
-    const current = !!last?.upgrades && Object.entries(upgrades).every(([name, level]) => Math.min(own[name] ?? 0, max[name]) === level);
-    if (current) tr.setAttribute('aria-current', 'true');
-    else tr.removeAttribute('aria-current');
-  }
-}
-
-buildOdds();
-
   showChosenProfit();
 });
 

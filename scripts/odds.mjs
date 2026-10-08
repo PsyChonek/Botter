@@ -3,18 +3,13 @@
 // the tables in the casino client (weights, paytables, upgrade effects, rules).
 // The slots are evaluated on the server, so Skeleton Slots and Slotingi follow
 // the client's rules text where it leaves details open (see the notes below).
-// For every game, roulette and blackjack included, it also records how often a
-// round ends ahead and how often a session of 1,000 rounds does.
 // Usage: node scripts/odds.mjs [spins per combination]
 import { writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const Blaze = require('../src/blaze.js');
-const BJ = require('../src/blackjack.js');
 const SPINS = Number(process.argv[2] ?? 300_000);
-const SESSIONS = 10_000;
-const SESSION_ROUNDS = 1000;
 const rand = Math.random;
 
 function picker(weights) {
@@ -38,37 +33,17 @@ function combos(maxLevels) {
 
 const round3 = (x) => Math.round(x * 1000) / 1000;
 
-// Return to player, share of rounds that return more than the bet, and share
-// of SESSION_ROUNDS-round sessions that end ahead, from the per-round returns
-// (per unit bet) of one combination. Sessions are drawn from those returns with
-// replacement, so a payout rarer than one in SPINS rounds is left out.
-function summary(returns) {
-  let paid = 0;
-  let won = 0;
-  for (const r of returns) {
-    paid += r;
-    if (r > 1 + 1e-9) won++;
-  }
-  let ahead = 0;
-  for (let s = 0; s < SESSIONS; s++) {
-    let total = 0;
-    for (let n = 0; n < SESSION_ROUNDS; n++) total += returns[(rand() * returns.length) | 0];
-    if (total > SESSION_ROUNDS + 1e-6) ahead++;
-  }
-  return { rtp: round3(paid / returns.length), chances: [round3(won / returns.length), round3(ahead / SESSIONS)] };
-}
-
 // ---------- Blaze 20 Wild (model in src/blaze.js) ----------
-function blazeSim([lucky, wild, star]) {
+function blazeRtp([lucky, wild, star]) {
   const cfg = Blaze.config({ lucky, wild, star });
   const draws = cfg.weights.map((w) => picker(Blaze.SYMBOLS.map((s) => w[s] ?? 0)));
-  const returns = { symbols: new Float64Array(SPINS), reels: new Float64Array(SPINS) };
+  const paid = { symbols: 0, reels: 0 };
   for (let n = 0; n < SPINS; n++) {
     const grid = draws.map((draw) => [0, 0, 0, 0].map(() => Blaze.SYMBOLS[draw()]));
     const expanded = Blaze.expand(grid);
-    for (const mode of Blaze.SCATTER_MODES) returns[mode][n] = Blaze.evaluate(grid, 1, cfg, mode, expanded);
+    for (const mode of Blaze.SCATTER_MODES) paid[mode] += Blaze.evaluate(grid, 1, cfg, mode, expanded);
   }
-  return { symbols: summary(returns.symbols), reels: summary(returns.reels) };
+  return { symbols: round3(paid.symbols / SPINS), reels: round3(paid.reels / SPINS) };
 }
 
 // ---------- Skeleton Slots: 7x7 clusters with cascades ----------
@@ -164,13 +139,13 @@ function skeletonSpin(cfg, draw, mult, cap) {
   return { win, rockets, mult };
 }
 
-function skeletonSim(levels) {
+function skeletonRtp(levels) {
   const cfg = skeletonConfig(levels);
   const draw = picker(cfg.weights);
-  const returns = new Float64Array(SPINS);
+  let paid = 0;
   for (let n = 0; n < SPINS; n++) {
     const base = skeletonSpin(cfg, draw, 1, cfg.baseMultCap);
-    let paid = base.win;
+    paid += base.win;
     let free = base.rockets >= 3 ? cfg.freeSpins[Math.min(base.rockets, 5) - 3] : 0;
     let mult = 1;
     while (free-- > 0) {
@@ -179,9 +154,8 @@ function skeletonSim(levels) {
       mult = spin.mult;
       if (spin.rockets >= 3) free += cfg.freeSpins[Math.min(spin.rockets, 5) - 3];
     }
-    returns[n] = paid;
   }
-  return summary(returns);
+  return round3(paid / SPINS);
 }
 
 // ---------- Slotingi: 5x3, 20 lines, Lingi Cash hold and win ----------
@@ -206,16 +180,15 @@ const SL_MINT = [0, 0.003, 0.006, 0.009];
 const SL_WILD = 8;
 const SL_COIN = 9;
 
-function slotingiSim([crown, gulas, mint]) {
+function slotingiRtp([crown, gulas, mint]) {
   const draws = [0, 1, 2, 3, 4].map((reel) =>
     picker(SL_SYMBOLS.map((s) => (s === 'wild' ? (reel >= 1 && reel <= 3 ? 6 : 0) : SL_WEIGHTS[s] + (s === 'coin' ? SL_CROWN[crown] : 0)))),
   );
   const pays = SL_SYMBOLS.slice(0, SL_WILD).map((s) => SL_PAYTABLE[s].map((e) => Math.round(e * SL_GULAS[gulas]) / 20));
   const coin = picker(SL_COINS.map(([, w]) => w));
   const respinCoin = 0.045 + SL_MINT[mint];
-  const returns = new Float64Array(SPINS);
+  let paid = 0;
   for (let n = 0; n < SPINS; n++) {
-    let paid = 0;
     const grid = draws.map((draw) => [draw(), draw(), draw()]);
     for (const line of SL_LINES) {
       const first = grid[0][line[0]];
@@ -226,140 +199,45 @@ function slotingiSim([crown, gulas, mint]) {
     }
     let coins = 0;
     for (const reel of grid) for (const s of reel) if (s === SL_COIN) coins++;
-    if (coins >= 6) paid += slotingiCash(coins, coin, respinCoin);
-    returns[n] = paid;
-  }
-  return summary(returns);
-}
-
-// Lingi Cash: every coin pays its value, every respin lands coins on the empty
-// cells, three empty respins in a row end it, a full screen pays the grand.
-function slotingiCash(coins, coin, respinCoin) {
-  let paid = 0;
-  for (let i = 0; i < coins; i++) paid += SL_COINS[coin()][0];
-  let respins = 3;
-  while (respins > 0 && coins < 15) {
-    let fresh = 0;
-    for (let i = coins; i < 15; i++) {
-      if (rand() < respinCoin) {
-        fresh++;
-        paid += SL_COINS[coin()][0];
+    if (coins < 6) continue;
+    for (let i = 0; i < coins; i++) paid += SL_COINS[coin()][0];
+    let respins = 3;
+    while (respins > 0 && coins < 15) {
+      let fresh = 0;
+      for (let i = coins; i < 15; i++) {
+        if (rand() < respinCoin) {
+          fresh++;
+          paid += SL_COINS[coin()][0];
+        }
       }
+      coins += fresh;
+      respins = fresh ? 3 : respins - 1;
     }
-    coins += fresh;
-    respins = fresh ? 3 : respins - 1;
+    if (coins === 15) paid += 1000;
   }
-  if (coins === 15) paid += 1000;
-  return paid;
-}
-
-// ---------- Roulette: an even-money outside bet ----------
-// 18 winning numbers on a wheel of 37 plus the zeros not yet removed.
-function rouletteSim([zeros]) {
-  const hit = 18 / (39 - zeros);
-  const returns = new Float64Array(SPINS);
-  for (let n = 0; n < SPINS; n++) returns[n] = rand() < hit ? 2 : 0;
-  return summary(returns);
-}
-
-// ---------- Blackjack: the bot's play from src/blackjack.js ----------
-// Infinite deck, no peek: a dealer blackjack also beats a doubled hand.
-const bjCard = () => {
-  const r = (rand() * 13) | 0;
-  return r < 8 ? r + 2 : r < 12 ? 10 : 11;
-};
-
-function bjAdd([total, soft], card) {
-  let t = total + card;
-  let s = soft + (card === 11 ? 1 : 0);
-  while (t > 21 && s > 0) {
-    t -= 10;
-    s -= 1;
-  }
-  return [t, s];
-}
-
-function blackjackSim([bjpay, ties, soft17, double]) {
-  const rules = BJ.rulesFromUpgrades({ bjpay, ties, soft17, double });
-  const solver = BJ.solverFor(rules);
-  const moves = new Map();
-  const best = (total, soft, up, firstTwo) => {
-    const key = `${total}|${soft}|${up}|${firstTwo}`;
-    if (!moves.has(key)) moves.set(key, solver.best(total, soft, up, firstTwo));
-    return moves.get(key);
-  };
-  const returns = new Float64Array(SPINS);
-  for (let n = 0; n < SPINS; n++) {
-    let hand = bjAdd(bjAdd([0, 0], bjCard()), bjCard());
-    const up = bjCard();
-    let dealer = bjAdd(bjAdd([0, 0], up), bjCard());
-    const dealerBj = dealer[0] === 21;
-    if (hand[0] === 21) {
-      returns[n] = dealerBj ? (rules.pushFrom <= 21 ? 1 : 0) : 1 + rules.bjPay;
-      continue;
-    }
-    let stake = 1;
-    for (let firstTwo = true; ; firstTwo = false) {
-      const move = best(hand[0], hand[1], up, firstTwo);
-      if (move === 'stand') break;
-      hand = bjAdd(hand, bjCard());
-      if (move === 'double') {
-        stake = 2;
-        break;
-      }
-      if (hand[0] > 21) break;
-    }
-    let net;
-    if (hand[0] > 21 || dealerBj) net = -stake;
-    else {
-      while (dealer[0] < 17 || (dealer[0] === 17 && dealer[1] > 0 && rules.dealerHitsSoft17)) dealer = bjAdd(dealer, bjCard());
-      const [p, d] = [hand[0], dealer[0]];
-      if (d > 21 || p > d) net = stake;
-      else if (p < d || p < rules.pushFrom) net = -stake;
-      else net = 0;
-    }
-    returns[n] = 1 + net;
-  }
-  return summary(returns);
+  return round3(paid / SPINS);
 }
 
 // ---------- write ----------
-const table = { blaze: { symbols: {}, reels: {} }, skeleton: {}, slotingi: {}, chances: { blaze: { symbols: {}, reels: {} } } };
+const table = { blaze: { symbols: {}, reels: {} }, skeleton: {}, slotingi: {} };
 const started = Date.now();
-const done = (game) => console.log(`${game} done in ${Math.round((Date.now() - started) / 1000)} s`);
 for (const [levels, key] of combos([5, 5, 5])) {
-  const sim = blazeSim(levels);
-  for (const mode of Blaze.SCATTER_MODES) {
-    table.blaze[mode][key] = sim[mode].rtp;
-    table.chances.blaze[mode][key] = sim[mode].chances;
-  }
+  const rtp = blazeRtp(levels);
+  table.blaze.symbols[key] = rtp.symbols;
+  table.blaze.reels[key] = rtp.reels;
 }
-done('blaze');
-for (const [game, sim, maxLevels] of [
-  ['skeleton', skeletonSim, [4, 4, 3]],
-  ['slotingi', slotingiSim, [3, 4, 3]],
-  ['roulette', rouletteSim, [2]],
-  ['blackjack', blackjackSim, [2, 4, 1, 1]],
-]) {
-  table.chances[game] = {};
-  for (const [levels, key] of combos(maxLevels)) {
-    const { rtp, chances } = sim(levels);
-    if (table[game]) table[game][key] = rtp;
-    table.chances[game][key] = chances;
-    // Roulette and blackjack returns are exact in src/odds.js; this checks the simulation.
-    if (key === '0'.repeat(maxLevels.length) && !table[game]) console.log(`${game} simulated return ${rtp}`);
-  }
-  done(game);
-}
+console.log(`blaze done in ${Math.round((Date.now() - started) / 1000)} s`);
+for (const [levels, key] of combos([4, 4, 3])) table.skeleton[key] = skeletonRtp(levels);
+console.log(`skeleton done in ${Math.round((Date.now() - started) / 1000)} s`);
+for (const [levels, key] of combos([3, 4, 3])) table.slotingi[key] = slotingiRtp(levels);
+console.log(`slotingi done in ${Math.round((Date.now() - started) / 1000)} s`);
 
 writeFileSync(
   new URL('../src/odds-table.js', import.meta.url),
   `// Generated by scripts/odds.mjs (${SPINS.toLocaleString('en')} spins per combination). Do not edit.
 // Slot return to player per upgrade combination. Keys are the upgrade levels in
 // order: blaze lucky/wild/star (per scatter rule), skeleton team/wild/deploy,
-// slotingi crown/gulas/mint. chances holds [share of rounds that end ahead,
-// share of ${SESSION_ROUNDS.toLocaleString('en')}-round sessions that end ahead] per game and combination,
-// also for roulette zeros (an even-money bet) and blackjack bjpay/ties/soft17/double.
+// slotingi crown/gulas/mint.
 (function (root) {
   const table = ${JSON.stringify(table)};
   if (typeof module !== 'undefined' && module.exports) module.exports = table;
