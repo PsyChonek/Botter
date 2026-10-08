@@ -62,38 +62,23 @@ test('repayAmount keeps the reserve and never exceeds the debt', () => {
   assert.equal(A.repayAmount({ credits: 1000, loan: null }, 0), 0);
 });
 
-test('grindPlan explores each game first at the chosen bet', () => {
+test('grindPlan plays the unlocked game with the lowest simulated edge at the chosen bet', () => {
   const unlocks = { blaze: 1, skeleton: 5, blackjack: 10 };
   const games = Object.keys(unlocks);
-  assert.deepEqual(A.grindPlan(games, 100, 1, {}, unlocks), { game: 'blaze', bet: 100 });
-  const stats = { blaze: { rounds: 40, wagered: 800, net: -100, xp: 40 } };
-  assert.deepEqual(A.grindPlan(games, 20, 6, stats, unlocks), { game: 'skeleton', bet: 20 });
-  assert.equal(A.grindPlan(games, 20, 0, stats, unlocks), null);
-  assert.equal(A.grindPlan(games, null, 12, stats, unlocks), null);
+  // Blaze once looked cheaper per XP on a lucky 10-round XP sample despite the
+  // higher edge; measured XP no longer takes part in the pick.
+  const edges = { blaze: 0.363, skeleton: 0.294, blackjack: 0.124 };
+  assert.deepEqual(A.grindPlan(games, 100, 1, unlocks, edges), { game: 'blaze', bet: 100 });
+  assert.deepEqual(A.grindPlan(games, 20, 6, unlocks, edges), { game: 'skeleton', bet: 20 });
+  assert.deepEqual(A.grindPlan(games, 40, 12, unlocks, edges), { game: 'blackjack', bet: 40 });
+  assert.equal(A.grindPlan(games, 20, 0, unlocks, edges), null);
+  assert.equal(A.grindPlan(games, null, 12, unlocks, edges), null);
 });
 
-test('grindPlan picks the game with the lowest edge', () => {
-  const unlocks = { blaze: 1, skeleton: 5, blackjack: 10 };
-  const games = Object.keys(unlocks);
-  const stats = {
-    blaze: { rounds: 40, wagered: 800, net: -400, xp: 40 },
-    skeleton: { rounds: 40, wagered: 800, net: -100, xp: 40 },
-    blackjack: { rounds: 40, wagered: 800, net: -200, xp: 40 },
-  };
-  assert.deepEqual(A.grindPlan(games, 40, 12, stats, unlocks), { game: 'skeleton', bet: 40 });
-});
-
-test('grindPlan ignores measured XP per credit and picks by the simulated edge', () => {
+test('grindPlan never picks a game without a model', () => {
   const unlocks = { blaze: 1, skeleton: 5 };
-  const games = Object.keys(unlocks);
-  // Blaze's few rounds happened to earn more XP per credit (10.24 vs 7.94 per
-  // 100), which made it look cheaper per XP than Skeleton despite the higher edge.
-  const stats = {
-    blaze: { rounds: 10, wagered: 200, net: -70, xp: 20.48 },
-    skeleton: { rounds: 10, wagered: 200, net: -60, xp: 15.88 },
-  };
-  const edges = { blaze: 0.363, skeleton: 0.294 };
-  assert.deepEqual(A.grindPlan(games, 20, 6, stats, unlocks, edges), { game: 'skeleton', bet: 20 });
+  assert.deepEqual(A.grindPlan(['blaze', 'skeleton'], 20, 6, unlocks, { skeleton: 0.294 }), { game: 'skeleton', bet: 20 });
+  assert.equal(A.grindPlan(['blaze'], 20, 6, unlocks, {}), null);
 });
 
 test('grindBet plays the chosen bet and steps down near a limit', () => {
@@ -192,46 +177,23 @@ test('pickAccount moves to the richest account that can grind when none has ener
   assert.equal(A.pickAccount(accounts.map((a) => ({ ...a, canGrind: false })), today, 15), null);
 });
 
-test('grindReport shows XP per credit and loss per XP for every game', () => {
+test('grindReport shows the simulated edge, XP per credit and loss per XP for every game', () => {
   const unlocks = { blaze: 1, roulette: 15 };
+  // Blaze ran lucky (measured edge 0.05); the report shows the simulated one.
   const stats = { blaze: { rounds: 40, wagered: 2000, net: -100, xp: 120 } };
   // 120 XP over 2000 credits wagered: 0.06 XP per credit.
-  const [blaze, roulette] = A.grindReport(['blaze', 'roulette'], 5, stats, unlocks);
+  const [blaze, roulette] = A.grindReport(['blaze', 'roulette'], 5, stats, unlocks, { blaze: 0.3, roulette: 0.077 });
   assert.equal(blaze.locked, false);
-  assert.equal(blaze.edge, 0.05);
+  assert.equal(blaze.edge, 0.3);
   assert.equal(blaze.rate, 0.06);
-  assert.ok(Math.abs(blaze.cost - 0.05 / 0.06) < 1e-9);
+  assert.ok(Math.abs(blaze.cost - 5) < 1e-9);
   assert.equal(roulette.locked, true);
-  assert.equal(roulette.edge, null);
+  assert.equal(roulette.edge, 0.077);
   assert.equal(roulette.rate, null);
   assert.equal(roulette.cost, null);
-});
-
-test('grindPlan uses modelled edges over measured ones and skips edge exploration', () => {
-  const unlocks = { skeleton: 5, roulette: 15 };
-  const games = Object.keys(unlocks);
-  // Skeleton ran lucky (measured edge 0), the model knows better.
-  const stats = { skeleton: { rounds: 40, wagered: 800, net: 50, xp: 40 }, roulette: { rounds: 40, wagered: 800, net: -60, xp: 40 } };
-  assert.deepEqual(A.grindPlan(games, 20, 15, stats, unlocks), { game: 'skeleton', bet: 20 });
-  const edges = { skeleton: 0.29, roulette: 0.077 };
-  assert.deepEqual(A.grindPlan(games, 20, 15, stats, unlocks, edges), { game: 'roulette', bet: 20 });
-  assert.deepEqual(A.grindPlan(games, 20, 15, stats, unlocks, { skeleton: 0.05, roulette: 0.077 }), {
-    game: 'skeleton',
-    bet: 20,
-  });
-  // A game with a model is not held back for the measured-edge exploration rounds.
-  assert.deepEqual(A.grindPlan(games, 20, 15, { skeleton: stats.skeleton }, unlocks, edges), {
-    game: 'roulette',
-    bet: 20,
-  });
-});
-
-test('grindReport shows the modelled and the measured edge', () => {
-  const stats = { skeleton: { rounds: 40, wagered: 800, net: -80, xp: 80 } };
-  const [row] = A.grindReport(['skeleton'], 5, stats, { skeleton: 5 }, { skeleton: 0.3 });
-  assert.equal(row.modelEdge, 0.3);
-  assert.equal(row.measuredEdge, 0.1);
-  assert.ok(Math.abs(row.cost - 3) < 1e-9);
+  const [unmodelled] = A.grindReport(['blaze'], 5, stats, unlocks);
+  assert.equal(unmodelled.edge, null);
+  assert.equal(unmodelled.cost, null);
 });
 
 // Upgrade verdict context with a toy edge model: each level of a key cuts the

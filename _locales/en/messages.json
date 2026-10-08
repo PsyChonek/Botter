@@ -578,11 +578,8 @@
   "optionsGrindBet": {
     "message": "XP grinding bet"
   },
-  "optionsGrindExplore": {
-    "message": "Rounds to measure each game first"
-  },
   "optionsGrindHint": {
-    "message": "Auto game picks the unlocked game that has cost the fewest credits per XP, after measuring each one for the given number of rounds. XP per round is proportional to the bet, so every bet level costs the same per XP: the bet only sets how fast XP comes in and how much rides on one round. Near a limit the grinder steps down to a smaller bet, and under a daily budget it never bets more than is left of it."
+    "message": "Auto game picks the unlocked game with the lowest simulated house edge at your upgrades. XP per round is proportional to the bet, so every bet level costs the same per XP: the bet only sets how fast XP comes in and how much rides on one round. Near a limit the grinder steps down to a smaller bet, and under a daily budget it never bets more than is left of it."
   },
   "optionsShopHeading": {
     "message": "Shop upgrades"
@@ -999,17 +996,6 @@
     "placeholders": {
       "level": {
         "content": "$1"
-      }
-    }
-  },
-  "xpExploring": {
-    "message": "exploring $ROUNDS$/$NEEDED$",
-    "placeholders": {
-      "rounds": {
-        "content": "$1"
-      },
-      "needed": {
-        "content": "$2"
       }
     }
   },

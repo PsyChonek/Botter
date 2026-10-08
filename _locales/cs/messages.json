@@ -578,11 +578,8 @@
   "optionsGrindBet": {
     "message": "Sázka při farmění XP"
   },
-  "optionsGrindExplore": {
-    "message": "Kol na změření každé hry"
-  },
   "optionsGrindHint": {
-    "message": "Auto hra vybere odemčenou hru, která stála nejméně kreditů za XP, poté co každou změří zadaným počtem kol. XP za kolo roste přímo úměrně sázce, takže každá výše sázky stojí za XP stejně: sázka určuje jen to, jak rychle XP přibývá a kolik je v jednom kole ve hře. U limitu grinder přejde na menší sázku a při denním rozpočtu nikdy nevsadí víc, než z něj zbývá."
+    "message": "Auto hra vybere odemčenou hru s nejnižší simulovanou výhodou kasina při tvých vylepšeních. XP za kolo roste přímo úměrně sázce, takže každá výše sázky stojí za XP stejně: sázka určuje jen to, jak rychle XP přibývá a kolik je v jednom kole ve hře. U limitu grinder přejde na menší sázku a při denním rozpočtu nikdy nevsadí víc, než z něj zbývá."
   },
   "optionsShopHeading": {
     "message": "Vylepšení z obchodu"
@@ -999,17 +996,6 @@
     "placeholders": {
       "level": {
         "content": "$1"
-      }
-    }
-  },
-  "xpExploring": {
-    "message": "průzkum $ROUNDS$/$NEEDED$",
-    "placeholders": {
-      "rounds": {
-        "content": "$1"
-      },
-      "needed": {
-        "content": "$2"
       }
     }
   },

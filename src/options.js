@@ -33,7 +33,6 @@ const NUMBERS = [
   'crashKelly',
   'xpBudget',
   'grindMinBalance',
-  'grindExploreRounds',
 ];
 const DEFAULTS = {
   aiSolver: 'local',
@@ -55,7 +54,6 @@ const DEFAULTS = {
   grindMinBalance: 0,
   grindGame: 'auto',
   grindBet: 20,
-  grindExploreRounds: 30,
   buyUpgrades: false,
   saveForUpgrades: true,
   recordSpins: true,

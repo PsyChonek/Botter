@@ -46,7 +46,6 @@
     grindMinBalance: 0,
     grindGame: 'auto',
     grindBet: 20,
-    grindExploreRounds: 30,
     buyUpgrades: false,
     saveForUpgrades: true,
     recordSpins: true,
@@ -970,7 +969,7 @@
   // that game has earned any XP.
   function xpPrice() {
     const { candidates, edges } = grindModel();
-    const game = A.cheapestGame(candidates, player.level, stats.games, GRIND_UNLOCKS, edges);
+    const game = A.cheapestGame(candidates, player.level, GRIND_UNLOCKS, edges);
     return game ? A.xpCost(game, stats.games, edges) : null;
   }
 
@@ -1377,7 +1376,7 @@
     const { levels, candidates, edges } = grindModel();
     const wanted = Number(settings.grindBet) || G.BET_LEVELS[0];
     const bet = A.grindBet(grindLimits(saving), player.credits, lost, levels, wanted);
-    const plan = A.grindPlan(candidates, bet, player.level, stats.games, GRIND_UNLOCKS, edges, settings.grindExploreRounds);
+    const plan = A.grindPlan(candidates, bet, player.level, GRIND_UNLOCKS, edges);
     return { lost, levels, candidates, edges, plan };
   }
 
@@ -1703,9 +1702,6 @@
         let state = '';
         if (game.locked) state = msg('xpLocked', [String(game.unlock)]);
         else if (plan?.game === game.game) state = msg('xpPick', [credits(plan.bet)]);
-        else if (game.modelEdge === null && game.rounds < settings.grindExploreRounds) {
-          state = msg('xpExploring', [num.format(game.rounds), num.format(settings.grindExploreRounds)]);
-        }
         const tr = document.createElement('tr');
         if (plan?.game === game.game) tr.className = 'pick';
         tr.append(

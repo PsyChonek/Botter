@@ -165,45 +165,33 @@
   // game, so the simulated edge alone decides.
   const xpRate = (row) => (row?.wagered > 0 && row.xp > 0 ? row.xp / row.wagered : null);
 
-  // House edge of a game measured from its tracked rounds (0 when it is ahead).
-  const gameEdge = (row) => (row?.wagered > 0 ? Math.max(0, -row.net) / row.wagered : null);
-
-  // House edge the grinder plans with: the model at the current upgrades
-  // (edges, from BotterOdds) when the game has one, since a few dozen rounds of
-  // a slot say little about its edge, otherwise the measured one.
-  const planEdge = (game, stats, edges) => edges?.[game] ?? gameEdge(stats[game]);
-
   // Credits lost per XP point on a game: house edge over XP per credit wagered.
   // It does not depend on the bet, so the bet only sets the pace.
   function xpCost(game, stats, edges) {
-    const edge = planEdge(game, stats, edges);
+    const edge = edges?.[game] ?? null;
     const rate = xpRate(stats[game]);
     return edge !== null && rate > 0 ? edge / rate : null;
   }
 
-  // Unlocked game with the lowest house edge the grinder plans with, or null.
-  function cheapestGame(games, level, stats, unlocks, edges = {}) {
+  // Unlocked game with the lowest simulated house edge (edges, from BotterOdds
+  // at the current upgrades), or null. A game without a model is never picked.
+  function cheapestGame(games, level, unlocks, edges = {}) {
     const unlocked = games.filter((game) => level >= unlocks[game]);
-    const edge = (game) => planEdge(game, stats, edges) ?? Infinity;
+    const edge = (game) => edges?.[game] ?? Infinity;
     return unlocked.length ? unlocked.reduce((a, b) => (edge(b) < edge(a) ? b : a)) : null;
   }
 
-  // Game to grind at the given bet (null when no bet is allowed). Games without
-  // a modelled edge and fewer than minRounds tracked rounds are explored first,
-  // then the one with the lowest house edge is played: XP per credit is the
-  // same in every game, so the lowest edge is the lowest loss per XP.
-  function grindPlan(games, bet, level, stats, unlocks, edges = {}, minRounds = 30) {
-    const unlocked = games.filter((game) => level >= unlocks[game]);
-    if (!unlocked.length || !(bet > 0)) return null;
-    const rounds = (game) => stats[game]?.rounds ?? 0;
-    const unexplored = unlocked.filter((game) => edges?.[game] === undefined && rounds(game) < minRounds);
-    if (unexplored.length) return { game: unexplored.reduce((a, b) => (rounds(b) < rounds(a) ? b : a)), bet };
-    return { game: cheapestGame(unlocked, level, stats, unlocks, edges), bet };
+  // Game to grind at the given bet (null when no bet is allowed or no unlocked
+  // game has a model): the one with the lowest simulated edge. XP per credit is
+  // the same in every game, so the lowest edge is the lowest loss per XP.
+  function grindPlan(games, bet, level, unlocks, edges = {}) {
+    if (!(bet > 0)) return null;
+    const game = cheapestGame(games, level, unlocks, edges);
+    return game && edges[game] !== undefined ? { game, bet } : null;
   }
 
-  // What the XP grinder knows per game, for the panel: the measured and the
-  // modelled edge, the edge it plans with, XP per credit wagered and credits
-  // lost per XP point.
+  // What the XP grinder knows per game, for the panel: the simulated edge, XP
+  // per credit wagered and credits lost per XP point.
   function grindReport(games, level, stats, unlocks, edges = {}) {
     return games.map((game) => {
       const row = stats[game];
@@ -211,10 +199,7 @@
         game,
         locked: level < unlocks[game],
         unlock: unlocks[game],
-        rounds: row?.rounds ?? 0,
-        edge: planEdge(game, stats, edges),
-        measuredEdge: gameEdge(row),
-        modelEdge: edges?.[game] ?? null,
+        edge: edges?.[game] ?? null,
         rate: xpRate(row),
         cost: xpCost(game, stats, edges),
       };

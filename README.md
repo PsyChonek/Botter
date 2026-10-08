@@ -81,8 +81,8 @@ progress shows at `chrome://on-device-internals`.
   roulette 92.3 % to 97.3 %, blackjack 87.6 % to 97.1 %, Slotingi about 74 % to 93 %,
   Skeleton Slots about 71 % to 94 %, Blaze about 63 % to 95 % (or 67 % to 108 % if the
   star scatter counts symbols; the Blaze model check decides once 50 spins are
-  recorded, until then the lower rule is used). Games without a model (none today)
-  are explored for 30 rounds and use the measured edge. XP per round is proportional
+  recorded, until then the lower rule is used). A game without a model is
+  never picked. XP per round is proportional
   to the bet the same way in every game, so the grinder plays the unlocked game with the
   lowest simulated edge, every bet level costs the same per XP and the bet is simply the
   one picked in the settings. The panel shows each game's XP per credit and loss per XP
@@ -158,7 +158,7 @@ progress shows at `chrome://on-device-internals`.
     leaderboards for a week. The sprint board is also opened with the others for the
     podium achievement.
 - **Settings for the rest** (settings, Auto tab): XP grinding game (cheapest
-  per XP or a fixed game), bet (a fixed level, 20 by default) and exploration rounds; automatic shop purchases from
+  per XP or a fixed game), bet (a fixed level, 20 by default); automatic shop purchases from
   a priority plan (`game:key` list, off by default) using the client's price and
   level formulas. A plan entry is skipped when it is not worth its price
   (`upgradeVerdict` in `src/auto.js`): it adds less than 0.5 % return per 10,000
@@ -195,9 +195,8 @@ progress shows at `chrome://on-device-internals`.
   `scripts/odds.mjs`. Roulette is an even-money bet, blackjack the bot's own strategy,
   Blaze is listed per scatter rule. The current account's upgrades are marked.
 - **XP per game** (panel): for each game the house edge the grinder plans with, XP per
-  100 credits wagered, credits lost per XP point and its state (locked, exploring,
-  measuring XP, or playing at the chosen bet). The row the grinder plays next is
-  highlighted, so you can check it really tried every game.
+  100 credits wagered, credits lost per XP point and its state (locked or playing at
+  the chosen bet). The row the grinder plays next is highlighted.
 - A small panel in the bottom-left corner of the page has Start/Stop for work and
   for games, the ticket type, the game, accuracy per answer source, AI cost and
   the profit table. **Hide** collapses it to a small Botter button in the same corner
