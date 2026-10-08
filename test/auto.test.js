@@ -447,3 +447,69 @@ test('loanCycle expects the cheaper of losing or finishing each point of the lev
   assert.equal(A.loanCycle(3000, 0, 1000, null, 3), null);
   assert.equal(A.loanCycle(0, 0, 1000, 2, 3), null);
 });
+
+test('questGame and questKind read the standup quest text', () => {
+  const spins = { key: 'q1', text: 'Zatoč si 25× Skeleton Slots' };
+  const wager = { key: 'q2', text: 'Protoč 2 500 kreditů' };
+  const ahead = { key: 'q3', text: 'Skonči 10× v plusu' };
+  assert.equal(A.questGame(spins), 'skeleton');
+  assert.equal(A.questKind(spins), 'rounds');
+  assert.equal(A.questGame(wager), null);
+  assert.equal(A.questKind(wager), 'wager');
+  assert.equal(A.questKind(ahead), 'wins');
+  assert.equal(A.questGame({ key: 'spins_roulette', text: 'Roztoč kolo' }), 'roulette');
+  assert.equal(A.questKind({ key: 'q', text: 'Vyhraj 1 000 kreditů' }), null);
+  assert.equal(A.questKind({ key: 'q', text: 'Dej si kafe' }), null);
+});
+
+test('standupPlan plays a quest on the game and bet where it costs least', () => {
+  const ctx = {
+    level: 20,
+    unlocks: { blaze: 1, skeleton: 5, slotingi: 7, blackjack: 10, roulette: 15 },
+    edges: { blaze: 0.37, skeleton: 0.29, slotingi: 0.26, blackjack: 0.12, roulette: 1 - 36 / 39 },
+    levels: [20, 40, 100],
+  };
+  const quests = [
+    { key: 'a', text: 'Zatoč si 25× Skeleton Slots', progress: 10, target: 25, done: false, reward: 480 },
+    { key: 'b', text: 'Protoč 2 500 kreditů', progress: 2500, target: 2500, done: true, reward: 480 },
+  ];
+  // 15 spins at 20 lose 15 * 20 * 0.29 = 87 on average, under the 480 reward.
+  const plan = A.standupPlan(quests, ctx);
+  assert.equal(plan.quest.key, 'a');
+  assert.equal(plan.game, 'skeleton');
+  assert.equal(plan.bet, 20);
+  assert.ok(Math.abs(plan.cost - 87) < 1e-9);
+
+  // A wager goes to the lowest edge at the biggest bet that does not overshoot.
+  const wager = A.standupPlan([{ key: 'w', text: 'Protoč 2 500 kreditů', progress: 2450, target: 2500, reward: 480 }], ctx);
+  assert.equal(wager.game, 'roulette');
+  assert.equal(wager.bet, 40);
+  // Rounds ahead go to roulette: half its return wins on an even-money bet.
+  const wins = A.standupPlan([{ key: 'p', text: 'Skonči 10× v plusu', progress: 0, target: 10, reward: 480 }], ctx);
+  assert.equal(wins.game, 'roulette');
+  assert.equal(wins.bet, 20);
+});
+
+test('standupPlan skips quests that cost more than they pay or cannot be played', () => {
+  const ctx = { level: 6, unlocks: { blaze: 1, skeleton: 5, roulette: 15 }, edges: { blaze: 0.37, skeleton: 0.29, roulette: 0.05 }, levels: [20] };
+  const skipped = [];
+  const plan = A.standupPlan(
+    [
+      { key: 'costly', text: 'Zatoč si 200× Blaze 20 Wild', progress: 0, target: 200, reward: 480 },
+      { key: 'locked', text: 'Zatoč si 10× Ruletu', progress: 0, target: 10, reward: 480 },
+      { key: 'crash', text: 'Vsaď na Produkce padá', progress: 0, target: 1, reward: 480 },
+      { key: 'odd', text: 'Dej si kafe', progress: 0, target: 1, reward: 480 },
+    ],
+    ctx,
+    skipped,
+  );
+  assert.equal(plan, null);
+  assert.deepEqual(
+    skipped.map((item) => `${item.key} ${item.reason}`),
+    ['costly tooCostly', 'locked noGame', 'crash noGame', 'odd unknown'],
+  );
+  // Nothing affordable: no bet level fits above the reserve.
+  const broke = [];
+  assert.equal(A.standupPlan([{ key: 'a', text: 'Zatoč si 5× Blaze', progress: 0, target: 5, reward: 480 }], { ...ctx, levels: [] }, broke), null);
+  assert.equal(broke[0].reason, 'noCredits');
+});

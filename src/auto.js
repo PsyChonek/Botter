@@ -358,6 +358,97 @@
     return null;
   }
 
+  // Daily standup quests (player.quests: { key, text, progress, target, done,
+  // reward }). The server tracks the progress and pays each reward the moment a
+  // quest is done, plus a bonus for all three, so the bot only plays the rounds.
+  // Quests come as Czech text, so the game and the kind are read from it.
+  const QUEST_GAMES = {
+    blaze: /blaze/,
+    skeleton: /skeleton slot/,
+    slotingi: /sloting/,
+    blackjack: /blackjack/,
+    roulette: /rulet|roulette/,
+    crash: /produkce|crash/,
+  };
+
+  // Game a quest is tied to, from its key or its text, or null for any game.
+  function questGame(quest) {
+    const words = String(quest?.key ?? '').toLowerCase().split(/[^a-z]+/);
+    const text = String(quest?.text ?? '').toLowerCase();
+    const game = Object.keys(QUEST_GAMES).find((g) => words.includes(g) || QUEST_GAMES[g].test(text));
+    return game ?? null;
+  }
+
+  // 'rounds' (play N rounds of a game), 'wager' (wager N credits), 'wins'
+  // (finish N rounds ahead), or null for a quest the bot cannot play, such as
+  // an amount won.
+  function questKind(quest) {
+    const text = `${quest?.key ?? ''} ${quest?.text ?? ''}`.toLowerCase();
+    const credits = /kredit|credit|wager/.test(text);
+    if (/plus|vyhr|win/.test(text)) return credits ? null : 'wins';
+    if (credits) return 'wager';
+    return questGame(quest) ? 'rounds' : null;
+  }
+
+  // Chance that one round ends ahead. An even-money roulette bet wins 18 of the
+  // 36 / rtp numbers, so half its return; basic-strategy blackjack wins about
+  // 42 % of hands. The slots pay often but mostly less than the bet; 25 % is a
+  // rough guess, so a "rounds ahead" quest goes to roulette or blackjack first.
+  const winChance = (game, edge) => {
+    if (game === 'roulette') return (1 - edge) / 2;
+    if (game === 'blackjack') return 0.42;
+    return 0.25;
+  };
+
+  // Expected loss of finishing a quest on one game, and the bet to play it at.
+  // levels are the affordable bet levels, ascending. Rounds and wins go at the
+  // smallest bet; a wager quest costs the same at any bet, so it goes at the
+  // biggest one that does not overshoot what is left.
+  function questCost(kind, game, left, edge, levels) {
+    const house = Math.max(0, edge);
+    const min = levels[0];
+    if (kind === 'wager') {
+      const bet = [...levels].reverse().find((b) => b <= left) ?? min;
+      return { bet, cost: left * house };
+    }
+    if (kind === 'wins') return { bet: min, cost: (left / winChance(game, edge)) * min * house };
+    return { bet: min, cost: left * min * house };
+  }
+
+  // Open standup quest to play next with its game and bet, or null. A quest is
+  // played only when its expected loss is below its reward, on the game where
+  // that loss is smallest. The bonus for all three and the standup achievement
+  // are left out, so a quest that pays only with them is skipped. ctx: level,
+  // unlocks ({ game: level }), edges ({ game: house edge }) and levels (bet
+  // levels affordable now). skipped collects the quests that are not worth it.
+  function standupPlan(quests, ctx, skipped = []) {
+    const levels = [...(ctx.levels ?? [])].sort((a, b) => a - b);
+    let best = null;
+    for (const quest of quests ?? []) {
+      const left = Math.max(0, (quest.target ?? 0) - (quest.progress ?? 0));
+      if (quest.done || !(left > 0)) continue;
+      const kind = questKind(quest);
+      const only = questGame(quest);
+      const games = (only ? [only] : Object.keys(ctx.unlocks)).filter(
+        (g) => ctx.unlocks[g] !== undefined && ctx.level >= ctx.unlocks[g] && ctx.edges[g] !== undefined,
+      );
+      if (!kind || !games.length || !levels.length) {
+        skipped.push({ key: quest.key, reason: !kind ? 'unknown' : !games.length ? 'noGame' : 'noCredits' });
+        continue;
+      }
+      const plan = games
+        .map((game) => ({ game, ...questCost(kind, game, left, ctx.edges[game], levels) }))
+        .reduce((a, b) => (b.cost < a.cost ? b : a));
+      if (plan.cost >= quest.reward) {
+        skipped.push({ key: quest.key, reason: 'tooCostly', cost: Math.round(plan.cost), reward: quest.reward });
+        continue;
+      }
+      const candidate = { quest, kind, ...plan };
+      if (!best || candidate.cost / quest.reward < best.cost / best.quest.reward) best = candidate;
+    }
+    return best;
+  }
+
   // Local calendar day, used to reset daily budgets and checks.
   function dayKey(now = Date.now()) {
     const d = new Date(now);
@@ -383,6 +474,9 @@
     grindVolume,
     upgradeVerdict,
     pickAccount,
+    questGame,
+    questKind,
+    standupPlan,
     dayKey,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

@@ -33,6 +33,7 @@
     autoBankrupt: true,
     loanCycle: true,
     loanTrick: true,
+    standup: true,
     crashEnabled: true,
     crashBet: 100,
     crashMinEv: 1.05,
@@ -257,6 +258,7 @@
       if (path === '/api/work/submit') onSubmitRejected(request?.id, data);
       return;
     }
+    bookRewards(data);
     if (data?.crash) bookCrash(data.crash);
     if (path === '/api/slot/spin' && data.result) recordSpin(request, data);
 
@@ -270,7 +272,7 @@
     } else if (FREE_PATHS[path] && typeof before === 'number' && data.player) {
       const kind = FREE_PATHS[path];
       // What the debt collector took from a wheel win paid off debt, it was not lost.
-      const gain = data.player.credits - before + (data.result?.garnished ?? 0);
+      const gain = data.player.credits - before + (data.result?.garnished ?? 0) - G.rewardTotal(data);
       stats.free[kind] = (stats.free[kind] ?? 0) + gain;
       saveStats();
       if (kind === 'wheel') log.info('wheel_spin', { segment: data.result?.segment, credits: data.result?.credits, energy: data.result?.energy });
@@ -291,6 +293,25 @@
       }
     }
     render();
+  }
+
+  // Standup quest and achievement rewards are paid with whatever response
+  // completed them, so they are booked as free income here and left out of that
+  // response's game or work profit. Standup rewards also offset the day's
+  // grinding loss, since the rounds played for a quest pay for themselves.
+  function bookRewards(data) {
+    const { standup, achievement } = G.rewardsPaid(data);
+    if (!standup && !achievement) return;
+    if (standup) stats.free.standup = (stats.free.standup ?? 0) + standup;
+    if (achievement) stats.free.achievement = (stats.free.achievement ?? 0) + achievement;
+    if (standup && stats.grind.day === A.dayKey()) stats.grind.net += standup;
+    saveStats();
+    log.info('rewards', {
+      standup,
+      achievement,
+      quests: data.quests?.map((quest) => quest.text),
+      achievements: data.achievements?.map((item) => item.key),
+    });
   }
 
   // Keeps the Blaze board and the server's win so the slot model can be checked.
@@ -327,7 +348,7 @@
     const { result } = data;
     if (typeof creditsBefore === 'number' && data.player) {
       stats.work.tickets += 1;
-      stats.work.net += data.player.credits - creditsBefore + (result.garnished ?? 0) - (data.levelUp?.reward ?? 0);
+      stats.work.net += data.player.credits - creditsBefore + (result.garnished ?? 0) - G.rewardTotal(data);
       stats.work.xp += result.xpGain ?? 0;
     }
     if (task && task.id === taskId && Number.isInteger(result.answer)) {
@@ -1029,6 +1050,44 @@
     return true;
   }
 
+  // Logged when the set of skipped standup quests changes, not on every tick.
+  let skippedQuests = '';
+
+  // Plays the next standup quest worth its reward (BotterAuto.standupPlan) on
+  // the game and at the bet where it costs least. It keeps the reserve but not
+  // the grinding budget or minimum balance: the reward pays for the rounds.
+  async function standupStep() {
+    if (!settings.standup || !player?.quests?.length) return false;
+    if (Date.now() - (claimTried.standup ?? 0) < CLAIM_RETRY_MS) return false;
+    const reserve = limits().reserve;
+    const skipped = [];
+    const plan = A.standupPlan(
+      player.quests,
+      {
+        level: player.level,
+        unlocks: GRIND_UNLOCKS,
+        edges: O.edges(G.GAME_KEYS, player.upgrades, blazeMode()),
+        levels: G.BET_LEVELS.filter((bet) => bet <= player.maxBet && player.credits - bet >= reserve),
+      },
+      skipped,
+    );
+    const note = skipped.map((item) => `${item.key} ${item.reason}`).join();
+    if (note !== skippedQuests) {
+      skippedQuests = note;
+      if (skipped.length) log.info('standup_skipped', { skipped });
+    }
+    if (!plan) return false;
+    const { quest, game, bet } = plan;
+    setStatus('statusStandup', [quest.text, msg(`game_${game}`), credits(bet), num.format(quest.progress), num.format(quest.target)]);
+    const res = await playRound(game, bet);
+    if (!res.ok) {
+      log.warn('standup_failed', { quest: quest.key, game, bet, status: res.status, error: res.data?.error });
+      claimTried.standup = Date.now();
+    }
+    await sleep(settings.gameDelayMs);
+    return true;
+  }
+
   // Every game loses on average, so gambling only buys XP, within a daily loss
   // budget or down to a minimum account balance.
   const GRIND_UNLOCKS = Object.fromEntries(G.GAME_KEYS.map((game) => [game, G.GAMES[game].unlock]));
@@ -1099,6 +1158,7 @@
     if (await buyStep()) return;
     if (await leaderboardStep()) return;
     if (await crashStep()) return;
+    if (await standupStep()) return;
     if (workAvailable()) return workStep();
     if (await grindStep()) return;
     if (await rotateStep()) return;

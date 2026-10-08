@@ -119,3 +119,16 @@ test('upgradeRest prices every remaining level', () => {
   assert.deepEqual(rest.upgrades.skeleton, { team: 4, deploy: 3 });
   assert.deepEqual(G.upgradeRest({}, 'skeleton', []).price, 0);
 });
+
+test('gameDelta leaves out standup and achievement rewards paid with the round', () => {
+  const data = {
+    player: { credits: 1500 },
+    quests: [{ key: 'a', reward: 480 }, { key: 'all', all: true, reward: 100 }],
+    achievements: [{ key: 'standup', reward: 500 }],
+  };
+  assert.deepEqual(G.rewardsPaid(data), { levelUp: 0, standup: 580, achievement: 500 });
+  assert.equal(G.rewardTotal(data), 1080);
+  // 1500 - 1000 - 1080: the spin itself lost 580.
+  assert.equal(G.gameDelta('/api/slot/spin', { bet: 20 }, data, 1000).net, -580);
+  assert.equal(G.rewardTotal({ player: { credits: 1 } }), 0);
+});

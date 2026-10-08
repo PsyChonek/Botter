@@ -81,6 +81,20 @@ progress shows at `chrome://on-device-internals`.
   ruled out get measured again. The auto bet only moves to the next level while XP per credit wagered keeps
   up, so it settles on the bet with the lowest loss per XP; under a daily budget it
   never bets more than what is left of it.
+- **Daily standup** (Dnešní standup, settings Auto tab, on by default): three quests a
+  day in `player.quests`, such as spinning a game 25 times, wagering 2,500 credits or
+  finishing 10 rounds ahead. The server tracks the progress and pays each reward (about
+  480) as soon as a quest is done, plus a bonus for all three and the Standup achievement
+  (500 / 2,000 / 5,000 for 1 / 7 / 30 full days). Auto mode reads the game and the kind
+  from the quest text and plays it before work when its expected loss is below its
+  reward (`standupPlan` in `src/auto.js`): game rounds at the smallest bet, a wager on
+  the lowest-edge game at the biggest bet that does not overshoot, rounds ahead on
+  roulette's even-money bet or blackjack (slots are assumed to end ahead a quarter of
+  the time). The bonus and the achievement are not counted, so the estimate is
+  conservative. It keeps the reserve but not the grinding budget: quest and achievement
+  rewards are booked as free income, kept out of game and work profit, and the standup
+  reward offsets the day's grinding loss. Quests it cannot read, crash quests and ones
+  on a locked game are skipped and logged as `standup_skipped`.
 - **Wheel of fortune** (Kolo štěstí, `/api/wheel/spin`): free once an hour, paid in
   multiples of a base set by the player's title (100 to 300) or a coffee that refills
   energy. It is spun as soon as `player.wheelNextAt` has passed, with the other free

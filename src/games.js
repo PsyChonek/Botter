@@ -106,9 +106,19 @@
     return Math.min(maxEnergy, energy + Math.max(0, gained));
   }
 
+  // Credits a response pays on top of what was played: a level-up reward, and
+  // the rewards of standup quests and achievements it completed, which the
+  // server pays at once. { levelUp, standup, achievement }.
+  function rewardsPaid(data) {
+    const sum = (list) => (Array.isArray(list) ? list.reduce((total, item) => total + (Number(item?.reward) || 0), 0) : 0);
+    return { levelUp: Number(data?.levelUp?.reward) || 0, standup: sum(data?.quests), achievement: sum(data?.achievements) };
+  }
+
+  const rewardTotal = (data) => Object.values(rewardsPaid(data)).reduce((a, b) => a + b, 0);
+
   // Profit of one game API response. Net is the credit change plus whatever the
   // debt collector took from the win, because that still paid down the loan,
-  // minus a level-up reward, which the same response pays but the game did not.
+  // minus the rewards the same response pays but the game did not earn.
   function gameDelta(path, request, data, creditsBefore, prevStake = 0) {
     const game = PATH_GAME[path];
     if (!game || !data?.player || typeof creditsBefore !== 'number') return null;
@@ -129,7 +139,7 @@
       game,
       rounds,
       wagered,
-      net: data.player.credits - creditsBefore + (data.garnished ?? 0) - (data.levelUp?.reward ?? 0),
+      net: data.player.credits - creditsBefore + (data.garnished ?? 0) - rewardTotal(data),
       xp: data.xpGain ?? 0,
       stake: data.hand?.stake ?? prevStake,
     };
@@ -212,6 +222,8 @@
     nextPurchase,
     betFor,
     energyNow,
+    rewardsPaid,
+    rewardTotal,
     gameDelta,
     addDelta,
     addBetXp,

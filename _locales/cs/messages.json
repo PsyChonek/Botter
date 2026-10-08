@@ -287,6 +287,12 @@
   "free_loan": {
     "message": "Půjčky smazané bankrotem"
   },
+  "free_standup": {
+    "message": "Standup úkoly"
+  },
+  "free_achievement": {
+    "message": "Achievementy"
+  },
   "optionsAutoClaim": {
     "message": "Automaticky vybírat denní bonus, točit hodinové kolo štěstí a při nule brát záchranný balíček"
   },
@@ -378,6 +384,26 @@
       }
     }
   },
+  "statusStandup": {
+    "message": "Standup úkol \"$P1$\" na $P2$ se sázkou $P3$, $P4$ z $P5$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      },
+      "p4": {
+        "content": "$4"
+      },
+      "p5": {
+        "content": "$5"
+      }
+    }
+  },
   "optionsAutoHeading": {
     "message": "Automatický režim"
   },
@@ -395,6 +421,9 @@
   },
   "optionsLoanTrick": {
     "message": "Vzít jednorázový achievement +500 za čistou půjčku"
+  },
+  "optionsStandup": {
+    "message": "Plnit denní standup úkoly, když odměna převýší očekávanou ztrátu na kolech, která potřebují"
   },
   "optionsCrashEnabled": {
     "message": "Sázet na crash, když se to podle historie vyplatí"

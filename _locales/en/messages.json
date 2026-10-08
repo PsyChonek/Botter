@@ -287,6 +287,12 @@
   "free_loan": {
     "message": "Loans dropped by bankruptcy"
   },
+  "free_standup": {
+    "message": "Standup quests"
+  },
+  "free_achievement": {
+    "message": "Achievements"
+  },
   "optionsAutoClaim": {
     "message": "Claim the daily bonus and the hourly wheel of fortune automatically, and the bailout when broke"
   },
@@ -378,6 +384,26 @@
       }
     }
   },
+  "statusStandup": {
+    "message": "Standup quest \"$P1$\" on $P2$ at $P3$ a round, $P4$ of $P5$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      },
+      "p4": {
+        "content": "$4"
+      },
+      "p5": {
+        "content": "$5"
+      }
+    }
+  },
   "optionsAutoHeading": {
     "message": "Auto mode"
   },
@@ -395,6 +421,9 @@
   },
   "optionsLoanTrick": {
     "message": "Take the one-time +500 clean-loan achievement"
+  },
+  "optionsStandup": {
+    "message": "Play the daily standup quests whose reward beats the expected loss of the rounds they need"
   },
   "optionsCrashEnabled": {
     "message": "Bet on crash when the history says it pays"
