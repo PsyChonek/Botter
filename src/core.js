@@ -250,6 +250,28 @@
     }
   }
 
+  // A stored supabase session (the JSON string in localStorage) as the token
+  // endpoint's response, the way supabase-js stores it: the body plus expires_at.
+  function sessionFromToken(body, now = Date.now()) {
+    if (typeof body?.access_token !== 'string' || typeof body.refresh_token !== 'string') return null;
+    const expiresAt = body.expires_at ?? Math.round(now / 1000) + (body.expires_in ?? 0);
+    return JSON.stringify({ ...body, expires_at: expiresAt });
+  }
+
+  // Every refresh rotates the refresh token and issues a later expiry, so of
+  // two saved copies of a login the later expiry is the one the server still
+  // accepts. Restoring an older one reuses a revoked refresh token, and supabase
+  // answers that by revoking the whole login.
+  function sessionExpiry(raw) {
+    try {
+      return JSON.parse(raw)?.expires_at ?? 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  const isNewerSession = (raw, than) => !than || sessionExpiry(raw) >= sessionExpiry(than);
+
   const LEVELS = { debug: 10, info: 20, warn: 30, error: 40 };
 
   // Structured console logger; every line is one JSON object.
@@ -286,6 +308,8 @@
     claudeCost,
     ticketLabel,
     tokenSubject,
+    sessionFromToken,
+    isNewerSession,
     createLogger,
   };
 

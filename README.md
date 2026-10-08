@@ -190,7 +190,15 @@ progress shows at `chrome://on-device-internals`.
   `chrome.storage.local`, together with a snapshot of its level, credits and energy.
   - **Add** in the panel saves the current session, removes it from the page without
     logging out and reloads to the login screen. Never use the casino's own Log out
-    to switch: supabase revokes the session on the server, so the saved copy dies too.
+    to switch: it signs out with scope `global`, which revokes every session of that
+    account on the server, so the saved copy dies too.
+  - Supabase rotates the refresh token on every refresh and revokes the whole login
+    when a replaced one is used again, so the saved copy must always hold the newest
+    token. The page hook reports every `/auth/v1/token` response and the content
+    script writes it into the saved login at once, even when supabase-js discards it
+    (it does when localStorage changes mid-refresh, as on a switch) or the page
+    reloads first. A saved copy is never replaced by one with an earlier
+    `expires_at`, and a switch waits until no refresh is in flight.
   - The account dropdown in the panel writes the chosen session back and reloads.
     If that login has expired, auto mode forgets it and switches back.
   - **Rotate accounts** (settings, Auto tab, on by default): when the current

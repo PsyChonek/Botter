@@ -4,9 +4,13 @@
 //   request was made with, so the content script can file it under the right account.
 // - Performs API calls for the game bot with the user's current session, so the
 //   bot code never handles the token.
+// - Reports every session the auth server issues, so the saved copy of a login
+//   follows each refresh token rotation even when supabase-js drops the result.
 (() => {
   const originalFetch = window.fetch;
   let lastAuth = null;
+  let refreshing = 0; // token requests in flight
+  let idleWaiters = [];
 
   const post = (payload) => window.postMessage({ source: 'botter-hook', ...payload }, location.origin);
 
@@ -68,7 +72,41 @@
     }
   }
 
+  const isTokenCall = (input) => {
+    try {
+      return new URL(typeof input === 'string' ? input : input.url, location.href).pathname.endsWith('/auth/v1/token');
+    } catch {
+      return false;
+    }
+  };
+
+  // A refresh rotates the refresh token on the server before the response is
+  // read. supabase-js discards the new tokens when localStorage changed while
+  // the call ran (an account switch), and a reload loses them, so the session is
+  // posted here as soon as it arrives.
+  async function tokenFetch(self, args) {
+    refreshing += 1;
+    try {
+      const response = await originalFetch.apply(self, args);
+      if (response.ok) {
+        const data = await response
+          .clone()
+          .json()
+          .catch(() => null);
+        if (data) post({ kind: 'session', data });
+      }
+      return response;
+    } finally {
+      refreshing -= 1;
+      if (!refreshing) {
+        idleWaiters.forEach((resolve) => resolve());
+        idleWaiters = [];
+      }
+    }
+  }
+
   window.fetch = async function (input, init) {
+    if (isTokenCall(input)) return tokenFetch(this, arguments);
     const auth = readAuth(init?.headers);
     if (auth) lastAuth = auth;
     const response = await originalFetch.apply(this, arguments);
@@ -90,8 +128,21 @@
     return response;
   };
 
+  // Resolves once no token request is in flight, so an account switch never
+  // replaces the session while a refresh of it is still on the way.
+  const idle = (timeoutMs) =>
+    refreshing
+      ? Promise.race([new Promise((resolve) => idleWaiters.push(resolve)), new Promise((resolve) => setTimeout(resolve, timeoutMs))])
+      : Promise.resolve();
+
   window.addEventListener('message', async (event) => {
-    if (event.source !== window || event.data?.source !== 'botter-content' || event.data.kind !== 'api') return;
+    if (event.source !== window || event.data?.source !== 'botter-content') return;
+    if (event.data.kind === 'idle') {
+      await idle(10_000);
+      post({ kind: 'idle', id: event.data.id });
+      return;
+    }
+    if (event.data.kind !== 'api') return;
     const { id, path, body } = event.data;
     if (typeof path !== 'string' || !/^\/api\/[\w/-]+(\?[\w=&-]+)?$/.test(path)) {
       post({ kind: 'api-result', id, ok: false, status: 0, data: { error: 'bad_path' } });

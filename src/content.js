@@ -258,19 +258,33 @@
     }
   }
 
+  // Waits until the page hook has no token refresh in flight.
+  function hookIdle() {
+    const id = ++apiSeq;
+    return new Promise((resolve) => {
+      apiWaiters.set(id, resolve);
+      window.postMessage({ source: 'botter-content', kind: 'idle', id }, location.origin);
+      setTimeout(() => {
+        if (apiWaiters.delete(id)) resolve();
+      }, API_TIMEOUT_MS);
+    });
+  }
+
+  const onHookEvent = (data) => (data.kind === 'session' ? onSession(data.data) : onResponse(data));
+
   window.addEventListener('message', (event) => {
     if (event.source !== window || event.data?.source !== 'botter-hook') return;
-    if (event.data.kind === 'api-result') {
+    if (event.data.kind === 'api-result' || event.data.kind === 'idle') {
       const resolve = apiWaiters.get(event.data.id);
       apiWaiters.delete(event.data.id);
       resolve?.(event.data);
       return;
     }
-    // Responses that arrive before storage is loaded wait, so they are booked
-    // to the right account's stats instead of an empty placeholder.
+    // Messages that arrive before storage is loaded wait, so they are booked
+    // to the right account instead of an empty placeholder.
     if (early) early.push(event.data);
-    else onResponse(event.data);
-    resolveScreenWaiters(event.data);
+    else onHookEvent(event.data);
+    if (event.data.kind === 'response') resolveScreenWaiters(event.data);
   });
 
   // Every /api/ response the page sees, from the app or from the bot.
@@ -499,7 +513,8 @@
     if (!accountId || !player) return Promise.resolve();
     const saved = accounts[accountId] ?? {};
     const session = readSession();
-    const own = session?.uid === accountId;
+    // The page can lag behind a refresh the hook already reported; never step back.
+    const own = session?.uid === accountId && C.isNewerSession(session.raw, saved.session);
     const newSession = own && session.raw !== saved.session;
     if (!force && !newSession && Date.now() - accountSavedAt < ACCOUNT_SAVE_MS) return Promise.resolve();
     accountSavedAt = Date.now();
@@ -519,13 +534,29 @@
     return chrome.storage.local.set({ [ACCOUNT_PREFIX + accountId]: record });
   }
 
+  // A session the auth server issued, reported by the page hook. It goes into the
+  // saved login of its account straight away: the server has already revoked the
+  // refresh token it replaced, so a saved copy that missed it is dead.
+  function onSession(data) {
+    const id = C.tokenSubject(data?.access_token);
+    const raw = C.sessionFromToken(data);
+    const saved = id && accounts[id];
+    if (!raw || !saved?.session || raw === saved.session || !C.isNewerSession(raw, saved.session)) return;
+    accounts[id] = { ...saved, session: raw };
+    chrome.storage.local.set({ [ACCOUNT_PREFIX + id]: accounts[id] });
+    log.debug('session_refreshed', { login: saved.login });
+  }
+
   // Logs the page in as a saved account: its session goes where the app keeps
-  // it, then the page reloads. The current session is saved first so it can return.
+  // it, then the page reloads. The current session is saved first so it can return,
+  // after any refresh in flight has landed, or the saved copy would hold a
+  // refresh token the server has just revoked.
   async function switchAccount(id) {
     const target = accounts[id];
     if (switching || id === accountId || !target?.session) return;
     switching = true;
     setStatus('statusSwitching', [target.login ?? id]);
+    await hookIdle();
     await saveAccount(true);
     sessionStorage.setItem(SWITCH_KEY, JSON.stringify({ from: accountId, to: id }));
     localStorage.setItem(target.storageKey, target.session);
@@ -537,6 +568,7 @@
   async function addAccount() {
     if (switching) return;
     switching = true;
+    await hookIdle();
     await saveAccount(true);
     const session = readSession();
     if (session) localStorage.removeItem(session.key);
@@ -1761,7 +1793,7 @@
   // ---------- boot ----------
 
   load().then(() => {
-    for (const response of early.splice(0)) onResponse(response);
+    for (const data of early.splice(0)) onHookEvent(data);
     early = null;
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountPanel);
     else mountPanel();

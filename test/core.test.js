@@ -157,3 +157,20 @@ test('tokenSubject reads the user id from a bearer token', () => {
   assert.equal(C.tokenSubject('not-a-jwt'), null);
   assert.equal(C.tokenSubject(null), null);
 });
+
+test('sessionFromToken stores the token response the way supabase-js does', () => {
+  const body = { access_token: 'a', refresh_token: 'r', expires_in: 3600, token_type: 'bearer', user: { id: 'u' } };
+  assert.deepEqual(JSON.parse(C.sessionFromToken(body, 1_000_000)), { ...body, expires_at: 4600 });
+  assert.equal(JSON.parse(C.sessionFromToken({ ...body, expires_at: 99 })).expires_at, 99);
+  assert.equal(C.sessionFromToken({ access_token: 'a' }), null);
+  assert.equal(C.sessionFromToken(null), null);
+});
+
+test('isNewerSession never lets an older copy of a login replace a newer one', () => {
+  const older = JSON.stringify({ refresh_token: 'r1', expires_at: 100 });
+  const newer = JSON.stringify({ refresh_token: 'r2', expires_at: 200 });
+  assert.equal(C.isNewerSession(newer, older), true);
+  assert.equal(C.isNewerSession(older, newer), false);
+  assert.equal(C.isNewerSession(older, undefined), true);
+  assert.equal(C.isNewerSession(newer, 'not json'), true);
+});
