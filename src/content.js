@@ -636,10 +636,13 @@
     if (!player) return true;
     if (normDone()) return false;
     const energy = G.energyNow(player.work, Date.now());
-    if (energy > WORK_MIN_ENERGY) workRun = true;
-    else if (energy < 1) workRun = false;
+    workRun = A.workDue(energy, player.work.maxEnergy ?? 20, workRun, WORK_MIN_ENERGY, grindReady());
     return workRun;
   }
+
+  // Whether auto mode can grind XP now. Tickets pay more at a higher level, so
+  // while it can, work waits and only keeps energy off the cap.
+  const grindReady = () => settings.autoMode && Date.now() >= grindPausedUntil && grindChoice().plan !== null;
 
   async function workStep() {
     if (dismissModal()) return;

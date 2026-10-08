@@ -345,3 +345,19 @@ test('upgradeVerdict buys a cheap first level that pays back on its own', () => 
   assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), ctx), null);
   assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), verdictCtx({ volume: 5000 })), 'xpFarmingBetter');
 });
+
+test('workDue keeps energy off the cap while grinding, else drains a run from above the minimum', () => {
+  // Grinding: work only near the cap, whatever the run state.
+  assert.equal(A.workDue(17, 20, false, 5, true), false);
+  assert.equal(A.workDue(17, 20, true, 5, true), false);
+  assert.equal(A.workDue(18, 20, false, 5, true), true);
+  assert.equal(A.workDue(20, 20, false, 5, true), true);
+  assert.equal(A.workDue(28, 30, false, 5, true), true);
+  // Not grinding: start above the minimum, then work down to zero.
+  assert.equal(A.workDue(5, 20, false, 5, false), false);
+  assert.equal(A.workDue(6, 20, false, 5, false), true);
+  assert.equal(A.workDue(3, 20, true, 5, false), true);
+  assert.equal(A.workDue(0, 20, true, 5, false), false);
+  // Grinding ends with energy just below the cap: that energy is worked down.
+  assert.equal(A.workDue(17, 20, false, 5, false), true);
+});

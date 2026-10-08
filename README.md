@@ -129,7 +129,10 @@ progress shows at `chrome://on-device-internals`.
     the dropdown, or the one auto mode was started on (marked in the dropdown). It
     stays at least a minute on each account. With one saved account it does nothing.
   - Work starts only once energy is above 5 and then works it down to zero, so single
-    refilled points do not keep interrupting the grinder.
+    refilled points do not keep interrupting the grinder. In auto mode, while the
+    account can still grind XP, it grinds first and works only to keep energy 2 below
+    the cap (at the cap the refill clock stops): tickets pay more at a higher level,
+    so the rest of the energy is spent once grinding is done.
   - Use one casino tab per account. Two tabs on the same origin share one supabase
     session, so a second tab can write its old session back. To run two accounts at
     once, open the second in an incognito window with Botter allowed in incognito;

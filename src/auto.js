@@ -259,6 +259,19 @@
     return settings.xpBudget > 0 && lostToday < settings.xpBudget;
   }
 
+  // While XP grinding can go on, work keeps energy this far below the cap and no
+  // lower: at the cap the refill clock stops, and tickets pay more at a higher
+  // level, so the rest of the energy waits until the grinder is done.
+  const WORK_CAP_MARGIN = 2;
+
+  // Whether the work bot should take a ticket now. While grinding, only to keep
+  // energy off the cap. Otherwise a run starts above minEnergy and works energy
+  // down to zero, so single refilled points do not keep interrupting.
+  function workDue(energy, maxEnergy, running, minEnergy, grinding) {
+    if (grinding) return energy >= maxEnergy - WORK_CAP_MARGIN;
+    return energy > minEnergy || (running && energy >= 1);
+  }
+
   // Account to switch to once the current one has nothing left to do. Each
   // candidate is { id, seenAt, seenDay, energy, normDone, credits, canGrind }.
   // One not visited today goes first (its daily bonus and checks are waiting).
@@ -292,6 +305,7 @@
     grindReport,
     grindBets,
     grindAllowed,
+    workDue,
     grindVolume,
     upgradeVerdict,
     pickAccount,
