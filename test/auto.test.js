@@ -116,16 +116,35 @@ test('grindPlan climbs to bigger bets while XP grows with the stake', () => {
     game: 'blaze',
     bet: 100,
   });
-  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: xpCells(linear, levels) }, unlocks), {
+  // XP per credit grows up to 100 and is scaled flat above it, so 100 wins.
+  const steep = (bet) => (bet / 20) ** 1.5;
+  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: xpCells(steep, levels) }, unlocks), {
     game: 'blaze',
-    bet: 200,
+    bet: 100,
   });
   // XP per credit peaks at 40: the bet goes back there once 100 is measured.
-  const peaked = (bet) => (bet <= 40 ? bet / 20 : 2);
+  const peaked = (bet) => (bet <= 40 ? (bet / 20) ** 1.5 : 2);
   assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: xpCells(peaked, levels) }, unlocks), {
     game: 'blaze',
     bet: 40,
   });
+});
+
+test('grindPlan prefers the smallest bet when XP per credit is similar', () => {
+  const unlocks = { blaze: 1 };
+  const stats = { blaze: { rounds: 40, wagered: 800, net: -100, xp: 40 } };
+  const levels = [20, 40, 100];
+  // XP grows with the stake, so every bet loses the same per XP point.
+  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: xpCells((bet) => bet / 20, levels) }, unlocks), {
+    game: 'blaze',
+    bet: 20,
+  });
+  // 40 is 3% better per credit, close enough to keep the smaller bet.
+  const slight = { ...xpCells((bet) => bet / 20, [20, 100]), 40: { rounds: 10, xp: 20.6 } };
+  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: slight }, unlocks), { game: 'blaze', bet: 20 });
+  // 40 is 10% better per credit: worth the bigger bet.
+  const clear = { ...xpCells((bet) => bet / 20, [20, 100]), 40: { rounds: 10, xp: 22 } };
+  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: clear }, unlocks), { game: 'blaze', bet: 40 });
 });
 
 test('grindPlan samples bets up to 100 and scales XP with the bet above that', () => {
@@ -133,14 +152,16 @@ test('grindPlan samples bets up to 100 and scales XP with the bet above that', (
   const stats = { blaze: { rounds: 40, wagered: 800, net: -100, xp: 40 } };
   const levels = [20, 40, 100, 200, 400];
   const linear = (bet) => bet / 20;
-  // 200 and 400 are never sampled: XP per credit stays that of 100, so the biggest bet wins.
-  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: xpCells(linear, [20, 40, 100]) }, unlocks), {
+  // 200 and 400 are never sampled: XP per credit stays that of 100, so the
+  // smallest of those bets wins.
+  const steep = (bet) => (bet / 20) ** 1.5;
+  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, { blaze: xpCells(steep, [20, 40, 100]) }, unlocks), {
     game: 'blaze',
-    bet: 400,
+    bet: 100,
   });
   // A weak measurement at 200 is ignored for the scaled rate.
   const betXp = { blaze: { ...xpCells(linear, [20, 40, 100]), 200: { rounds: 10, xp: 10 } } };
-  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, betXp, unlocks), { game: 'blaze', bet: 400 });
+  assert.deepEqual(A.grindPlan(['blaze'], levels, 1, stats, betXp, unlocks), { game: 'blaze', bet: 20 });
   const report = A.grindReport(['blaze'], levels, 1, stats, betXp, unlocks);
   assert.deepEqual(
     report[0].bets.map((row) => row.perRound),
@@ -263,8 +284,8 @@ test('grindReport shows XP per bet and where each level stands on the ladder', (
   assert.deepEqual(
     blaze.bets.map(({ bet, perRound, cost, state }) => [bet, perRound, cost, state]),
     [
-      [20, 2, 0.5, null],
-      [40, 4, 0.5, 'best'],
+      [20, 2, 0.5, 'best'],
+      [40, 4, 0.5, null],
       [100, 5, 1, 'worse'],
     ],
   );

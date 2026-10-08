@@ -163,40 +163,46 @@
   // The next bet level is still sampled while XP per credit wagered stays within
   // this share of the best so far, so measurement noise does not end the climb.
   const XP_LADDER_KEEP = 0.9;
-  // A bigger bet within this share of the best XP per credit is preferred: about
-  // the same loss per XP, but more XP per round.
-  const XP_BIGGER_BET_SLACK = 0.98;
+  // The smallest bet within this share of the best XP per credit is preferred:
+  // about the same loss per XP, with less riding on each round.
+  const XP_SIMILAR = 0.95;
 
   // Bets above this are not sampled: XP per round looks proportional to the bet
   // there, so it is scaled up from the biggest sampled level.
   const XP_SAMPLE_MAX_BET = 100;
 
-  // Measured bet ladder of one game: the best bet so far, the next level still
-  // to sample (null once XP per credit drops off), the level where it dropped
-  // off (null while the climb goes on) and XP per round per level reached,
-  // measured up to XP_SAMPLE_MAX_BET and scaled with the bet above it.
+  // Measured bet ladder of one game: the best bet so far (the smallest within
+  // XP_SIMILAR of the top XP per credit), the next level still to sample (null
+  // once XP per credit drops off), the level where it dropped off (null while
+  // the climb goes on) and XP per round per level reached, measured up to
+  // XP_SAMPLE_MAX_BET and scaled with the bet above it.
   function betLadder(cells, levels) {
-    let best = null;
+    const reached = [];
     let top = 0;
     let last = null;
     const rates = {};
+    const ladder = (next, stop) => {
+      const pick = reached.find((r) => r.perRound / r.bet >= top * XP_SIMILAR);
+      const best = pick ? { bet: pick.bet, perRound: pick.perRound } : null;
+      return { best, next, stop, rates };
+    };
     for (const bet of levels) {
       let perRound;
       if (bet > XP_SAMPLE_MAX_BET && last) {
         perRound = (last.perRound * bet) / last.bet;
       } else {
         const cell = cells?.[bet];
-        if (!cell || cell.rounds < XP_SAMPLE_ROUNDS) return { best, next: bet, stop: null, rates };
+        if (!cell || cell.rounds < XP_SAMPLE_ROUNDS) return ladder(bet, null);
         perRound = cell.xp / cell.rounds;
         last = { bet, perRound };
       }
       rates[bet] = perRound;
       const perCredit = perRound / bet;
-      if (best && perCredit < top * XP_LADDER_KEEP) return { best, next: null, stop: bet, rates };
+      if (reached.length && perCredit < top * XP_LADDER_KEEP) return ladder(null, bet);
       top = Math.max(top, perCredit);
-      if (perCredit >= top * XP_BIGGER_BET_SLACK) best = { bet, perRound };
+      reached.push({ bet, perRound });
     }
-    return { best, next: null, stop: null, rates };
+    return ladder(null, null);
   }
 
   // House edge of a game measured from its tracked rounds (0 when it is ahead).
@@ -234,7 +240,7 @@
       const edge = planEdge(game, stats, edges) ?? 0;
       return best.perRound > 0 ? (edge * best.bet) / best.perRound : Infinity;
     };
-    const better = (a, b) => cost(b) < cost(a) || (cost(b) === cost(a) && b.best.perRound > a.best.perRound);
+    const better = (a, b) => cost(b) < cost(a) || (cost(b) === cost(a) && b.best.bet < a.best.bet);
     const lead = ladders.reduce((a, b) => (better(a, b) ? b : a));
     return { game: lead.game, bet: lead.best.bet };
   }
