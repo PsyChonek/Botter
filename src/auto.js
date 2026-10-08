@@ -197,10 +197,11 @@
   // house edge times bet / XP per round: the edge does not depend on the bet,
   // XP per round is measured per bet level, since the server's XP formula is
   // unknown. Games without a modelled edge and fewer than minRounds tracked
-  // rounds are explored first at the smallest bet. Then the leading game climbs
-  // its bet ladder while XP per credit wagered keeps up, so a flat XP per round
-  // costs only one sample at the next level. bets are the levels allowed right
-  // now; betXp is { game: { bet: { rounds, xp } } }.
+  // rounds are explored first at the smallest bet. Then every game climbs its
+  // bet ladder while XP per credit wagered keeps up, so a flat XP per round
+  // costs only one sample at the next level, and games are compared at their
+  // best bets: one measured at 20 and another at 100 would not compare fairly.
+  // bets are the levels allowed right now; betXp is { game: { bet: { rounds, xp } } }.
   function grindPlan(games, bets, level, stats, betXp, unlocks, edges = {}, minRounds = 30) {
     const unlocked = games.filter((game) => level >= unlocks[game]);
     const levels = [...bets].sort((a, b) => a - b);
@@ -212,8 +213,8 @@
     }
 
     const ladders = unlocked.map((game) => ({ game, ...betLadder(betXp?.[game], levels) }));
-    const unsampled = ladders.find((ladder) => !ladder.best);
-    if (unsampled) return { game: unsampled.game, bet: unsampled.next };
+    const climbing = ladders.find((ladder) => ladder.next !== null);
+    if (climbing) return { game: climbing.game, bet: climbing.next };
 
     const cost = ({ game, best }) => {
       const edge = planEdge(game, stats, edges) ?? 0;
@@ -221,7 +222,7 @@
     };
     const better = (a, b) => cost(b) < cost(a) || (cost(b) === cost(a) && b.best.perRound > a.best.perRound);
     const lead = ladders.reduce((a, b) => (better(a, b) ? b : a));
-    return { game: lead.game, bet: lead.next ?? lead.best.bet };
+    return { game: lead.game, bet: lead.best.bet };
   }
 
   // What the XP grinder has measured, per game, for the panel: the measured

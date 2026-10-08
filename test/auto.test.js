@@ -128,16 +128,23 @@ test('grindPlan climbs to bigger bets while XP grows with the stake', () => {
   });
 });
 
-test('grindPlan only climbs the ladder of the leading game', () => {
+test('grindPlan climbs every ladder before comparing games at their best bets', () => {
   const unlocks = { blaze: 1, skeleton: 5 };
+  const games = Object.keys(unlocks);
   const stats = {
-    blaze: { rounds: 40, wagered: 800, net: -400, xp: 40 },
+    blaze: { rounds: 40, wagered: 800, net: -160, xp: 40 },
     skeleton: { rounds: 40, wagered: 800, net: -100, xp: 40 },
   };
-  const first = xpCells(() => 1, [20]);
-  assert.deepEqual(A.grindPlan(['blaze', 'skeleton'], [20, 40], 6, stats, { blaze: first, skeleton: first }, unlocks), {
-    game: 'skeleton',
-    bet: 40,
+  const levels = [20, 40, 100];
+  const linear = (bet) => bet / 20;
+  // Skeleton leads at 20 and has climbed to 100; Blaze still has to sample 40.
+  const betXp = { blaze: xpCells(() => 1, [20]), skeleton: xpCells(linear, levels) };
+  assert.deepEqual(A.grindPlan(games, levels, 6, stats, betXp, unlocks), { game: 'blaze', bet: 40 });
+  // Blaze's XP grows faster with the stake, so at its best bet it is cheaper.
+  const steep = (bet) => (bet / 20) ** 1.5;
+  assert.deepEqual(A.grindPlan(games, levels, 6, stats, { ...betXp, blaze: xpCells(steep, levels) }, unlocks), {
+    game: 'blaze',
+    bet: 100,
   });
 });
 
