@@ -227,6 +227,15 @@ test('grindAllowed keeps the reserve under either limit', () => {
   assert.equal(A.grindAllowed({ ...daily, grindLimit: 'balance', grindMinBalance: 100 }, 310, 0, 20), false);
 });
 
+test('grindAllowed with the limit off bets down to the reserve only', () => {
+  const off = { grindLimit: 'off', xpBudget: 0, grindMinBalance: 0, reserve: 0 };
+  assert.equal(A.grindAllowed(off, 20, 50_000, 20), true);
+  assert.equal(A.grindAllowed(off, 19, 0, 20), false);
+  assert.equal(A.grindAllowed({ ...off, reserve: 300 }, 320, 0, 20), true);
+  assert.equal(A.grindAllowed({ ...off, reserve: 300 }, 319, 0, 20), false);
+  assert.deepEqual(A.grindBets(off, 1200, 50_000, [20, 40, 100, 1000, 2000]), [20, 40, 100, 1000]);
+});
+
 test('pickAccount visits an account not seen today first', () => {
   const accounts = [
     { id: 'a', seenAt: 300, seenDay: '2026-10-07', energy: 20, normDone: false },
@@ -389,6 +398,7 @@ test('grindVolume is the budget over the horizon or what is above the floor', ()
   assert.equal(A.grindVolume({ grindLimit: 'daily', xpBudget: 1000 }, 50_000), 14_000);
   assert.equal(A.grindVolume({ grindLimit: 'balance', grindMinBalance: 20_000 }, 50_000), 30_000);
   assert.equal(A.grindVolume({ grindLimit: 'balance', grindMinBalance: 60_000 }, 50_000), 0);
+  assert.equal(A.grindVolume({ grindLimit: 'off', reserve: 5_000 }, 50_000), 45_000);
 });
 
 test('upgradeVerdict buys a cheap first level that pays back on its own', () => {

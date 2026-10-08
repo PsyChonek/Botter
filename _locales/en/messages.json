@@ -455,6 +455,9 @@
   "grindLimit_balance": {
     "message": "Minimum account balance"
   },
+  "grindLimit_off": {
+    "message": "Off (grind down to the reserve)"
+  },
   "optionsGrindMinBalance": {
     "message": "Stop grinding below this balance (0 = off)"
   },

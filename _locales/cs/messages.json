@@ -455,6 +455,9 @@
   "grindLimit_balance": {
     "message": "Minimální zůstatek účtu"
   },
+  "grindLimit_off": {
+    "message": "Vypnuto (farmit až po rezervu)"
+  },
   "optionsGrindMinBalance": {
     "message": "Nefarmit pod tento zůstatek (0 = vypnuto)"
   },

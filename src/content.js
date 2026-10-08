@@ -1262,8 +1262,9 @@
     if (!plan) return false;
     const { game, bet } = plan;
     const limit = limits();
-    if (limit.grindLimit === 'balance') {
-      setStatus('statusGrindingFloor', [msg(`game_${game}`), credits(player.credits), credits(limit.grindMinBalance), credits(bet)]);
+    if (limit.grindLimit !== 'daily') {
+      const floor = limit.grindLimit === 'off' ? limit.reserve : limit.grindMinBalance;
+      setStatus('statusGrindingFloor', [msg(`game_${game}`), credits(player.credits), credits(floor), credits(bet)]);
     } else {
       setStatus('statusGrinding', [msg(`game_${game}`), credits(lost), credits(settings.xpBudget), credits(bet)]);
     }

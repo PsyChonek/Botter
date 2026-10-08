@@ -143,6 +143,7 @@
               <select id="grindLimit" name="grindLimit">
                 <option value="daily" data-i18n="grindLimit_daily"></option>
                 <option value="balance" data-i18n="grindLimit_balance"></option>
+                <option value="off" data-i18n="grindLimit_off"></option>
               </select>
             </div>
             <div data-when="grindLimit:daily">
@@ -154,7 +155,7 @@
               <input id="grindMinBalance" name="grindMinBalance" type="number" min="0" step="100" />
             </div>
           </div>
-          <div data-when="grindLimit:daily xpBudget | grindLimit:balance grindMinBalance">
+          <div data-when="grindLimit:daily xpBudget | grindLimit:balance grindMinBalance | grindLimit:off">
             <div class="grid">
               <div>
                 <label for="grindGame" data-i18n="optionsGrindGame"></label>

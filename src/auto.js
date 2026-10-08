@@ -295,8 +295,10 @@
   const UPGRADE_HORIZON_DAYS = 14;
 
   // Credits the grinder expects to lose while an upgrade has to pay off: the
-  // daily budget over the horizon, or what is above the minimum balance.
+  // daily budget over the horizon, what is above the minimum balance, or with
+  // the limit off what is above the reserve.
   function grindVolume(settings, credits) {
+    if (settings.grindLimit === 'off') return Math.max(0, credits - settings.reserve);
     if (settings.grindLimit === 'balance') return Math.max(0, credits - settings.grindMinBalance);
     return Math.max(0, settings.xpBudget) * UPGRADE_HORIZON_DAYS;
   }
@@ -357,16 +359,17 @@
     return levels.filter(
       (bet) =>
         grindAllowed(settings, credits, lostToday, bet) &&
-        (settings.grindLimit === 'balance' || bet <= settings.xpBudget - lostToday),
+        (settings.grindLimit !== 'daily' || bet <= settings.xpBudget - lostToday),
     );
   }
 
-  // Whether XP grinding may place another bet. The limit is either a daily loss
-  // budget or a minimum account balance, 0 turns the chosen one off, and the
-  // reserve applies on top of both.
+  // Whether XP grinding may place another bet. The limit is a daily loss
+  // budget, a minimum account balance (0 turns either off) or off, which
+  // grinds down to the reserve. The reserve applies under every limit.
   function grindAllowed(settings, credits, lostToday, bet) {
     const after = credits - bet;
     if (after < settings.reserve) return false;
+    if (settings.grindLimit === 'off') return true;
     if (settings.grindLimit === 'balance') return settings.grindMinBalance > 0 && after >= settings.grindMinBalance;
     return settings.xpBudget > 0 && lostToday < settings.xpBudget;
   }
