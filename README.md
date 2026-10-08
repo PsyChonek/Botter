@@ -90,11 +90,27 @@ progress shows at `chrome://on-device-internals`.
   default): offered only in execution. The debt is wiped and credits are set to 500,
   but the XP into the current level is lost, as are this week's sprint points, and
   the shark lends nothing for a week (the clean-loan trick waits). Paying costs the
-  whole debt, so the bot declares it when the debt is bigger than the credits above
+  whole debt, so bankruptcy is planned when the debt is bigger than the credits above
   500 plus the lost XP at the grinder's measured credits per XP (`bankruptWorth` in
-  `src/auto.js`). Before any XP price is measured it only goes bankrupt with no XP at
-  stake. It runs before the claims, which the reset would wipe. Sprint points are
-  not valued, so turn it off if an account is chasing the weekly sprint.
+  `src/auto.js`; before any XP price is measured, only with no XP at stake).
+  - Once it is planned, credits are worth nothing past the reset, so the bot stops
+    repaying, the shop plan buys with no reserve and the grinder bets down to the last
+    credit, ignoring the daily budget and minimum balance. It declares when nothing is
+    left to buy or bet.
+  - Near the end of a level it waits for the level-up when the XP into the level is
+    worth more than the garnish on the work pay that finishes it (half of the missing
+    XP times credits per work XP, `waitForLevel`). Otherwise it declares right away
+    rather than hand half of every payout to a debt that will be wiped.
+  - **Loan cycle** (on by default, needs bankruptcy on): with no loan, no block and the
+    clean-loan trick done, the bot takes the biggest loan when dropping it pays
+    (`loanCycle`). The loan is spent like above, and 12 hours later the debt hits its
+    cap, execution starts and bankruptcy wipes it. The expected cost is the XP into the
+    level at that point, uniform over the level, each point at the cheaper of losing
+    it or waiting for the level, plus the account's credits above 500, which go with
+    it. A test checks the formula against a Monte Carlo run. At most once a week,
+    because of the block. The loan is booked as free income.
+  - Sprint points are not valued, so turn it off if an account is chasing the weekly
+    sprint. Each bankruptcy shows 🏚️ next to the name on the leaderboards for a week.
 - **Settings for the rest** (settings, Auto tab): XP grinding game (cheapest
   per XP or a fixed game), bet (cheapest per XP or a fixed level) and exploration rounds; automatic shop purchases from
   a priority plan (`game:key` list, off by default) using the client's price and

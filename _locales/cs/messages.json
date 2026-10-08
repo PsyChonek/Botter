@@ -284,6 +284,9 @@
   "free_insolvency": {
     "message": "Bankrot (kredity na 500)"
   },
+  "free_loan": {
+    "message": "Půjčky smazané bankrotem"
+  },
   "optionsAutoClaim": {
     "message": "Automaticky vybírat denní bonus, točit hodinové kolo štěstí a při nule brát záchranný balíček"
   },
@@ -324,6 +327,14 @@
   },
   "statusBankrupt": {
     "message": "Vyhlašuji osobní bankrot, dluh $P1$ je levnější zahodit než splatit...",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusLoanCycle": {
+    "message": "Beru půjčku $P1$, utratím ji a v exekuci ji smaže bankrot...",
     "placeholders": {
       "p1": {
         "content": "$1"
@@ -378,6 +389,9 @@
   },
   "optionsAutoBankrupt": {
     "message": "V exekuci vyhlásit osobní bankrot, když vyjde levněji než splatit dluh"
+  },
+  "optionsLoanCycle": {
+    "message": "Vzít největší půjčku, když se vyplatí ji utratit a smazat bankrotem (jednou týdně)"
   },
   "optionsLoanTrick": {
     "message": "Vzít jednorázový achievement +500 za čistou půjčku"

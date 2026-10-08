@@ -403,3 +403,47 @@ test('pickAccount spins a ready wheel after fresh accounts and before going home
   assert.equal(A.pickAccount([...accounts, { id: 'd', seenAt: 9, seenDay: '2026-10-06' }], today, 15, 'home'), 'd');
   assert.equal(A.pickAccount(accounts.map((a) => ({ ...a, wheel: false })), today, 15, 'home'), 'home');
 });
+
+test('waitForLevel finishes a level when its XP is worth more than the garnished pay', () => {
+  // 900 of 1000 XP in: losing 900 XP at 2 credits costs 1800, finishing the
+  // last 100 XP costs half of 100 * 3 = 150 of work pay.
+  assert.equal(A.waitForLevel({ xpInto: 900, xpNeed: 1000 }, 2, 3), true);
+  // 50 of 1000 XP in: losing 100 credits of XP beats 1425 of garnish.
+  assert.equal(A.waitForLevel({ xpInto: 50, xpNeed: 1000 }, 2, 3), false);
+  // No prices, or nothing to lose: declare now.
+  assert.equal(A.waitForLevel({ xpInto: 900, xpNeed: 1000 }, null, 3), false);
+  assert.equal(A.waitForLevel({ xpInto: 900, xpNeed: 1000 }, 2, null), false);
+  assert.equal(A.waitForLevel({ xpInto: 0, xpNeed: 1000 }, 2, 3), false);
+});
+
+test('loanAmount rounds down to the 500 steps the shark lends in', () => {
+  assert.equal(A.loanAmount(4321), 4000);
+  assert.equal(A.loanAmount(499), 0);
+  assert.equal(A.loanAmount(undefined), 0);
+});
+
+test('loanCycle expects the cheaper of losing or finishing each point of the level', () => {
+  const [amount, xpNeed, xpPrice, workPerXp] = [3000, 1000, 2, 3];
+  // Monte Carlo: bankruptcy lands at a uniform point of the level, and the bot
+  // waits for the level when that is cheaper (waitForLevel).
+  let seed = 1;
+  const random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  let total = 0;
+  const runs = 200_000;
+  for (let i = 0; i < runs; i++) {
+    const xpInto = random() * xpNeed;
+    const wait = A.waitForLevel({ xpInto, xpNeed }, xpPrice, workPerXp);
+    total += wait ? 0.5 * workPerXp * (xpNeed - xpInto) : xpInto * xpPrice;
+  }
+  const plan = A.loanCycle(amount, 0, xpNeed, xpPrice, workPerXp);
+  assert.ok(Math.abs(plan.cost - total / runs) < 5, `${plan.cost} vs ${total / runs}`);
+  assert.ok(plan.value > 0);
+  // A small loan against an expensive level does not pay.
+  assert.ok(A.loanCycle(500, 0, 10_000, 2, 3).value < 0);
+  // Savings above 500 would be ground away with the loan, so they count.
+  assert.equal(A.loanCycle(3000, 2500, 1000, 2, null).cost, 3000);
+  // Without a work rate, the XP lost is half a level on average.
+  assert.equal(A.loanCycle(3000, 300, 1000, 2, null).cost, 1000);
+  assert.equal(A.loanCycle(3000, 0, 1000, null, 3), null);
+  assert.equal(A.loanCycle(0, 0, 1000, 2, 3), null);
+});

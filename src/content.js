@@ -31,6 +31,7 @@
     autoMode: false,
     repayDebt: true,
     autoBankrupt: true,
+    loanCycle: true,
     loanTrick: true,
     crashEnabled: true,
     crashBet: 100,
@@ -789,7 +790,7 @@
   // Credits the grinder pays per XP point: the cheapest best bet measured over
   // the games it may pick, or null before any game has one.
   function xpPrice() {
-    const { levels, candidates, edges } = grindChoice();
+    const { levels, candidates, edges } = grindModel();
     const costs = A.grindReport(candidates, levels, player.level, stats.games, stats.betXp, GRIND_UNLOCKS, edges)
       .flatMap((row) => row.bets)
       .filter((cell) => cell.state === 'best' && cell.cost !== null)
@@ -797,13 +798,32 @@
     return costs.length ? Math.min(...costs) : null;
   }
 
-  // Personal bankruptcy when it costs less than paying the debt off. Runs before
-  // any claim or repayment, since the credits are reset to 500 either way.
+  // Credits a work ticket pays per XP point, or null before any ticket.
+  const workPerXp = () => (stats.work.xp > 0 ? Math.max(0, stats.work.net) / stats.work.xp : null);
+
+  // Whether the open loan is going to be dropped by bankruptcy: a loan taken for
+  // the bankruptcy cycle, or execution where bankruptcy is cheaper than paying.
+  // Bankruptcy resets credits to 500, so until then they are spent, not repaid.
+  function bankruptPlanned() {
+    if (!settings.autoBankrupt || !player?.loan) return false;
+    if (!player.loan.execution) return stats.flags.cycleLoan === true;
+    return A.bankruptWorth(player, xpPrice());
+  }
+
+  // Limits the grinder and the shop spend within. Past a planned bankruptcy a
+  // credit is worth nothing, so they may spend down to the last one.
+  const limits = () =>
+    bankruptPlanned() ? { ...settings, reserve: 0, grindLimit: 'balance', grindMinBalance: 1 } : settings;
+
+  // Personal bankruptcy once it is planned and execution allows it, after the
+  // shop and the grinder have spent the credits the reset would wipe, and
+  // unless finishing the current level first costs less than losing its XP.
   async function bankruptStep() {
-    if (!settings.autoBankrupt || !player.loan?.execution) return false;
+    if (!player.loan?.execution || !bankruptPlanned()) return false;
     if (Date.now() - (claimTried.bankrupt ?? 0) < CLAIM_RETRY_MS) return false;
+    if (shopOffer() || grindReady()) return false;
     const price = xpPrice();
-    if (!A.bankruptWorth(player, price)) return false;
+    if (A.waitForLevel(player, price, workPerXp())) return false;
     claimTried.bankrupt = Date.now();
     const terms = { debt: player.loan.debt, credits: player.credits, xpLost: player.xpInto ?? 0, xpPrice: price };
     setStatus('statusBankrupt', [credits(terms.debt)]);
@@ -814,13 +834,50 @@
   }
 
   async function repayStep() {
-    if (!settings.repayDebt) return false;
+    if (!settings.repayDebt || bankruptPlanned()) return false;
     const amount = A.repayAmount(player, settings.reserve);
     if (amount < 1 || Date.now() - (claimTried.repay ?? 0) < CRASH_POLL_MS) return false;
     claimTried.repay = Date.now();
     setStatus('statusRepay', [credits(amount)]);
     const res = await api('/api/loan/repay', { amount });
     if (!res.ok) log.warn('repay_failed', { status: res.status, error: res.data?.error });
+    else if (stats.flags.cycleLoan) {
+      // A cycle loan repaid after all was not free income.
+      stats.free.loan = (stats.free.loan ?? 0) - amount;
+      saveStats();
+    }
+    return true;
+  }
+
+  // A loan taken to be dropped by bankruptcy at execution, when the expected
+  // XP lost then (BotterAuto.loanCycle) is worth less than the loan. Waits for
+  // the clean-loan achievement, which needs a loan of its own. The loan is
+  // booked as free income, since it is never paid back.
+  async function loanCycleStep() {
+    if (!player.loan && stats.flags.cycleLoan) {
+      stats.flags.cycleLoan = false;
+      saveStats();
+    }
+    if (!settings.loanCycle || !settings.autoBankrupt || player.loan) return false;
+    if (player.loanBlockedUntil > Date.now() || (settings.loanTrick && !stats.flags.cleanDone)) return false;
+    if (Date.now() - (claimTried.cycle ?? 0) < CLAIM_RETRY_MS) return false;
+    claimTried.cycle = Date.now();
+    const amount = A.loanAmount(player.loanLimit);
+    const plan = A.loanCycle(amount, player.credits, player.xpNeed, xpPrice(), workPerXp());
+    if (!plan || plan.value <= 0) {
+      log.info('loan_cycle_skip', { amount, credits: player.credits, xpNeed: player.xpNeed, value: plan?.value ?? null });
+      return false;
+    }
+    setStatus('statusLoanCycle', [credits(amount)]);
+    const res = await api('/api/loan/take', { amount });
+    if (!res.ok) {
+      log.warn('loan_cycle_failed', { amount, status: res.status, error: res.data?.error });
+      return true;
+    }
+    stats.flags.cycleLoan = true;
+    stats.free.loan = (stats.free.loan ?? 0) + amount;
+    saveStats();
+    log.info('loan_cycle', plan);
     return true;
   }
 
@@ -889,7 +946,7 @@
       edge: (game, upgrades) => O.edges([game], upgrades, mode)[game] ?? null,
       rest: (keys, upTo) => G.upgradeRest(player.upgrades, offer.game, keys, upTo),
       maxLevels: Object.fromEntries(Object.entries(G.SHOP[offer.game]).map(([key, [max]]) => [key, max])),
-      volume: A.grindVolume(settings, player.credits),
+      volume: A.grindVolume(limits(), player.credits),
       betCapped: Boolean(plan) && plan.bet >= player.maxBet,
       crashOn: settings.crashEnabled,
     });
@@ -898,10 +955,9 @@
   // Logged when the set of skipped upgrades changes, not on every tick.
   let skippedUpgrades = '';
 
-  // Buys the next upgrade in the plan that is worth its price as soon as it is
-  // affordable above the reserve.
-  async function buyStep() {
-    if (!settings.buyUpgrades || Date.now() - (claimTried.buy ?? 0) < CRASH_POLL_MS) return false;
+  // The next upgrade in the plan that is worth its price and affordable now, or null.
+  function shopOffer() {
+    if (!settings.buyUpgrades) return null;
     const skipped = [];
     const offer = G.nextPurchase(G.parsePlan(settings.upgradePlan), player, (o) => {
       const reason = upgradeSkip(o);
@@ -912,7 +968,15 @@
       skippedUpgrades = skipped.join();
       if (skipped.length) log.info('upgrades_skipped', { skipped });
     }
-    if (!offer || player.credits - offer.price < settings.reserve) return false;
+    return offer && player.credits - offer.price >= limits().reserve ? offer : null;
+  }
+
+  // Buys the next upgrade in the plan that is worth its price as soon as it is
+  // affordable above the reserve.
+  async function buyStep() {
+    if (!settings.buyUpgrades || Date.now() - (claimTried.buy ?? 0) < CRASH_POLL_MS) return false;
+    const offer = shopOffer();
+    if (!offer) return false;
     claimTried.buy = Date.now();
     setStatus('statusBuying', [`${offer.game}:${offer.key}`, String(offer.next), credits(offer.price)]);
     const res = await api('/api/shop/buy', { game: offer.game, key: offer.key });
@@ -980,18 +1044,25 @@
 
   // Games and bet levels the grinder may pick from right now, the modelled house
   // edges at the current upgrades, and its pick.
-  function grindChoice() {
-    const lost = Math.max(0, -(stats.grind.day === A.dayKey() ? stats.grind.net : 0));
+  // Bet levels, candidate games and their modelled edges, before any limit.
+  function grindModel() {
     G.expireBetXp(stats.betXp);
     const levels = G.BET_LEVELS.filter((bet) => bet <= player.maxBet);
-    const bets =
-      settings.grindBet === 'auto'
-        ? A.grindBets(settings, player.credits, lost, levels)
-        : [G.betFor(Number(settings.grindBet), player.maxBet)].filter((bet) =>
-            A.grindAllowed(settings, player.credits, lost, bet),
-          );
     const candidates = settings.grindGame === 'auto' ? G.GAME_KEYS : [settings.grindGame];
     const edges = O.edges(candidates, player.upgrades, blazeMode());
+    return { levels, candidates, edges };
+  }
+
+  function grindChoice() {
+    const lost = Math.max(0, -(stats.grind.day === A.dayKey() ? stats.grind.net : 0));
+    const { levels, candidates, edges } = grindModel();
+    const limit = limits();
+    const bets =
+      settings.grindBet === 'auto'
+        ? A.grindBets(limit, player.credits, lost, levels)
+        : [G.betFor(Number(settings.grindBet), player.maxBet)].filter((bet) =>
+            A.grindAllowed(limit, player.credits, lost, bet),
+          );
     const plan = A.grindPlan(candidates, bets, player.level, stats.games, stats.betXp, GRIND_UNLOCKS, edges, settings.grindExploreRounds);
     return { lost, levels, candidates, edges, plan };
   }
@@ -1003,8 +1074,9 @@
     const { lost, plan } = grindChoice();
     if (!plan) return false;
     const { game, bet } = plan;
-    if (settings.grindLimit === 'balance') {
-      setStatus('statusGrindingFloor', [msg(`game_${game}`), credits(player.credits), credits(settings.grindMinBalance), credits(bet)]);
+    const limit = limits();
+    if (limit.grindLimit === 'balance') {
+      setStatus('statusGrindingFloor', [msg(`game_${game}`), credits(player.credits), credits(limit.grindMinBalance), credits(bet)]);
     } else {
       setStatus('statusGrinding', [msg(`game_${game}`), credits(lost), credits(settings.xpBudget), credits(bet)]);
     }
@@ -1023,6 +1095,7 @@
     if (await claimFreebies()) return;
     if (await repayStep()) return;
     if (await loanTrickStep()) return;
+    if (await loanCycleStep()) return;
     if (await buyStep()) return;
     if (await leaderboardStep()) return;
     if (await crashStep()) return;

@@ -284,6 +284,9 @@
   "free_insolvency": {
     "message": "Bankruptcy (credits reset to 500)"
   },
+  "free_loan": {
+    "message": "Loans dropped by bankruptcy"
+  },
   "optionsAutoClaim": {
     "message": "Claim the daily bonus and the hourly wheel of fortune automatically, and the bailout when broke"
   },
@@ -324,6 +327,14 @@
   },
   "statusBankrupt": {
     "message": "Declaring personal bankruptcy, $P1$ of debt is cheaper to drop than to pay...",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusLoanCycle": {
+    "message": "Taking a $P1$ loan to spend and drop by bankruptcy at execution...",
     "placeholders": {
       "p1": {
         "content": "$1"
@@ -378,6 +389,9 @@
   },
   "optionsAutoBankrupt": {
     "message": "Declare personal bankruptcy in execution when it costs less than paying the debt"
+  },
+  "optionsLoanCycle": {
+    "message": "Take the biggest loan when dropping it by bankruptcy is expected to pay (once a week)"
   },
   "optionsLoanTrick": {
     "message": "Take the one-time +500 clean-loan achievement"

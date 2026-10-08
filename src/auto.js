@@ -90,6 +90,46 @@
     return loan.debt > cost;
   }
 
+  // Share of every win and payout the debt collector takes in execution.
+  const GARNISH = 0.5;
+
+  // Whether a planned bankruptcy should wait until the current level is done.
+  // Declaring now loses the XP into the level, worth xpPrice credits a point.
+  // Waiting means the work bot earns the XP still missing while half of its pay
+  // is garnished into a debt that is wiped anyway. workPerXp is the credits a
+  // ticket pays per XP point. Without either price it does not wait.
+  function waitForLevel(player, xpPrice, workPerXp) {
+    const into = player?.xpInto ?? 0;
+    if (!(into > 0) || xpPrice === null || workPerXp === null) return false;
+    const left = Math.max(0, (player.xpNeed ?? 0) - into);
+    return into * xpPrice > GARNISH * left * workPerXp;
+  }
+
+  // The shark lends in steps of 500.
+  const loanAmount = (limit) => Math.floor(Math.max(0, limit ?? 0) / 500) * 500;
+
+  // Expected value of a loan taken to be dropped by bankruptcy: the loan is
+  // spent on upgrades and XP, and once the debt hits its cap (12 hours) and
+  // execution starts, bankruptcy wipes it. The only cost is the XP into the
+  // level at that moment, uniform over the level. Each point x of it costs the
+  // cheaper of losing it (x * xpPrice) or waiting for the level
+  // (GARNISH * workPerXp * (xpNeed - x), see waitForLevel), so the expected
+  // cost is the integral of that minimum over the level. The credits the
+  // account holds above 500 count too: the reset would wipe them, so they are
+  // ground away with the loan. Sprint points and the week without loans are not
+  // valued. Null when the XP price is unknown.
+  function loanCycle(amount, credits, xpNeed, xpPrice, workPerXp) {
+    if (!(amount > 0) || !(xpNeed > 0) || xpPrice === null) return null;
+    let cost = (xpPrice * xpNeed) / 2;
+    if (workPerXp !== null && xpPrice + GARNISH * workPerXp > 0) {
+      const wait = GARNISH * workPerXp;
+      const cross = (wait * xpNeed) / (xpPrice + wait);
+      cost = (xpPrice * cross ** 2 + wait * (xpNeed - cross) ** 2) / 2 / xpNeed;
+    }
+    cost += Math.max(0, credits - BANKRUPT_CREDITS);
+    return { amount, cost, value: amount - cost };
+  }
+
   // The wheel of fortune is free once an hour; null means never spun. A player
   // snapshot from before the wheel existed has no field and is not ready.
   const wheelReady = (wheelNextAt, now = Date.now()) =>
@@ -331,6 +371,9 @@
     crashStake,
     repayAmount,
     bankruptWorth,
+    waitForLevel,
+    loanAmount,
+    loanCycle,
     wheelReady,
     grindPlan,
     grindReport,
