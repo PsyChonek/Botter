@@ -142,6 +142,7 @@
   let capture = []; // raw responses of rarely seen endpoints, for debugging
   let unsavedSpins = 0;
   let grindPausedUntil = 0;
+  let grindError = null; // why the last grinding round failed, shown while paused
   let busy = false;
   let status = { key: 'statusIdle' };
   let ui = null;
@@ -735,25 +736,32 @@
     return goal && grindChoice().plan === null && grindChoice(false).plan !== null ? goal : null;
   }
 
+  // Status for an auto-mode grinder that is not betting, or null: paused
+  // after a failed round, or holding credits back for an upgrade.
+  function grindIdleStatus() {
+    if (!settings.autoMode || !player) return null;
+    const left = grindPausedUntil - Date.now();
+    if (left > 0) return ['statusGrindPaused', [grindError ?? '-', String(Math.ceil(left / 60_000))]];
+    const goal = grindHeldFor();
+    if (!goal) return null;
+    return ['statusSavingForUpgrade', [`${goal.game}:${goal.key} ${goal.next}`, credits(player.credits), credits(limits().reserve + goal.price)]];
+  }
+
   async function workStep() {
     if (dismissModal()) return;
 
     const screen = document.querySelector('.work-screen');
     const taskEl = screen?.querySelector('section.task');
     // With no ticket open and nothing to work on, leave the user on whatever
-    // screen they are on instead of pulling them back to work every tick.
+    // screen they are on instead of pulling them back to work every tick. In
+    // auto mode the status says why the grinder is idle too, not only the work.
     if (!taskEl) {
       if (normDone()) {
-        stopWork('statusNormDone');
+        stopWork(...(grindIdleStatus() ?? ['statusNormDone']));
         return;
       }
       if (!workAvailable()) {
-        const goal = grindHeldFor();
-        if (goal) {
-          setStatus('statusSavingForUpgrade', [`${goal.game}:${goal.key} ${goal.next}`, credits(player.credits), credits(limits().reserve + goal.price)]);
-        } else {
-          setStatus('statusWaitEnergy', [String(WORK_MIN_ENERGY), String(G.energyNow(player.work, Date.now()))]);
-        }
+        setStatus(...(grindIdleStatus() ?? ['statusWaitEnergy', [String(WORK_MIN_ENERGY), String(G.energyNow(player.work, Date.now()))]]));
         return;
       }
     }
@@ -807,10 +815,11 @@
       BJ.decide(hand, BJ.rulesFromUpgrades(player.upgrades?.blackjack), data?.player?.credits ?? player.credits),
   });
 
+  const openHand = () => (player.blackjack && !player.blackjack.done ? player.blackjack : null);
+
   async function playBlackjack(bet) {
-    const open = player.blackjack && !player.blackjack.done ? player.blackjack : null;
+    const open = openHand();
     if (open) bjStake = open.stake ?? bjStake;
-    if (settings.playOnScreen) return screenPlay.blackjack(bet, open);
     let res = open ? { ok: true, data: { hand: open, player } } : await api('/api/blackjack/deal', { bet });
     while (res.ok && res.data.hand && !res.data.hand.done && gamesOn()) {
       await sleep(settings.gameDelayMs / 2);
@@ -821,9 +830,27 @@
     return res;
   }
 
-  function playRound(game, bet) {
+  function playOnScreen(game, bet) {
+    if (game === 'blackjack') {
+      const open = openHand();
+      if (open) bjStake = open.stake ?? bjStake;
+      return screenPlay.blackjack(bet, open);
+    }
+    if (game === 'roulette') return screenPlay.roulette(settings.rouletteBet, bet);
+    return screenPlay.slot(game, bet);
+  }
+
+  // Status 0 from the screen is a failure on the page (a screen, button or
+  // spin the app never sent), not a bet the server refused, so the round goes
+  // through the API instead of stalling the bot. An open blackjack hand is
+  // played on from where the screen left it.
+  async function playRound(game, bet) {
+    if (settings.playOnScreen) {
+      const res = await playOnScreen(game, bet);
+      if (res.ok || res.status !== 0) return res;
+      log.warn('screen_play_failed', { game, bet, error: res.data?.error });
+    }
     if (game === 'blackjack') return playBlackjack(bet);
-    if (settings.playOnScreen) return game === 'roulette' ? screenPlay.roulette(settings.rouletteBet, bet) : screenPlay.slot(game, bet);
     if (game === 'roulette') return api('/api/roulette/spin', { bets: { [settings.rouletteBet]: bet } });
     return api(G.GAMES[game].path, { bet });
   }
@@ -1271,6 +1298,7 @@
     const res = await playRound(game, bet);
     if (!res.ok) {
       log.warn('grind_failed', { game, status: res.status, error: res.data?.error });
+      grindError = res.data?.error ?? String(res.status);
       grindPausedUntil = Date.now() + CLAIM_RETRY_MS;
     }
     await sleep(settings.gameDelayMs);
@@ -1323,9 +1351,9 @@
     setStatus('statusStarting');
   }
 
-  function stopWork(reasonKey = 'statusIdle') {
+  function stopWork(reasonKey = 'statusIdle', subs) {
     saveSettings({ enabled: false });
-    setStatus(reasonKey);
+    setStatus(reasonKey, subs);
   }
 
   function startGames() {

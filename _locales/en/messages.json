@@ -478,6 +478,17 @@
       }
     }
   },
+  "statusGrindPaused": {
+    "message": "Grinding paused after a failed round ($P1$), retrying in $P2$ min.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
   "statusSavingForUpgrade": {
     "message": "Saving for upgrade $P1$: balance $P2$, grinding resumes above $P3$. Turn off \"Save for the next upgrade\" to grind now.",
     "placeholders": {

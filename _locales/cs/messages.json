@@ -478,6 +478,17 @@
       }
     }
   },
+  "statusGrindPaused": {
+    "message": "Farmení pozastaveno po nepovedeném kole ($P1$), zkusím znovu za $P2$ min.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
   "statusSavingForUpgrade": {
     "message": "Šetřím na vylepšení $P1$: zůstatek $P2$, farmení pokračuje nad $P3$. Vypni \"Šetřit na další vylepšení\", ať se farmí hned.",
     "placeholders": {
