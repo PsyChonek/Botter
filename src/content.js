@@ -726,6 +726,15 @@
   // while it can, work waits and only keeps energy off the cap.
   const grindReady = () => settings.autoMode && Date.now() >= grindPausedUntil && grindChoice().plan !== null;
 
+  // The upgrade goal that alone keeps the grinder from betting, or null: the
+  // credits are kept for it (see savingFor), so the panel says so instead of
+  // looking idle.
+  function grindHeldFor() {
+    if (!settings.autoMode) return null;
+    const goal = savingFor();
+    return goal && grindChoice().plan === null && grindChoice(false).plan !== null ? goal : null;
+  }
+
   async function workStep() {
     if (dismissModal()) return;
 
@@ -739,7 +748,12 @@
         return;
       }
       if (!workAvailable()) {
-        setStatus('statusWaitEnergy', [String(WORK_MIN_ENERGY), String(G.energyNow(player.work, Date.now()))]);
+        const goal = grindHeldFor();
+        if (goal) {
+          setStatus('statusSavingForUpgrade', [`${goal.game}:${goal.key} ${goal.next}`, credits(player.credits), credits(limits().reserve + goal.price)]);
+        } else {
+          setStatus('statusWaitEnergy', [String(WORK_MIN_ENERGY), String(G.energyNow(player.work, Date.now()))]);
+        }
         return;
       }
     }

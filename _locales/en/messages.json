@@ -475,6 +475,20 @@
       }
     }
   },
+  "statusSavingForUpgrade": {
+    "message": "Saving for upgrade $P1$: balance $P2$, grinding resumes above $P3$. Turn off \"Save for the next upgrade\" to grind now.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
   "grind_auto": {
     "message": "Cheapest per XP (auto)"
   },
