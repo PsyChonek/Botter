@@ -146,6 +146,12 @@ test('grindPlan samples bets up to 100 and scales XP with the bet above that', (
     report[0].bets.map((row) => row.perRound),
     [1, 2, 5, 10, 20],
   );
+  // While the sampled levels are still being tested, the levels above them are not listed.
+  const testing = A.grindReport(['blaze'], levels, 1, stats, { blaze: xpCells(linear, [20]) }, unlocks);
+  assert.deepEqual(
+    testing[0].bets.map((row) => row.bet),
+    [20, 40, 100],
+  );
 });
 
 test('grindPlan climbs every ladder before comparing games at their best bets', () => {
@@ -246,7 +252,7 @@ test('pickAccount moves to the richest account that can grind when none has ener
 test('grindReport shows XP per bet and where each level stands on the ladder', () => {
   const unlocks = { blaze: 1, roulette: 15 };
   const stats = { blaze: { rounds: 40, wagered: 2000, net: -100, xp: 120 } };
-  // 20 and 40 keep XP per credit, 100 drops off, so 200 is never tried.
+  // 20 and 40 keep XP per credit, 100 drops off, so 200 is never tried and not listed.
   const betXp = {
     blaze: { 20: { rounds: 10, xp: 20 }, 40: { rounds: 10, xp: 40 }, 100: { rounds: 10, xp: 50 } },
   };
@@ -260,7 +266,6 @@ test('grindReport shows XP per bet and where each level stands on the ladder', (
       [20, 2, 0.5, null],
       [40, 4, 0.5, 'best'],
       [100, 5, 1, 'worse'],
-      [200, null, null, 'skipped'],
     ],
   );
   assert.equal(roulette.locked, true);

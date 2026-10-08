@@ -251,7 +251,9 @@
       const row = stats[game];
       const edge = planEdge(game, stats, edges);
       const ladder = betLadder(betXp?.[game], sorted);
-      const bets = sorted.map((bet) => {
+      // Levels above the sampled ones are listed once the ladder has scaled them.
+      const shown = sorted.filter((bet) => bet <= XP_SAMPLE_MAX_BET || ladder.rates[bet] !== undefined);
+      const bets = shown.map((bet) => {
         const cell = betXp?.[game]?.[bet];
         const rounds = cell?.rounds ?? 0;
         const perRound = ladder.rates[bet] ?? (rounds > 0 ? cell.xp / rounds : null);
