@@ -681,6 +681,7 @@ test('huntPlan moves to blackjack once the zero is done and stops when nothing p
   // The rounds tier alone is worth 1000 / 500 = 2 a round, above roulette's 20 * 3/39 loss.
   assert.equal(A.huntPlan(hunter({ achievements: done }), huntCtx()).game, 'roulette');
   assert.equal(A.huntPlan(hunter({ achievements: done, totalSpins: 100 }), huntCtx()), null);
+  assert.equal(A.huntPlan(hunter({ achievements: done, achProgress: { regular: 100 } }), huntCtx()), null);
 });
 
 test('huntPlan plays a round at night and skips locked games and missing data', () => {

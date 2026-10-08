@@ -587,7 +587,9 @@
     const shared = [];
     if (open('night_owl') && nightHours(now)) shared.push({ key: 'night_owl', value: achievementReward('night_owl', 0) });
     const tier = achievementTier(player, 'regular');
-    const left = tier === null ? 0 : HUNT_ACHIEVEMENTS.regular.tiers[tier] - (player.totalSpins ?? Infinity);
+    // The client shows counter progress from achProgress; totalSpins is the same count.
+    const played = player.achProgress?.regular ?? player.totalSpins ?? Infinity;
+    const left = tier === null ? 0 : HUNT_ACHIEVEMENTS.regular.tiers[tier] - played;
     if (left > 0) shared.push({ key: 'regular', value: achievementReward('regular', tier) / left });
 
     let best = null;
