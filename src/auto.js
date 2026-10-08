@@ -254,8 +254,8 @@
   // ctx: games (unlocked games the grinder may pick), upgrades, betXp,
   // edge(game, upgrades) (modelled house edge or null), rest(keys, upTo)
   // ({ price, upgrades } after buying those upgrades of the offer's game up to
-  // level upTo, default max), maxLevels ({ key: max } of the game), volume (see
-  // grindVolume) and crashOn (crash betting is on).
+  // level upTo, default max), maxLevels ({ key: max } of the game) and volume (see
+  // grindVolume).
   // Credits spent on upgrades are not there to grind with, so they are bought
   // only if the XP from the remaining volume at the cheaper cost beats the XP
   // from the whole volume at today's best cost. That is checked for the next
@@ -263,7 +263,6 @@
   // and for every worthwhile upgrade of the game maxed together.
   function upgradeVerdict(offer, ctx) {
     const { game } = offer;
-    if (game === 'crash') return ctx.crashOn ? null : 'crashOff';
     const now = (g) => ctx.edge(g, ctx.upgrades);
     if (now(game) === null) return null;
     if (!ctx.games.includes(game)) return 'notGrinded';

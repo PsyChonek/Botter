@@ -167,8 +167,8 @@ progress shows at `chrome://on-device-internals`.
   pick the game even fully upgraded, or spending the price on plain grinding gives
   more XP than grinding the rest at the cheaper cost (volume: 14 days of the daily
   budget, or the credits above the minimum balance; judged for the next levels alone
-  and for the game's useful upgrades maxed together). `crash:sla` is bought only while
-  crash betting is on. `global:bets` (higher max bet) is not in the plan: XP per round
+  and for the game's useful upgrades maxed together). `crash:sla` is never bought:
+  Produkce padá's daily payout is too small to earn it back. `global:bets` (higher max bet) is not in the plan: XP per round
   is proportional to the bet, so a bigger bet never buys XP cheaper. The whole plan is judged again every 10 minutes and as soon as the level, the
   upgrades or the max bet change (`G.shopQueue` with `reviewShop` in `src/content.js`);
   the first entry worth buying at the current level is the goal, logged as

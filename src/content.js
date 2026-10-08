@@ -1159,7 +1159,6 @@
       rest: (keys, upTo) => G.upgradeRest(player.upgrades, offer.game, keys, upTo),
       maxLevels: Object.fromEntries(Object.entries(G.SHOP[offer.game]).map(([key, [max]]) => [key, max])),
       volume: A.grindVolume(limits(), player.credits),
-      crashOn: settings.crashEnabled,
     });
   }
 
@@ -1168,7 +1167,7 @@
   // worth buying at this level. Changes are logged, not every review.
   function reviewShop() {
     if (!settings.buyUpgrades || !player) return (shopReview = null);
-    const key = JSON.stringify([accountId, player.level, player.upgrades, bankruptPlanned(), settings.crashEnabled]);
+    const key = JSON.stringify([accountId, player.level, player.upgrades, bankruptPlanned()]);
     if (shopReview?.key === key && Date.now() - shopReview.at < SHOP_REVIEW_MS) return shopReview;
     const queue = G.shopQueue(G.UPGRADE_PLAN, player, upgradeSkip);
     const goal = queue.find((offer) => !offer.reason) ?? null;

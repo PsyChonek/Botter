@@ -85,6 +85,10 @@ test('the upgrade plan never buys a bigger max bet', () => {
   assert.equal(G.UPGRADE_PLAN.some((o) => o.game === 'global'), false);
 });
 
+test('the upgrade plan never buys crash upgrades', () => {
+  assert.equal(G.UPGRADE_PLAN.some((o) => o.game === 'crash'), false);
+});
+
 test('shopQueue follows the plan order and level gates', () => {
   const plan = [
     { game: 'crash', key: 'sla' },

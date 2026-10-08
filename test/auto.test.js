@@ -268,7 +268,6 @@ function verdictCtx(overrides = {}) {
     },
     maxLevels: { team: 4, wild: 4, hint: 1 },
     volume: 1_000_000,
-    crashOn: true,
     ...overrides,
   };
 }
@@ -297,11 +296,6 @@ test('upgradeVerdict prefers plain XP grinding when the volume is too small to p
   // Spending 8000 of 9000 credits on upgrades leaves too little to grind.
   assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), verdictCtx({ volume: 9000 })), 'xpFarmingBetter');
   assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), verdictCtx({ volume: 0 })), 'xpFarmingBetter');
-});
-
-test('upgradeVerdict judges crash upgrades by their own use', () => {
-  assert.equal(A.upgradeVerdict(offer('crash', 'sla'), verdictCtx()), null);
-  assert.equal(A.upgradeVerdict(offer('crash', 'sla'), verdictCtx({ crashOn: false })), 'crashOff');
 });
 
 test('grindVolume is the budget over the horizon or what is above the floor', () => {

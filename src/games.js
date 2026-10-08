@@ -59,9 +59,11 @@
   // Shop upgrades in priority order: the next level of the first one that is
   // worth its price is bought, later ones wait. global:bets is left out: XP per
   // round is proportional to the bet, so a bigger max bet never buys XP cheaper.
+  // crash:sla is left out too: Produkce padá's daily payout cap is too small for
+  // it to pay back.
   const UPGRADE_PLAN = [
     'blaze:star', 'skeleton:team', 'blaze:lucky', 'blaze:wild', 'skeleton:wild', 'slotingi:gulas', 'skeleton:deploy',
-    'slotingi:crown', 'roulette:zeros', 'blackjack:ties', 'blackjack:bjpay', 'crash:sla',
+    'slotingi:crown', 'roulette:zeros', 'blackjack:ties', 'blackjack:bjpay',
   ].map((entry) => {
     const [game, key] = entry.split(':');
     return { game, key };

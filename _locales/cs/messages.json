@@ -591,7 +591,7 @@
     "message": "Kupovat vylepšení automaticky, když se vyplatí"
   },
   "optionsUpgradeHint": {
-    "message": "Pořadí priority: Blaze hvězdy, Skeleton tým, Blaze štěstí, Blaze wild, Skeleton wild, Slotingi guláš, Skeleton deploy, Slotingi koruna, Ruleta nuly, Blackjack remízy a výplata blackjacku, Crash SLA. Vyšší sázky (globální vylepšení) se nekupují nikdy: XP za kolo roste se sázkou, takže vyšší sázka XP nikdy nezlevní. Auto koupí další úroveň prvního vylepšení, které se vyplatí, není na maximu a je povolené na tvém levelu, jakmile se vejde nad rezervu; další čekají. Přeskočí, co se nevyplatí: vylepšení, která přidají méně než 0,5 % výnosu na 10 000 kreditů (blackjack:hint/double/soft17, slotingi:mint), vylepšení hry, kterou by grinder XP nevybral ani plně vylepšenou, vylepšení hry, když by stejné kredity prostě protočené na XP daly víc XP (za 14 dní denního rozpočtu, nebo až po minimální zůstatek), a crash:sla při vypnutých sázkách na crash. Vymaxování libovolné hry dává jednorázový achievement 5000, se kterým kontrola nepočítá. Každých 10 minut, a hned když se změní level nebo vylepšení, se znovu posoudí celý plán; první vylepšení, které se vyplatí, se stane cílem a je vidět v panelu pod Fronta vylepšení. Se zapnutým šetřením nechá grinder XP cenu cíle nad rezervou nedotčenou, takže na něj našetří výplata z práce, a po koupi hned koupí i další cíl, pokud se vejde. Šetření se vypíná před plánovanou insolvencí, která by úspory smazala."
+    "message": "Pořadí priority: Blaze hvězdy, Skeleton tým, Blaze štěstí, Blaze wild, Skeleton wild, Slotingi guláš, Skeleton deploy, Slotingi koruna, Ruleta nuly, Blackjack remízy a výplata blackjacku. Crash SLA se nekupuje nikdy: Produkce padá vyplatí za den příliš málo, aby se vrátilo. Vyšší sázky (globální vylepšení) se nekupují nikdy: XP za kolo roste se sázkou, takže vyšší sázka XP nikdy nezlevní. Auto koupí další úroveň prvního vylepšení, které se vyplatí, není na maximu a je povolené na tvém levelu, jakmile se vejde nad rezervu; další čekají. Přeskočí, co se nevyplatí: vylepšení, která přidají méně než 0,5 % výnosu na 10 000 kreditů (blackjack:hint/double/soft17, slotingi:mint), vylepšení hry, kterou by grinder XP nevybral ani plně vylepšenou, a vylepšení hry, když by stejné kredity prostě protočené na XP daly víc XP (za 14 dní denního rozpočtu, nebo až po minimální zůstatek). Vymaxování libovolné hry dává jednorázový achievement 5000, se kterým kontrola nepočítá. Každých 10 minut, a hned když se změní level nebo vylepšení, se znovu posoudí celý plán; první vylepšení, které se vyplatí, se stane cílem a je vidět v panelu pod Fronta vylepšení. Se zapnutým šetřením nechá grinder XP cenu cíle nad rezervou nedotčenou, takže na něj našetří výplata z práce, a po koupi hned koupí i další cíl, pokud se vejde. Šetření se vypíná před plánovanou insolvencí, která by úspory smazala."
   },
   "optionsModelHeading": {
     "message": "Kontrola modelu Blaze"
@@ -1099,9 +1099,6 @@
   },
   "shopState_queued": {
     "message": "ve frontě"
-  },
-  "shopState_crashOff": {
-    "message": "crash vypnutý"
   },
   "shopState_notGrinded": {
     "message": "hra se negrinduje"

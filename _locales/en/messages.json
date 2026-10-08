@@ -591,7 +591,7 @@
     "message": "Buy upgrades automatically when they are worth it"
   },
   "optionsUpgradeHint": {
-    "message": "Priority order: Blaze star, Skeleton team, Blaze lucky, Blaze wild, Skeleton wild, Slotingi gulas, Skeleton deploy, Slotingi crown, Roulette zeros, Blackjack ties and blackjack pay, Crash SLA. Global bets (higher max bet) are never bought: XP per round grows with the bet, so a bigger bet never buys XP cheaper. Auto buys the next level of the first upgrade that is worth its price, is not maxed and is allowed at your level, as soon as it fits above the reserve; later ones wait. Skipped as not worth it: upgrades that add less than 0.5 % return per 10,000 credits (blackjack:hint/double/soft17, slotingi:mint), upgrades of a game the XP grinder would not pick even fully upgraded, a game's upgrades when spending the price on plain XP grinding gives more XP (over 14 days of the daily budget, or down to the minimum balance), and crash:sla while crash betting is off. Maxing any game also pays a one-time 5000 achievement, which the check does not count. Every 10 minutes, and whenever your level or upgrades change, the whole plan is judged again; the first upgrade worth buying becomes the goal, shown in the panel under Upgrade queue. With saving on, the XP grinder leaves the goal's price untouched on top of the reserve, so work pay builds up to it, and once it is bought the next goal is bought right away if it fits too. Saving pauses past a planned bankruptcy, which would wipe the savings."
+    "message": "Priority order: Blaze star, Skeleton team, Blaze lucky, Blaze wild, Skeleton wild, Slotingi gulas, Skeleton deploy, Slotingi crown, Roulette zeros, Blackjack ties and blackjack pay. Crash SLA is never bought: Produkce padá pays out too little per day to earn it back. Global bets (higher max bet) are never bought: XP per round grows with the bet, so a bigger bet never buys XP cheaper. Auto buys the next level of the first upgrade that is worth its price, is not maxed and is allowed at your level, as soon as it fits above the reserve; later ones wait. Skipped as not worth it: upgrades that add less than 0.5 % return per 10,000 credits (blackjack:hint/double/soft17, slotingi:mint), upgrades of a game the XP grinder would not pick even fully upgraded, and a game's upgrades when spending the price on plain XP grinding gives more XP (over 14 days of the daily budget, or down to the minimum balance). Maxing any game also pays a one-time 5000 achievement, which the check does not count. Every 10 minutes, and whenever your level or upgrades change, the whole plan is judged again; the first upgrade worth buying becomes the goal, shown in the panel under Upgrade queue. With saving on, the XP grinder leaves the goal's price untouched on top of the reserve, so work pay builds up to it, and once it is bought the next goal is bought right away if it fits too. Saving pauses past a planned bankruptcy, which would wipe the savings."
   },
   "optionsModelHeading": {
     "message": "Blaze model check"
@@ -1099,9 +1099,6 @@
   },
   "shopState_queued": {
     "message": "queued"
-  },
-  "shopState_crashOff": {
-    "message": "crash off"
   },
   "shopState_notGrinded": {
     "message": "game not ground"
