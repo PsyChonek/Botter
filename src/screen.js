@@ -71,8 +71,9 @@
     }
 
     // Blaze draws on a canvas that is created after its HUD, and ignores clicks
-    // until it exists.
+    // until it exists. It also stays mounted, hidden, on the work view.
     function ready(game) {
+      if (document.querySelector('nav.views button')?.getAttribute('aria-pressed') !== 'true') return null;
       const screen = document.querySelector(SCREENS[game]);
       if (!screen || (game === 'blaze' && !document.querySelector('.stage canvas'))) return null;
       return screen;
