@@ -840,15 +840,19 @@
     return screenPlay.slot(game, bet);
   }
 
-  // Status 0 from the screen is a failure on the page (a screen, button or
-  // spin the app never sent), not a bet the server refused, so the round goes
-  // through the API instead of stalling the bot. An open blackjack hand is
-  // played on from where the screen left it.
+  // Screen failures that happen before the app sends the bet. Only these fall
+  // back to the API: after a timeout the spin may have gone through unseen,
+  // and a blackjack button can go missing mid-hand, so retrying would bet twice.
+  const SCREEN_UNSENT = ['screen_missing', 'bet_unavailable', 'spot_missing', 'chip_missing'];
+  const screenUnsent = (game, error) =>
+    SCREEN_UNSENT.includes(error) || (error === 'button_missing' && game !== 'blackjack');
+
   async function playRound(game, bet) {
     if (settings.playOnScreen) {
       const res = await playOnScreen(game, bet);
       if (res.ok || res.status !== 0) return res;
       log.warn('screen_play_failed', { game, bet, error: res.data?.error });
+      if (!screenUnsent(game, res.data?.error)) return res;
     }
     if (game === 'blackjack') return playBlackjack(bet);
     if (game === 'roulette') return api('/api/roulette/spin', { bets: { [settings.rouletteBet]: bet } });
