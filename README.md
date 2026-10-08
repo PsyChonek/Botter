@@ -88,9 +88,9 @@ progress shows at `chrome://on-device-internals`.
   (500 / 2,000 / 5,000 for 1 / 7 / 30 full days). Auto mode reads the game and the kind
   from the quest text and plays it before work when its expected loss is below its
   reward (`standupPlan` in `src/auto.js`): game rounds at the smallest bet, a wager on
-  the lowest-edge game at the biggest bet that does not overshoot, rounds ahead on
-  roulette's even-money bet or blackjack (slots are assumed to end ahead a quarter of
-  the time). The bonus and the achievement are not counted, so the estimate is
+  the lowest-edge game at the biggest bet that does not overshoot, rounds ahead on the
+  game where the simulated share of rounds that end ahead (see Odds in the settings)
+  makes them cheapest. The bonus and the achievement are not counted, so the estimate is
   conservative. It keeps the reserve but not the grinding budget: quest and achievement
   rewards are booked as free income, kept out of game and work profit, and the standup
   reward offsets the day's grinding loss. Quests it cannot read, crash quests and ones
@@ -168,6 +168,11 @@ progress shows at `chrome://on-device-internals`.
   for games, the ticket type, the game, accuracy per answer source, AI cost and
   the profit table. **Hide** collapses it to a small Botter button in the same corner
   (highlighted while a bot runs); click it to bring the panel back. The same switch is
+- **Odds per upgrade** (settings, Games tab): for every game and every combination of
+  its shop upgrades the return to player, the share of rounds won (more back than the
+  bet) and the chance that 1,000 rounds end ahead, all from the simulation in
+  `scripts/odds.mjs`. Roulette is an even-money bet, blackjack the bot's own strategy,
+  Blaze is listed per scatter rule. The current account's upgrades are marked.
   in the settings (Bot tab).
 - **Accounts**: stats, profit, achievement flags (clean loan, leaderboards) and the
   daily XP budget are kept per account under `stats:<user id>`; the answer bank and
@@ -220,8 +225,11 @@ bank learned on one machine can be reused on another.
 npm run check
 ```
 
-`node scripts/odds.mjs [spins]` regenerates `src/odds-table.js` (about 6 minutes at
-the default 300,000 spins per combination). Rerun it when the casino changes a slot's
+`node scripts/odds.mjs [spins]` regenerates `src/odds-table.js` (about 10 minutes at
+the default 300,000 spins per combination). Besides the slot returns it records, for
+every game and upgrade combination (roulette and blackjack included), the share of
+rounds that return more than the bet and the share of 10,000 sessions of 1,000 rounds,
+drawn from those spins, that end ahead. Rerun it when the casino changes a slot's
 weights, paytable or upgrade effects. Skeleton Slots and Slotingi are evaluated on the
 server, so their models follow the client's rules text where it leaves details open:
 Skeleton counts rockets after the last cascade and lets free spins retrigger, Slotingi

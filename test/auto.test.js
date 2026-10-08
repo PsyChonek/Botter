@@ -535,6 +535,23 @@ test('standupPlan plays a quest on the game and bet where it costs least', () =>
   assert.equal(wins.bet, 20);
 });
 
+test('standupPlan prices a rounds-ahead quest with the simulated win rate when given', () => {
+  const ctx = {
+    level: 20,
+    unlocks: { slotingi: 7, roulette: 15 },
+    edges: { slotingi: 0.03, roulette: 1 - 36 / 39 },
+    levels: [20],
+  };
+  const quest = [{ key: 'p', text: 'Skonči 10× v plusu', progress: 0, target: 10, reward: 480 }];
+  // Without win rates a slot is guessed to win a quarter of its rounds: 10 / 0.25 * 20 * 0.03 = 24,
+  // under roulette's 10 / 0.4615 * 20 * 0.0769 = 33.
+  assert.equal(A.standupPlan(quest, ctx).game, 'slotingi');
+  // At a simulated 10 % the slot costs 60, so roulette wins.
+  const plan = A.standupPlan(quest, { ...ctx, wins: { slotingi: 0.1, roulette: 18 / 39 } });
+  assert.equal(plan.game, 'roulette');
+  assert.ok(Math.abs(plan.cost - (10 / (18 / 39)) * 20 * (3 / 39)) < 1e-9);
+});
+
 test('standupPlan skips quests that cost more than they pay or cannot be played', () => {
   const ctx = { level: 6, unlocks: { blaze: 1, skeleton: 5, roulette: 15 }, edges: { blaze: 0.37, skeleton: 0.29, roulette: 0.05 }, levels: [20] };
   const skipped = [];

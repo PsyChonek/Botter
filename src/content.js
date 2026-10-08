@@ -509,6 +509,7 @@
   // Detaches the current session and reloads to the login screen. The app's own
   // log out would revoke the session on the server, and with it the saved copy.
   async function addAccount() {
+      upgrades: player.upgrades,
     if (switching) return;
     switching = true;
     await saveAccount(true);
@@ -1166,6 +1167,7 @@
   function grindModel() {
     G.expireBetXp(stats.betXp);
     const levels = G.BET_LEVELS.filter((bet) => bet <= player.maxBet);
+        wins: O.winRates(G.GAME_KEYS, player.upgrades, blazeMode()),
     const candidates = settings.grindGame === 'auto' ? G.GAME_KEYS : [settings.grindGame];
     const edges = O.edges(candidates, player.upgrades, blazeMode());
     return { levels, candidates, edges };

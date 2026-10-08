@@ -153,6 +153,9 @@ tfoot td { font-weight: 700; border-bottom: 0; }
 .pos { color: var(--accent); }
 .neg { color: var(--neg); }
 .hint { color: var(--muted); font-size: 0.85rem; }
+details { margin-top: 8px; }
+summary { cursor: pointer; padding: 4px 0; }
+tr[aria-current] td { font-weight: 700; color: var(--accent); }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
