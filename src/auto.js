@@ -70,6 +70,31 @@
     return Math.max(0, Math.floor(Math.min(debt, player.credits - reserve)));
   }
 
+  // Credits the casino leaves after a personal bankruptcy.
+  const BANKRUPT_CREDITS = 500;
+
+  // Whether declaring personal bankruptcy beats paying the debt. The casino
+  // offers it only in execution: the debt is wiped and credits are set to 500,
+  // but the XP into the current level is lost (along with this week's sprint
+  // points and a week without loans, which the bot does not use). Paying costs
+  // the whole debt, now or through the garnish, so bankruptcy wins when the debt
+  // is bigger than the credits above 500 plus what the lost XP costs to grind
+  // back. xpPrice is credits per XP point, null when not measured yet, and then
+  // only a bankruptcy that loses no XP is taken.
+  function bankruptWorth(player, xpPrice) {
+    const loan = player?.loan;
+    if (!loan?.execution || !(loan.debt > 0)) return false;
+    const xpLost = Math.max(0, player.xpInto ?? 0);
+    if (xpLost > 0 && xpPrice === null) return false;
+    const cost = player.credits - BANKRUPT_CREDITS + (xpLost > 0 ? xpLost * xpPrice : 0);
+    return loan.debt > cost;
+  }
+
+  // The wheel of fortune is free once an hour; null means never spun. A player
+  // snapshot from before the wheel existed has no field and is not ready.
+  const wheelReady = (wheelNextAt, now = Date.now()) =>
+    wheelNextAt !== undefined && (wheelNextAt === null || wheelNextAt <= now);
+
   const XP_SAMPLE_ROUNDS = 10;
   // The next bet level is still sampled while XP per credit wagered stays within
   // this share of the best so far, so measurement noise does not end the climb.
@@ -273,14 +298,18 @@
   }
 
   // Account to switch to once the current one has nothing left to do. Each
-  // candidate is { id, seenAt, seenDay, energy, normDone, credits, canGrind }.
-  // One not visited today goes first (its daily bonus and checks are waiting).
+  // candidate is { id, seenAt, seenDay, energy, normDone, credits, canGrind,
+  // wheel }. One not visited today goes first (its daily bonus and checks are
+  // waiting), then one whose free wheel spin is ready, longest unseen first.
   // Away from the home account, the next stop is home. From home, the one with
   // the most refilled energy above minEnergy, else the richest one that can
   // still grind XP, so betting carries on when home has run out of credits.
   function pickAccount(candidates, today, minEnergy, home = null) {
+    const oldest = (list) => list.reduce((a, b) => (b.seenAt < a.seenAt ? b : a)).id;
     const fresh = candidates.filter((a) => a.seenDay !== today);
-    if (fresh.length) return fresh.reduce((a, b) => (b.seenAt < a.seenAt ? b : a)).id;
+    if (fresh.length) return oldest(fresh);
+    const spin = candidates.filter((a) => a.wheel);
+    if (spin.length) return oldest(spin);
     if (home && candidates.some((a) => a.id === home)) return home;
     const ready = candidates.filter((a) => !a.normDone && a.energy > minEnergy);
     if (ready.length) return ready.reduce((a, b) => (b.energy > a.energy ? b : a)).id;
@@ -301,6 +330,8 @@
     bestCrashTarget,
     crashStake,
     repayAmount,
+    bankruptWorth,
+    wheelReady,
     grindPlan,
     grindReport,
     grindBets,

@@ -269,14 +269,23 @@
   "statusClaimBailout": {
     "message": "Beru záchranný balíček..."
   },
+  "statusWheel": {
+    "message": "Točím kolem štěstí zdarma..."
+  },
   "free_daily": {
     "message": "Denní bonus"
   },
   "free_bailout": {
     "message": "Záchranný balíček"
   },
+  "free_wheel": {
+    "message": "Kolo štěstí"
+  },
+  "free_insolvency": {
+    "message": "Bankrot (kredity na 500)"
+  },
   "optionsAutoClaim": {
-    "message": "Automaticky vybírat denní bonus a při nule záchranný balíček"
+    "message": "Automaticky vybírat denní bonus, točit hodinové kolo štěstí a při nule brát záchranný balíček"
   },
   "panelAuto": {
     "message": "Auto"
@@ -307,6 +316,14 @@
   },
   "statusRepay": {
     "message": "Splácím dluh $P1$...",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusBankrupt": {
+    "message": "Vyhlašuji osobní bankrot, dluh $P1$ je levnější zahodit než splatit...",
     "placeholders": {
       "p1": {
         "content": "$1"
@@ -358,6 +375,9 @@
   },
   "optionsRepayDebt": {
     "message": "Splácet dluh z volných kreditů"
+  },
+  "optionsAutoBankrupt": {
+    "message": "V exekuci vyhlásit osobní bankrot, když vyjde levněji než splatit dluh"
   },
   "optionsLoanTrick": {
     "message": "Vzít jednorázový achievement +500 za čistou půjčku"

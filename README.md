@@ -57,7 +57,9 @@ progress shows at `chrome://on-device-internals`.
   session, a credit reserve, and the game's unlock level. With both bots on, work
   goes first and games fill the time while energy refills.
 - **Auto mode** (`src/auto.js`, one toggle in the panel) runs everything in order of
-  value each tick: claim the daily bonus and bailout, repay debt (8 %/h compounding
+  value each tick: declare personal bankruptcy when it is cheaper than paying (see
+  below), claim the daily bonus, the free hourly wheel of fortune and the bailout,
+  repay debt (8 %/h compounding
   until 2.5x, then 50 % of every payout is garnished), take the one-time +500
   clean-loan achievement (borrow 500, repay inside the free hour), open every
   leaderboard once a day (the podium achievement pays +1000 for top 3 on any board,
@@ -79,6 +81,20 @@ progress shows at `chrome://on-device-internals`.
   ruled out get measured again. The auto bet only moves to the next level while XP per credit wagered keeps
   up, so it settles on the bet with the lowest loss per XP; under a daily budget it
   never bets more than what is left of it.
+- **Wheel of fortune** (Kolo štěstí, `/api/wheel/spin`): free once an hour, paid in
+  multiples of a base set by the player's title (100 to 300) or a coffee that refills
+  energy. It is spun as soon as `player.wheelNextAt` has passed, with the other free
+  claims (also outside auto mode), and booked as free income. Account rotation visits
+  another account whose wheel is ready, right after accounts not seen today.
+- **Personal bankruptcy** (Insolvence, `/api/loan/bankrupt`, settings Auto tab, on by
+  default): offered only in execution. The debt is wiped and credits are set to 500,
+  but the XP into the current level is lost, as are this week's sprint points, and
+  the shark lends nothing for a week (the clean-loan trick waits). Paying costs the
+  whole debt, so the bot declares it when the debt is bigger than the credits above
+  500 plus the lost XP at the grinder's measured credits per XP (`bankruptWorth` in
+  `src/auto.js`). Before any XP price is measured it only goes bankrupt with no XP at
+  stake. It runs before the claims, which the reset would wipe. Sprint points are
+  not valued, so turn it off if an account is chasing the weekly sprint.
 - **Settings for the rest** (settings, Auto tab): XP grinding game (cheapest
   per XP or a fixed game), bet (cheapest per XP or a fixed level) and exploration rounds; automatic shop purchases from
   a priority plan (`game:key` list, off by default) using the client's price and

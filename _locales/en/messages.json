@@ -269,14 +269,23 @@
   "statusClaimBailout": {
     "message": "Claiming the bailout..."
   },
+  "statusWheel": {
+    "message": "Spinning the free wheel of fortune..."
+  },
   "free_daily": {
     "message": "Daily bonus"
   },
   "free_bailout": {
     "message": "Bailout"
   },
+  "free_wheel": {
+    "message": "Wheel of fortune"
+  },
+  "free_insolvency": {
+    "message": "Bankruptcy (credits reset to 500)"
+  },
   "optionsAutoClaim": {
-    "message": "Claim the daily bonus automatically, and the bailout when broke"
+    "message": "Claim the daily bonus and the hourly wheel of fortune automatically, and the bailout when broke"
   },
   "panelAuto": {
     "message": "Auto"
@@ -307,6 +316,14 @@
   },
   "statusRepay": {
     "message": "Repaying $P1$ of debt...",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "statusBankrupt": {
+    "message": "Declaring personal bankruptcy, $P1$ of debt is cheaper to drop than to pay...",
     "placeholders": {
       "p1": {
         "content": "$1"
@@ -358,6 +375,9 @@
   },
   "optionsRepayDebt": {
     "message": "Repay debt with spare credits"
+  },
+  "optionsAutoBankrupt": {
+    "message": "Declare personal bankruptcy in execution when it costs less than paying the debt"
   },
   "optionsLoanTrick": {
     "message": "Take the one-time +500 clean-loan achievement"

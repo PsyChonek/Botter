@@ -361,3 +361,45 @@ test('workDue keeps energy off the cap while grinding, else drains a run from ab
   // Grinding ends with energy just below the cap: that energy is worked down.
   assert.equal(A.workDue(17, 20, false, 5, false), true);
 });
+
+test('bankruptWorth only in execution, when the debt costs more than the reset', () => {
+  const player = (debt, credits, xpInto = 0, execution = true) => ({
+    credits,
+    xpInto,
+    loan: { debt, execution },
+  });
+  // 2500 debt against 300 credits: the debt vanishes and credits rise to 500.
+  assert.equal(A.bankruptWorth(player(2500, 300), 1), true);
+  // Not offered before execution, and never without a loan.
+  assert.equal(A.bankruptWorth(player(2500, 300, 0, false), 1), false);
+  assert.equal(A.bankruptWorth({ credits: 300 }, 1), false);
+  // Rich enough to pay: losing 9500 credits to drop 2500 of debt is worse.
+  assert.equal(A.bankruptWorth(player(2500, 10_000), 1), false);
+  // Between the debt and debt + 500 the reset is cheaper.
+  assert.equal(A.bankruptWorth(player(2500, 2800), 1), true);
+  // The lost XP counts at the grinder's price per XP point.
+  assert.equal(A.bankruptWorth(player(2500, 300, 1000, true), 2), true);
+  assert.equal(A.bankruptWorth(player(2500, 300, 1000, true), 3), false);
+  // Unknown XP price: only a bankruptcy that loses no XP.
+  assert.equal(A.bankruptWorth(player(2500, 300, 0), null), true);
+  assert.equal(A.bankruptWorth(player(2500, 300, 10), null), false);
+});
+
+test('wheelReady when never spun or past the cooldown, not for old snapshots', () => {
+  assert.equal(A.wheelReady(null, 1000), true);
+  assert.equal(A.wheelReady(1000, 1000), true);
+  assert.equal(A.wheelReady(1001, 1000), false);
+  assert.equal(A.wheelReady(undefined, 1000), false);
+});
+
+test('pickAccount spins a ready wheel after fresh accounts and before going home', () => {
+  const today = '2026-10-07';
+  const accounts = [
+    { id: 'home', seenAt: 1, seenDay: today, energy: 0, wheel: false },
+    { id: 'b', seenAt: 3, seenDay: today, energy: 20, wheel: true },
+    { id: 'c', seenAt: 2, seenDay: today, energy: 0, wheel: true },
+  ];
+  assert.equal(A.pickAccount(accounts, today, 15, 'home'), 'c');
+  assert.equal(A.pickAccount([...accounts, { id: 'd', seenAt: 9, seenDay: '2026-10-06' }], today, 15, 'home'), 'd');
+  assert.equal(A.pickAccount(accounts.map((a) => ({ ...a, wheel: false })), today, 15, 'home'), 'home');
+});

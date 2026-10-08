@@ -30,6 +30,7 @@
     autoClaim: true,
     autoMode: false,
     repayDebt: true,
+    autoBankrupt: true,
     loanTrick: true,
     crashEnabled: true,
     crashBet: 100,
@@ -76,8 +77,15 @@
   const MAX_SPINS = 2000;
   const MAX_CAPTURE = 40;
   const SPIN_FLUSH_EVERY = 10;
-  const CAPTURE_PATHS = /^\/api\/(loan|crash|shop|leaderboard|bonus)/;
-  const FREE_PATHS = { '/api/bonus/daily': 'daily', '/api/bonus/bailout': 'bailout' };
+  const CAPTURE_PATHS = /^\/api\/(loan|crash|shop|leaderboard|bonus|wheel)/;
+  // Credits from these are booked as free income. A bankruptcy sets credits to
+  // 500, so it books what that took or gave.
+  const FREE_PATHS = {
+    '/api/bonus/daily': 'daily',
+    '/api/bonus/bailout': 'bailout',
+    '/api/wheel/spin': 'wheel',
+    '/api/loan/bankrupt': 'insolvency',
+  };
   const CLAIM_RETRY_MS = 10 * 60_000;
   const TICK_MS = 700;
   const API_TIMEOUT_MS = 30_000;
@@ -259,8 +267,12 @@
     } else if (path === '/api/work/submit' && data.result) {
       onResult(request?.id, data, before);
     } else if (FREE_PATHS[path] && typeof before === 'number' && data.player) {
-      stats.free[FREE_PATHS[path]] += data.player.credits - before;
+      const kind = FREE_PATHS[path];
+      // What the debt collector took from a wheel win paid off debt, it was not lost.
+      const gain = data.player.credits - before + (data.result?.garnished ?? 0);
+      stats.free[kind] = (stats.free[kind] ?? 0) + gain;
       saveStats();
+      if (kind === 'wheel') log.info('wheel_spin', { segment: data.result?.segment, credits: data.result?.credits, energy: data.result?.energy });
     } else {
       const delta = G.gameDelta(path, request, data, before, bjStake);
       if (delta) {
@@ -436,6 +448,7 @@
       level: player.level,
       credits: player.credits,
       work: player.work,
+      wheelNextAt: player.wheelNextAt,
       seenAt: Date.now(),
       seenDay: A.dayKey(),
       ...(own ? { storageKey: session.key, session: session.raw } : {}),
@@ -518,6 +531,7 @@
         normDone: settings.stopAtNorm && saved.seenDay === today && saved.work?.paidToday >= saved.work?.norm,
         credits: saved.credits ?? 0,
         canGrind: canGrind(id, saved, today),
+        wheel: settings.autoClaim && A.wheelReady(saved.wheelNextAt, now),
       }));
     const home = settings.homeAccount && settings.homeAccount !== accountId ? settings.homeAccount : null;
     const id = A.pickAccount(candidates, today, ROTATE_MIN_ENERGY, home);
@@ -527,6 +541,7 @@
       home: id === settings.homeAccount,
       energy: G.energyNow(accounts[id].work, now),
       credits: accounts[id].credits,
+      wheel: A.wheelReady(accounts[id].wheelNextAt, now),
     });
     await switchAccount(id);
     return true;
@@ -747,22 +762,56 @@
 
   // ---------- loop ----------
 
-  // Free credits: the daily bonus, and the once-a-day bailout when broke.
+  // Free credits: the daily bonus, the hourly wheel of fortune, and the
+  // once-a-day bailout when broke.
+  const FREEBIES = {
+    daily: { path: '/api/bonus/daily', status: 'statusClaimDaily' },
+    wheel: { path: '/api/wheel/spin', status: 'statusWheel' },
+    bailout: { path: '/api/bonus/bailout', status: 'statusClaimBailout' },
+  };
   async function claimFreebies() {
     if (!player || !settings.autoClaim) return false;
     const due = (kind) => Date.now() - (claimTried[kind] ?? 0) > CLAIM_RETRY_MS;
     let kind = null;
     if (player.daily?.available && due('daily')) kind = 'daily';
+    else if (A.wheelReady(player.wheelNextAt) && due('wheel')) kind = 'wheel';
     else if (player.bailout?.available && player.credits < G.BET_LEVELS[0] && due('bailout')) kind = 'bailout';
     if (!kind) return false;
     claimTried[kind] = Date.now();
-    setStatus(kind === 'daily' ? 'statusClaimDaily' : 'statusClaimBailout');
-    const res = await api(`/api/bonus/${kind}`, {});
+    setStatus(FREEBIES[kind].status);
+    const res = await api(FREEBIES[kind].path, {});
     if (!res.ok) log.warn('claim_failed', { kind, status: res.status, error: res.data?.error });
     return true;
   }
 
   // ---------- auto mode ----------
+
+  // Credits the grinder pays per XP point: the cheapest best bet measured over
+  // the games it may pick, or null before any game has one.
+  function xpPrice() {
+    const { levels, candidates, edges } = grindChoice();
+    const costs = A.grindReport(candidates, levels, player.level, stats.games, stats.betXp, GRIND_UNLOCKS, edges)
+      .flatMap((row) => row.bets)
+      .filter((cell) => cell.state === 'best' && cell.cost !== null)
+      .map((cell) => cell.cost);
+    return costs.length ? Math.min(...costs) : null;
+  }
+
+  // Personal bankruptcy when it costs less than paying the debt off. Runs before
+  // any claim or repayment, since the credits are reset to 500 either way.
+  async function bankruptStep() {
+    if (!settings.autoBankrupt || !player.loan?.execution) return false;
+    if (Date.now() - (claimTried.bankrupt ?? 0) < CLAIM_RETRY_MS) return false;
+    const price = xpPrice();
+    if (!A.bankruptWorth(player, price)) return false;
+    claimTried.bankrupt = Date.now();
+    const terms = { debt: player.loan.debt, credits: player.credits, xpLost: player.xpInto ?? 0, xpPrice: price };
+    setStatus('statusBankrupt', [credits(terms.debt)]);
+    const res = await api('/api/loan/bankrupt', {});
+    if (!res.ok) log.warn('bankrupt_failed', { ...terms, status: res.status, error: res.data?.error });
+    else log.info('bankrupt', terms);
+    return true;
+  }
 
   async function repayStep() {
     if (!settings.repayDebt) return false;
@@ -804,8 +853,9 @@
       return true;
     }
 
-    // Do not interfere with a pre-existing real loan.
-    if (player.loan) return false;
+    // Do not interfere with a pre-existing real loan, and after a bankruptcy
+    // the shark lends nothing for a week.
+    if (player.loan || player.loanBlockedUntil > Date.now()) return false;
     claimTried.clean = Date.now();
     setStatus('statusLoanTrick');
     const take = await api('/api/loan/take', { amount: CLEAN_LOAN });
@@ -969,6 +1019,7 @@
 
   async function autoStep() {
     if (!player) return loadPlayer();
+    if (await bankruptStep()) return;
     if (await claimFreebies()) return;
     if (await repayStep()) return;
     if (await loanTrickStep()) return;
