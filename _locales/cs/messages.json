@@ -905,6 +905,9 @@
   "panelXpNote": {
     "message": "Ztráta/XP je průměrná ztráta kreditů za jeden bod XP při dané sázce. Zvýrazněný řádek bot hraje jako další."
   },
+  "panelXpRetest": {
+    "message": "Znovu otestovat všechny hry"
+  },
   "colBet": {
     "message": "Sázka"
   },

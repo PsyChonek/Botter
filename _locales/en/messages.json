@@ -905,6 +905,9 @@
   "panelXpNote": {
     "message": "Loss per XP is the credits the game loses on average for one XP point at that bet. The highlighted row is what the grinder plays next."
   },
+  "panelXpRetest": {
+    "message": "Re-test all games"
+  },
   "colBet": {
     "message": "Bet"
   },

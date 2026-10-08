@@ -1280,6 +1280,7 @@
         .pos { color: #a6e05a; }
         .neg { color: #ff8f7a; }
         .xp-note { margin: 4px 0 0; }
+        .xp-retest { margin-top: 4px; }
         tr.group td { text-align: left; padding-top: 6px; font-weight: 600; color: #e8f5c8; }
         tr.pick td { color: #d4ff6a; font-weight: 700; }
       </style>
@@ -1322,6 +1323,7 @@
         <details class="xp">
           <summary></summary>
           <p class="muted xp-note"></p>
+          <button type="button" class="xp-retest"></button>
           <table>
             <thead><tr><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th></tr></thead>
             <tbody></tbody>
@@ -1353,6 +1355,7 @@
       body: $('.profit tbody'),
       xpSummary: $('.xp summary'),
       xpNote: $('.xp-note'),
+      xpRetest: $('.xp-retest'),
       xpHead: [...shadow.querySelectorAll('.xp th')],
       xpBody: $('.xp tbody'),
     };
@@ -1371,6 +1374,7 @@
     ['colGame', 'colRounds', 'colNet', 'colRtp'].forEach((key, i) => (ui.head[i].textContent = msg(key)));
     ui.xpSummary.textContent = msg('panelXp');
     ui.xpNote.textContent = msg('panelXpNote');
+    ui.xpRetest.textContent = msg('panelXpRetest');
     ['colBet', 'colRounds', 'colXpPerRound', 'colCostPerXp', 'colState'].forEach(
       (key, i) => (ui.xpHead[i].textContent = msg(key)),
     );
@@ -1392,6 +1396,7 @@
     ui.gamesToggle.addEventListener('click', () => (settings.gamesEnabled ? stopGames() : startGames()));
     ui.type.addEventListener('change', () => saveSettings({ taskType: ui.type.value }));
     ui.game.addEventListener('change', () => saveSettings({ game: ui.game.value }));
+    ui.xpRetest.addEventListener('click', retestGames);
     document.documentElement.appendChild(host);
     render();
   }
@@ -1438,6 +1443,15 @@
         return tr;
       }),
     );
+  }
+
+  // Forgets the measured XP per bet, so the grinder samples every unlocked game
+  // and bet level again before it picks one.
+  function retestGames() {
+    stats.betXp = {};
+    saveStats();
+    log.info('xp_retest');
+    render();
   }
 
   // XP grinding measurements per game and bet level, with the grinder's pick.
