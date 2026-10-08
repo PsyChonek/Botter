@@ -436,6 +436,19 @@ test('pickAccount spins a ready wheel after fresh accounts and before going home
   assert.equal(A.pickAccount(accounts.map((a) => ({ ...a, wheel: false })), today, 15, 'home'), 'home');
 });
 
+test('urgentAccount leaves only for a fresh account or a ready wheel', () => {
+  const today = '2026-10-07';
+  const accounts = [
+    { id: 'home', seenAt: 1, seenDay: today, energy: 20, canGrind: true, wheel: false },
+    { id: 'b', seenAt: 3, seenDay: today, energy: 20, wheel: true },
+    { id: 'c', seenAt: 2, seenDay: today, energy: 0, wheel: true },
+  ];
+  assert.equal(A.urgentAccount(accounts, today), 'c');
+  assert.equal(A.urgentAccount([...accounts, { id: 'd', seenAt: 9, seenDay: '2026-10-06' }], today), 'd');
+  assert.equal(A.urgentAccount(accounts.map((a) => ({ ...a, wheel: false })), today), null);
+  assert.equal(A.urgentAccount([], today), null);
+});
+
 test('waitForLevel finishes a level when its XP is worth more than the garnished pay', () => {
   // 900 of 1000 XP in: losing 900 XP at 2 credits costs 1800, finishing the
   // last 100 XP costs half of 100 * 3 = 150 of work pay.

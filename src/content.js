@@ -548,8 +548,13 @@
 
   // An account with nothing left to do hands over to another saved account
   // instead of idling while its energy refills, and returns home afterwards.
-  async function rotateStep() {
+  // urgent only leaves for free credits waiting elsewhere (A.urgentAccount), so
+  // work and grinding here do not hold up another account's wheel or daily bonus.
+  // An account left within CLAIM_RETRY_MS already tried its wheel, so a refused
+  // spin there does not pull the bot back and forth.
+  async function rotateStep(urgent = false) {
     if (!settings.rotateAccounts || !player || Date.now() - accountSince < ROTATE_DWELL_MS) return false;
+    if (urgent && document.querySelector('.work-screen section.task')) return false;
     const now = Date.now();
     const today = A.dayKey(now);
     const candidates = Object.entries(accounts)
@@ -562,13 +567,14 @@
         normDone: settings.stopAtNorm && saved.seenDay === today && saved.work?.paidToday >= saved.work?.norm,
         credits: saved.credits ?? 0,
         canGrind: canGrind(id, saved, today),
-        wheel: settings.autoClaim && A.wheelReady(saved.wheelNextAt, now),
+        wheel: settings.autoClaim && A.wheelReady(saved.wheelNextAt, now) && now - (saved.seenAt ?? 0) > CLAIM_RETRY_MS,
       }));
     const home = settings.homeAccount && settings.homeAccount !== accountId ? settings.homeAccount : null;
-    const id = A.pickAccount(candidates, today, ROTATE_MIN_ENERGY, home);
+    const id = urgent ? A.urgentAccount(candidates, today) : A.pickAccount(candidates, today, ROTATE_MIN_ENERGY, home);
     if (!id) return false;
     log.info('account_rotate', {
       to: accounts[id].login,
+      urgent,
       home: id === settings.homeAccount,
       energy: G.energyNow(accounts[id].work, now),
       credits: accounts[id].credits,
@@ -1193,6 +1199,7 @@
     if (await leaderboardStep()) return;
     if (await crashStep()) return;
     if (await standupStep()) return;
+    if (await rotateStep(true)) return;
     if (workAvailable()) return workStep();
     if (await grindStep()) return;
     if (await rotateStep()) return;

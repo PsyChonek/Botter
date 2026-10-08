@@ -378,19 +378,27 @@
     return energy > minEnergy || (running && energy >= 1);
   }
 
-  // Account to switch to once the current one has nothing left to do. Each
-  // candidate is { id, seenAt, seenDay, energy, normDone, credits, canGrind,
-  // wheel }. One not visited today goes first (its daily bonus and checks are
-  // waiting), then one whose free wheel spin is ready, longest unseen first.
-  // Away from the home account, the next stop is home. From home, the one with
-  // the most refilled energy above minEnergy, else the richest one that can
-  // still grind XP, so betting carries on when home has run out of credits.
-  function pickAccount(candidates, today, minEnergy, home = null) {
+  // Account with free credits waiting, worth leaving even a busy one for: one
+  // not visited today (its daily bonus and checks are waiting), then one whose
+  // free wheel spin is ready, longest unseen first. Null when there is none.
+  function urgentAccount(candidates, today) {
     const oldest = (list) => list.reduce((a, b) => (b.seenAt < a.seenAt ? b : a)).id;
     const fresh = candidates.filter((a) => a.seenDay !== today);
     if (fresh.length) return oldest(fresh);
     const spin = candidates.filter((a) => a.wheel);
     if (spin.length) return oldest(spin);
+    return null;
+  }
+
+  // Account to switch to once the current one has nothing left to do. Each
+  // candidate is { id, seenAt, seenDay, energy, normDone, credits, canGrind,
+  // wheel }. An urgent one goes first (see urgentAccount). Away from the home
+  // account, the next stop is home. From home, the one with the most refilled
+  // energy above minEnergy, else the richest one that can still grind XP, so
+  // betting carries on when home has run out of credits.
+  function pickAccount(candidates, today, minEnergy, home = null) {
+    const urgent = urgentAccount(candidates, today);
+    if (urgent) return urgent;
     if (home && candidates.some((a) => a.id === home)) return home;
     const ready = candidates.filter((a) => !a.normDone && a.energy > minEnergy);
     if (ready.length) return ready.reduce((a, b) => (b.energy > a.energy ? b : a)).id;
@@ -517,6 +525,7 @@
     workDue,
     grindVolume,
     upgradeVerdict,
+    urgentAccount,
     pickAccount,
     questGame,
     questKind,
