@@ -143,7 +143,15 @@ progress shows at `chrome://on-device-internals`.
   budget, or the credits above the minimum balance; judged for the next levels alone
   and for the game's useful upgrades maxed together). `global:bets` is bought only
   while the grinder's bet is at the max bet, `crash:sla` only while crash betting is
-  on. Skips are logged as `upgrades_skipped`; a Blaze model check (`src/blaze.js`) that records every Blaze spin
+  on. The whole plan is judged again every 10 minutes and as soon as the level, the
+  upgrades or the max bet change (`G.shopQueue` with `reviewShop` in `src/content.js`);
+  the first entry worth buying at the current level is the goal, logged as
+  `upgrade_goal`. With **Save for the next upgrade** (on by default) the grinder keeps
+  the goal's price on top of the reserve, so work pay saves up to it instead of being
+  ground away (not past a planned bankruptcy, which wipes the savings). Once bought, the
+  next goal is bought on the next tick if it fits too. The panel's **Upgrade queue**
+  shows the goal with the savings toward it and why every other upgrade waits. Skips
+  are logged as `upgrades_skipped`; a Blaze model check (`src/blaze.js`) that records every Blaze spin
   with its board and the server win, reports which scatter rule reproduces the
   server and simulates the payout rate for current and maxed upgrades; and a debug
   capture of raw loan, crash, shop, leaderboard and bonus responses for export.

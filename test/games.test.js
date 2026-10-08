@@ -79,16 +79,24 @@ test('upgradeOffer prices the next level like the shop does', () => {
   assert.equal(G.upgradeOffer({}, 'crash', 'nope'), null);
 });
 
-test('nextPurchase follows the plan order and level gates', () => {
+const goal = (queue) => queue.find((offer) => !offer.reason) ?? null;
+
+test('shopQueue follows the plan order and level gates', () => {
   const plan = [
     { game: 'crash', key: 'sla' },
     { game: 'blaze', key: 'star' },
     { game: 'blaze', key: 'lucky' },
   ];
-  assert.equal(G.nextPurchase(plan, { level: 1, upgrades: {} }).key, 'star');
-  assert.equal(G.nextPurchase(plan, { level: 3, upgrades: {} }).key, 'sla');
-  assert.equal(G.nextPurchase(plan, { level: 3, upgrades: { crash: { sla: 1 } } }).key, 'star');
-  assert.equal(G.nextPurchase([], { level: 50, upgrades: {} }), null);
+  const low = G.shopQueue(plan, { level: 1, upgrades: {} });
+  assert.deepEqual(low.map((o) => o.reason), ['level', null, null]);
+  assert.equal(goal(low).key, 'star');
+  assert.equal(goal(G.shopQueue(plan, { level: 3, upgrades: {} })).key, 'sla');
+  // sla level 2 needs player level 6
+  const next = G.shopQueue(plan, { level: 3, upgrades: { crash: { sla: 1 } } });
+  assert.deepEqual(next[0], { game: 'crash', key: 'sla', next: 2, price: 8800, minLevel: 6, reason: 'level' });
+  assert.equal(goal(next).key, 'star');
+  assert.deepEqual(G.shopQueue(plan, { level: 50, upgrades: { crash: { sla: 3 } } }).map((o) => o.key), ['star', 'lucky']);
+  assert.deepEqual(G.shopQueue([], { level: 50, upgrades: {} }), []);
 });
 
 test('syncBetXp drops a game\'s XP samples when its upgrades change', () => {
@@ -103,15 +111,17 @@ test('syncBetXp drops a game\'s XP samples when its upgrades change', () => {
   assert.ok(table.blaze);
 });
 
-test('nextPurchase skips offers the skip check rejects', () => {
+test('shopQueue keeps the reason the skip check gives', () => {
   const plan = [
     { game: 'blackjack', key: 'hint' },
     { game: 'blackjack', key: 'ties' },
   ];
   const player = { level: 20, upgrades: {} };
-  assert.equal(G.nextPurchase(plan, player).key, 'hint');
-  assert.equal(G.nextPurchase(plan, player, (o) => (o.key === 'hint' ? 'tooSmall' : null)).key, 'ties');
-  assert.equal(G.nextPurchase(plan, player, () => 'tooSmall'), null);
+  assert.equal(goal(G.shopQueue(plan, player)).key, 'hint');
+  const queue = G.shopQueue(plan, player, (o) => (o.key === 'hint' ? 'tooSmall' : null));
+  assert.deepEqual(queue.map((o) => o.reason), ['tooSmall', null]);
+  assert.equal(goal(queue).key, 'ties');
+  assert.equal(goal(G.shopQueue(plan, player, () => 'tooSmall')), null);
 });
 
 test('upgradeRest prices every remaining level', () => {

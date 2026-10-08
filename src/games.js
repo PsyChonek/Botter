@@ -80,15 +80,19 @@
     return { price, upgrades: { ...upgrades, [game]: own } };
   }
 
-  // First upgrade in plan order that is not maxed, is allowed at this level and
-  // is not skipped (skip returns why an offer is not worth buying, or null).
-  // Later entries wait until it is bought, so the order is the priority.
-  function nextPurchase(plan, player, skip = () => null) {
+  // Every plan entry that is not maxed, in plan order, with the next level's
+  // offer and why it is not bought now: 'level' (needs a higher player level),
+  // a skip reason (skip returns why an offer is not worth buying, or null) or
+  // null when it is worth buying. The first entry with no reason is the goal;
+  // later entries wait until it is bought, so the order is the priority.
+  function shopQueue(plan, player, skip = () => null) {
+    const queue = [];
     for (const { game, key } of plan) {
       const offer = upgradeOffer(player?.upgrades, game, key);
-      if (offer && player.level >= offer.minLevel && !skip(offer)) return offer;
+      if (!offer) continue;
+      queue.push({ ...offer, reason: player.level < offer.minLevel ? 'level' : skip(offer) });
     }
-    return null;
+    return queue;
   }
 
   // Highest allowed bet level that does not exceed what the user asked for.
@@ -220,7 +224,7 @@
     UPGRADE_PLAN,
     upgradeOffer,
     upgradeRest,
-    nextPurchase,
+    shopQueue,
     betFor,
     energyNow,
     rewardsPaid,

@@ -45,6 +45,7 @@
     grindBet: 'auto',
     grindExploreRounds: 30,
     buyUpgrades: false,
+    saveForUpgrades: true,
     recordSpins: true,
     captureDebug: false,
     logLevel: 'info',
@@ -89,6 +90,9 @@
     '/api/loan/bankrupt': 'insolvency',
   };
   const CLAIM_RETRY_MS = 10 * 60_000;
+  // The shop queue is re-judged this often, and at once when the account, its
+  // level, upgrades or max bet change.
+  const SHOP_REVIEW_MS = 10 * 60_000;
   const TICK_MS = 700;
   const API_TIMEOUT_MS = 30_000;
   const STATS_PREFIX = 'stats:';
@@ -130,6 +134,7 @@
   let sessionBase = 0; // total game net when the game bot was started
   const claimTried = {}; // kind -> last attempt, so a refused claim is not spammed
   let crashPolledAt = 0;
+  let shopReview = null; // { at, key, queue, goal } of the last shop review
   let sprint = null; // { rank, score, endAt, at } of this account in the weekly sprint
   let spins = []; // recorded Blaze spins for the model check
   let capture = []; // raw responses of rarely seen endpoints, for debugging
@@ -548,13 +553,8 @@
 
   // An account with nothing left to do hands over to another saved account
   // instead of idling while its energy refills, and returns home afterwards.
-  // urgent only leaves for free credits waiting elsewhere (A.urgentAccount), so
-  // work and grinding here do not hold up another account's wheel or daily bonus.
-  // An account left within CLAIM_RETRY_MS already tried its wheel, so a refused
-  // spin there does not pull the bot back and forth.
-  async function rotateStep(urgent = false) {
+  async function rotateStep() {
     if (!settings.rotateAccounts || !player || Date.now() - accountSince < ROTATE_DWELL_MS) return false;
-    if (urgent && document.querySelector('.work-screen section.task')) return false;
     const now = Date.now();
     const today = A.dayKey(now);
     const candidates = Object.entries(accounts)
@@ -567,14 +567,13 @@
         normDone: settings.stopAtNorm && saved.seenDay === today && saved.work?.paidToday >= saved.work?.norm,
         credits: saved.credits ?? 0,
         canGrind: canGrind(id, saved, today),
-        wheel: settings.autoClaim && A.wheelReady(saved.wheelNextAt, now) && now - (saved.seenAt ?? 0) > CLAIM_RETRY_MS,
+        wheel: settings.autoClaim && A.wheelReady(saved.wheelNextAt, now),
       }));
     const home = settings.homeAccount && settings.homeAccount !== accountId ? settings.homeAccount : null;
-    const id = urgent ? A.urgentAccount(candidates, today) : A.pickAccount(candidates, today, ROTATE_MIN_ENERGY, home);
+    const id = A.pickAccount(candidates, today, ROTATE_MIN_ENERGY, home);
     if (!id) return false;
     log.info('account_rotate', {
       to: accounts[id].login,
-      urgent,
       home: id === settings.homeAccount,
       energy: G.energyNow(accounts[id].work, now),
       credits: accounts[id].credits,
@@ -996,8 +995,10 @@
   }
 
   // Why an upgrade from the plan is skipped (see BotterAuto.upgradeVerdict), or null.
+  // The grinder is judged as if it were not saving, or saving for global:bets
+  // would stop the grinder, uncap its bet and drop the goal again.
   function upgradeSkip(offer) {
-    const { levels, candidates, plan } = grindChoice();
+    const { levels, candidates, plan } = grindChoice(false);
     const mode = blazeMode();
     return A.upgradeVerdict(offer, {
       games: candidates.filter((game) => player.level >= GRIND_UNLOCKS[game]),
@@ -1013,36 +1014,54 @@
     });
   }
 
-  // Logged when the set of skipped upgrades changes, not on every tick.
-  let skippedUpgrades = '';
-
-  // The next upgrade in the plan that is worth its price and affordable now, or null.
-  function shopOffer() {
-    if (!settings.buyUpgrades) return null;
-    const skipped = [];
-    const offer = G.nextPurchase(G.UPGRADE_PLAN, player, (o) => {
-      const reason = upgradeSkip(o);
-      if (reason) skipped.push(`${o.game}:${o.key} ${reason}`);
-      return reason;
-    });
-    if (skipped.join() !== skippedUpgrades) {
-      skippedUpgrades = skipped.join();
-      if (skipped.length) log.info('upgrades_skipped', { skipped });
+  // Judges every upgrade in the plan (G.shopQueue) every SHOP_REVIEW_MS, or at
+  // once when what the verdicts depend on changes. The goal is the first one
+  // worth buying at this level. Changes are logged, not every review.
+  function reviewShop() {
+    if (!settings.buyUpgrades || !player) return (shopReview = null);
+    const key = JSON.stringify([accountId, player.level, player.maxBet, player.upgrades, bankruptPlanned(), settings.crashEnabled]);
+    if (shopReview?.key === key && Date.now() - shopReview.at < SHOP_REVIEW_MS) return shopReview;
+    const queue = G.shopQueue(G.UPGRADE_PLAN, player, upgradeSkip);
+    const goal = queue.find((offer) => !offer.reason) ?? null;
+    const skipped = queue.filter((o) => o.reason && o.reason !== 'level').map((o) => `${o.game}:${o.key} ${o.reason}`);
+    if (skipped.join() !== shopReview?.skipped.join() && skipped.length) log.info('upgrades_skipped', { skipped });
+    const label = (o) => (o ? `${o.game}:${o.key} ${o.next}` : null);
+    if (label(goal) !== label(shopReview?.goal)) {
+      log.info('upgrade_goal', goal ? { ...goal, credits: player.credits } : { goal: null });
     }
-    return offer && player.credits - offer.price >= limits().reserve ? offer : null;
+    shopReview = { at: Date.now(), key, queue, goal, skipped };
+    return shopReview;
   }
 
-  // Buys the next upgrade in the plan that is worth its price as soon as it is
-  // affordable above the reserve.
+  // The goal upgrade when it is affordable above the reserve, or null.
+  function shopOffer() {
+    const goal = reviewShop()?.goal;
+    return goal && player.credits - goal.price >= limits().reserve ? goal : null;
+  }
+
+  // The goal upgrade the grinder leaves credits for, or null. Its verdict says
+  // the credits buy more XP as the upgrade than as grinding, so they are not
+  // gambled meanwhile. Not past a planned bankruptcy, which wipes the savings.
+  function savingFor() {
+    if (!settings.saveForUpgrades || !settings.autoMode || bankruptPlanned()) return null;
+    return reviewShop()?.goal ?? null;
+  }
+
+  // Buys the goal upgrade as soon as it fits above the reserve. A purchase
+  // changes the upgrades, so the next tick reviews the queue and buys the next
+  // goal right away if that fits too; only a refused buy waits.
   async function buyStep() {
     if (!settings.buyUpgrades || Date.now() - (claimTried.buy ?? 0) < CRASH_POLL_MS) return false;
     const offer = shopOffer();
     if (!offer) return false;
-    claimTried.buy = Date.now();
     setStatus('statusBuying', [`${offer.game}:${offer.key}`, String(offer.next), credits(offer.price)]);
     const res = await api('/api/shop/buy', { game: offer.game, key: offer.key });
-    if (!res.ok) log.warn('buy_failed', { ...offer, status: res.status, error: res.data?.error });
-    else log.info('upgrade_bought', offer);
+    if (!res.ok) {
+      claimTried.buy = Date.now();
+      log.warn('buy_failed', { ...offer, status: res.status, error: res.data?.error });
+    } else {
+      log.info('upgrade_bought', offer);
+    }
     return true;
   }
 
@@ -1152,10 +1171,18 @@
     return { levels, candidates, edges };
   }
 
-  function grindChoice() {
+  // While saving for an upgrade (savingFor), its price is kept on top of the
+  // reserve; saving = false judges the grinder without it.
+  function grindLimits(saving = true) {
+    const limit = limits();
+    const goal = saving ? savingFor() : null;
+    return goal ? { ...limit, reserve: limit.reserve + goal.price } : limit;
+  }
+
+  function grindChoice(saving = true) {
     const lost = Math.max(0, -(stats.grind.day === A.dayKey() ? stats.grind.net : 0));
     const { levels, candidates, edges } = grindModel();
-    const limit = limits();
+    const limit = grindLimits(saving);
     const bets =
       settings.grindBet === 'auto'
         ? A.grindBets(limit, player.credits, lost, levels)
@@ -1199,7 +1226,6 @@
     if (await leaderboardStep()) return;
     if (await crashStep()) return;
     if (await standupStep()) return;
-    if (await rotateStep(true)) return;
     if (workAvailable()) return workStep();
     if (await grindStep()) return;
     if (await rotateStep()) return;
@@ -1336,6 +1362,14 @@
             <tbody></tbody>
           </table>
         </details>
+        <details class="shop">
+          <summary></summary>
+          <p class="muted xp-note shop-goal"></p>
+          <table>
+            <thead><tr><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </details>
       </div>
       <button type="button" class="show"></button>`;
     const $ = (sel) => shadow.querySelector(sel);
@@ -1365,6 +1399,11 @@
       xpRetest: $('.xp-retest'),
       xpHead: [...shadow.querySelectorAll('.xp th')],
       xpBody: $('.xp tbody'),
+      shop: $('.shop'),
+      shopSummary: $('.shop summary'),
+      shopGoal: $('.shop-goal'),
+      shopHead: [...shadow.querySelectorAll('.shop th')],
+      shopBody: $('.shop tbody'),
     };
     ui.panel.setAttribute('aria-label', msg('extName'));
     ui.title.textContent = msg('extName');
@@ -1385,6 +1424,8 @@
     ['colBet', 'colRounds', 'colXpPerRound', 'colCostPerXp', 'colState'].forEach(
       (key, i) => (ui.xpHead[i].textContent = msg(key)),
     );
+    ui.shopSummary.textContent = msg('panelShop');
+    ['colUpgrade', 'colLevel', 'colPrice', 'colState'].forEach((key, i) => (ui.shopHead[i].textContent = msg(key)));
     for (const option of ui.type.options) option.textContent = msg(`type_${option.value}`);
     for (const game of G.GAME_KEYS) ui.game.add(new Option(msg(`game_${game}`), game));
     ui.autoToggle.addEventListener('click', () => {
@@ -1512,6 +1553,35 @@
     ui.xpBody.replaceChildren(...rows);
   }
 
+  // The shop queue from the last review: the goal with the savings toward it,
+  // then every upgrade left in the plan and why it waits.
+  function renderShop() {
+    const review = settings.buyUpgrades && player ? shopReview : null;
+    ui.shop.hidden = !review;
+    if (!review) return;
+    const { goal, queue } = review;
+    ui.shopGoal.textContent = goal
+      ? msg('shopGoal', [
+          `${goal.game}:${goal.key} ${goal.next}`,
+          credits(Math.min(player.credits, goal.price)),
+          credits(goal.price),
+          pct.format(Math.min(1, player.credits / goal.price)),
+        ])
+      : msg('shopNoGoal');
+    ui.shopBody.replaceChildren(
+      ...queue.map((offer) => {
+        const tr = document.createElement('tr');
+        if (offer === goal) tr.className = 'pick';
+        let state = msg('shopState_queued');
+        if (offer === goal) state = msg('shopState_goal');
+        else if (offer.reason === 'level') state = msg('shopNeedsLevel', [String(offer.minLevel)]);
+        else if (offer.reason) state = msg(`shopState_${offer.reason}`);
+        tr.append(cell(`${offer.game}:${offer.key}`), cell(String(offer.next)), cell(credits(offer.price)), cell(state));
+        return tr;
+      }),
+    );
+  }
+
   // Rebuilt only when the list changes, so a render does not close an open dropdown.
   function renderAccounts() {
     const now = Date.now();
@@ -1576,6 +1646,7 @@
     ui.cost.textContent = msg('panelCost', [usd.format(spent), usd.format(calls ? spent / calls : 0)]);
     renderProfit();
     renderXp();
+    renderShop();
   }
 
   // ---------- boot ----------
