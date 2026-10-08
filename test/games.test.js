@@ -79,13 +79,12 @@ test('upgradeOffer prices the next level like the shop does', () => {
   assert.equal(G.upgradeOffer({}, 'crash', 'nope'), null);
 });
 
-test('parsePlan and nextPurchase follow the plan order and level gates', () => {
-  const plan = G.parsePlan('crash:sla, blaze:star\nbogus:x blaze:lucky');
-  assert.deepEqual(plan, [
+test('nextPurchase follows the plan order and level gates', () => {
+  const plan = [
     { game: 'crash', key: 'sla' },
     { game: 'blaze', key: 'star' },
     { game: 'blaze', key: 'lucky' },
-  ]);
+  ];
   assert.equal(G.nextPurchase(plan, { level: 1, upgrades: {} }).key, 'star');
   assert.equal(G.nextPurchase(plan, { level: 3, upgrades: {} }).key, 'sla');
   assert.equal(G.nextPurchase(plan, { level: 3, upgrades: { crash: { sla: 1 } } }).key, 'star');
@@ -105,7 +104,10 @@ test('syncBetXp drops a game\'s XP samples when its upgrades change', () => {
 });
 
 test('nextPurchase skips offers the skip check rejects', () => {
-  const plan = G.parsePlan('blackjack:hint, blackjack:ties');
+  const plan = [
+    { game: 'blackjack', key: 'hint' },
+    { game: 'blackjack', key: 'ties' },
+  ];
   const player = { level: 20, upgrades: {} };
   assert.equal(G.nextPurchase(plan, player).key, 'hint');
   assert.equal(G.nextPurchase(plan, player, (o) => (o.key === 'hint' ? 'tooSmall' : null)).key, 'ties');
@@ -133,9 +135,8 @@ test('gameDelta leaves out standup and achievement rewards paid with the round',
   assert.equal(G.rewardTotal({ player: { credits: 1 } }), 0);
 });
 
-test('withoutOldDefaults drops a saved copy of an old default plan only', () => {
-  assert.deepEqual(G.withoutOldDefaults({ upgradePlan: 'crash:sla, blaze:star, blaze:lucky, blaze:wild', xpBudget: 5 }), { xpBudget: 5 });
-  assert.deepEqual(G.withoutOldDefaults({ upgradePlan: 'crash:sla,blaze:star  blaze:lucky;blaze:wild' }), {});
-  assert.deepEqual(G.withoutOldDefaults({ upgradePlan: 'blaze:wild, crash:sla' }), { upgradePlan: 'blaze:wild, crash:sla' });
-  assert.deepEqual(G.withoutOldDefaults(undefined), {});
+test('UPGRADE_PLAN only names upgrades in the shop, each once', () => {
+  const names = G.UPGRADE_PLAN.map(({ game, key }) => `${game}:${key}`);
+  assert.ok(G.UPGRADE_PLAN.every(({ game, key }) => G.SHOP[game]?.[key]));
+  assert.equal(new Set(names).size, names.length);
 });

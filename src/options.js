@@ -18,7 +18,7 @@ const CHECKBOXES = [
 ];
 const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet', 'grindLimit', 'grindGame', 'grindBet'];
 const INT_SELECTS = ['gameBet', 'crashBet'];
-const TEXTS = ['openrouterModel', 'upgradePlan'];
+const TEXTS = ['openrouterModel'];
 const NUMBERS = [
   'minDelayMs',
   'maxDelayMs',
@@ -53,7 +53,6 @@ const DEFAULTS = {
   grindBet: 'auto',
   grindExploreRounds: 30,
   buyUpgrades: false,
-  upgradePlan: 'blaze:star, skeleton:team, blaze:lucky, blaze:wild, skeleton:wild, slotingi:gulas, skeleton:deploy, slotingi:crown, roulette:zeros, blackjack:ties, blackjack:bjpay, crash:sla, global:bets',
   recordSpins: true,
   captureDebug: false,
   panelHidden: false,
@@ -113,7 +112,7 @@ async function load() {
     'openrouterKey',
     'bank',
   ]);
-  fill({ ...DEFAULTS, ...G.withoutOldDefaults(settings) });
+  fill({ ...DEFAULTS, ...settings });
   $('apiKey').value = apiKey;
   $('openrouterKey').value = openrouterKey;
   showBankSize(bank);
@@ -441,7 +440,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   const keys = Object.keys(changes);
   if (keys.some((key) => key === 'stats' || key.startsWith(STATS_PREFIX) || key.startsWith(ACCOUNT_PREFIX))) showAccounts();
   if (changes.bank) showBankSize(changes.bank.newValue ?? {});
-  if (changes.settings && !saveTimer) fill({ ...DEFAULTS, ...G.withoutOldDefaults(changes.settings.newValue) });
+  if (changes.settings && !saveTimer) fill({ ...DEFAULTS, ...changes.settings.newValue });
 });
 
 async function showLocalStatus(state) {

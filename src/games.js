@@ -56,14 +56,15 @@
     };
   }
 
-  // "crash:sla, blaze:star" -> [{ game, key }], unknown entries dropped.
-  function parsePlan(text) {
-    return String(text ?? '')
-      .split(/[\s,;]+/)
-      .map((entry) => entry.split(':'))
-      .filter(([game, key]) => SHOP[game]?.[key])
-      .map(([game, key]) => ({ game, key }));
-  }
+  // Shop upgrades in priority order: the next level of the first one that is
+  // worth its price is bought, later ones wait.
+  const UPGRADE_PLAN = [
+    'blaze:star', 'skeleton:team', 'blaze:lucky', 'blaze:wild', 'skeleton:wild', 'slotingi:gulas', 'skeleton:deploy',
+    'slotingi:crown', 'roulette:zeros', 'blackjack:ties', 'blackjack:bjpay', 'crash:sla', 'global:bets',
+  ].map((entry) => {
+    const [game, key] = entry.split(':');
+    return { game, key };
+  });
 
   // Price of buying the given upgrades of one game up to level upTo (default
   // their max), and the upgrades after that.
@@ -77,18 +78,6 @@
       }
     }
     return { price, upgrades: { ...upgrades, [game]: own } };
-  }
-
-  // Upgrade plans that shipped as the default before. A saved copy of one was
-  // never chosen by the user, so it follows the current default instead.
-  const OLD_DEFAULT_PLANS = ['crash:sla, blaze:star, blaze:lucky, blaze:wild'];
-  const planKey = (text) => parsePlan(text).map(({ game, key }) => `${game}:${key}`).join();
-
-  // Saved settings without values that only repeat an old default.
-  function withoutOldDefaults(settings) {
-    const out = { ...settings };
-    if (OLD_DEFAULT_PLANS.some((plan) => planKey(plan) === planKey(out.upgradePlan))) delete out.upgradePlan;
-    return out;
   }
 
   // First upgrade in plan order that is not maxed, is allowed at this level and
@@ -228,10 +217,9 @@
     ROULETTE_BETS,
     PATH_GAME,
     SHOP,
+    UPGRADE_PLAN,
     upgradeOffer,
-    parsePlan,
     upgradeRest,
-    withoutOldDefaults,
     nextPurchase,
     betFor,
     energyNow,

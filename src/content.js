@@ -45,7 +45,6 @@
     grindBet: 'auto',
     grindExploreRounds: 30,
     buyUpgrades: false,
-    upgradePlan: 'blaze:star, skeleton:team, blaze:lucky, blaze:wild, skeleton:wild, slotingi:gulas, skeleton:deploy, slotingi:crown, roulette:zeros, blackjack:ties, blackjack:bjpay, crash:sla, global:bets',
     recordSpins: true,
     captureDebug: false,
     logLevel: 'info',
@@ -176,7 +175,7 @@
     const stored = await chrome.storage.local.get(null);
     spins = stored.spins ?? [];
     capture = stored.capture ?? [];
-    settings = { ...DEFAULT_SETTINGS, ...G.withoutOldDefaults(stored.settings) };
+    settings = { ...DEFAULT_SETTINGS, ...stored.settings };
     bank = stored.bank ?? {};
     statsCache = byPrefix(stored, STATS_PREFIX);
     accounts = byPrefix(stored, ACCOUNT_PREFIX);
@@ -187,7 +186,7 @@
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
     if (changes.settings) {
-      settings = { ...DEFAULT_SETTINGS, ...G.withoutOldDefaults(changes.settings.newValue) };
+      settings = { ...DEFAULT_SETTINGS, ...changes.settings.newValue };
       log = C.createLogger(settings.logLevel);
     }
     if (changes.bank) bank = changes.bank.newValue ?? {};
@@ -1015,7 +1014,7 @@
   function shopOffer() {
     if (!settings.buyUpgrades) return null;
     const skipped = [];
-    const offer = G.nextPurchase(G.parsePlan(settings.upgradePlan), player, (o) => {
+    const offer = G.nextPurchase(G.UPGRADE_PLAN, player, (o) => {
       const reason = upgradeSkip(o);
       if (reason) skipped.push(`${o.game}:${o.key} ${reason}`);
       return reason;
