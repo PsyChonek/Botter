@@ -730,13 +730,26 @@
     if (dismissModal()) return;
 
     const screen = document.querySelector('.work-screen');
+    const taskEl = screen?.querySelector('section.task');
+    // With no ticket open and nothing to work on, leave the user on whatever
+    // screen they are on instead of pulling them back to work every tick.
+    if (!taskEl) {
+      if (normDone()) {
+        stopWork('statusNormDone');
+        return;
+      }
+      if (!workAvailable()) {
+        setStatus('statusWaitEnergy', [String(WORK_MIN_ENERGY), String(G.energyNow(player.work, Date.now()))]);
+        return;
+      }
+    }
+
     if (!screen) {
       setStatus('statusOpening');
       document.querySelectorAll('nav.views button')[1]?.click();
       return;
     }
 
-    const taskEl = screen.querySelector('section.task');
     if (taskEl) {
       if (taskEl.querySelector('button.right, button.wrong')) {
         await sleep(humanDelay() / 2);
@@ -755,14 +768,6 @@
 
     const pick = screen.querySelector('.work-pick');
     if (!pick) return;
-    if (normDone()) {
-      stopWork('statusNormDone');
-      return;
-    }
-    if (!workAvailable()) {
-      setStatus('statusWaitEnergy', [String(WORK_MIN_ENERGY), String(G.energyNow(player.work, Date.now()))]);
-      return;
-    }
     const type = C.nextType(settings.taskType, lastType);
     const card = pick.querySelectorAll('.job-card')[C.TYPES.indexOf(type)];
     if (!card || card.disabled) {
