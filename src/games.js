@@ -79,6 +79,18 @@
     return { price, upgrades: { ...upgrades, [game]: own } };
   }
 
+  // Upgrade plans that shipped as the default before. A saved copy of one was
+  // never chosen by the user, so it follows the current default instead.
+  const OLD_DEFAULT_PLANS = ['crash:sla, blaze:star, blaze:lucky, blaze:wild'];
+  const planKey = (text) => parsePlan(text).map(({ game, key }) => `${game}:${key}`).join();
+
+  // Saved settings without values that only repeat an old default.
+  function withoutOldDefaults(settings) {
+    const out = { ...settings };
+    if (OLD_DEFAULT_PLANS.some((plan) => planKey(plan) === planKey(out.upgradePlan))) delete out.upgradePlan;
+    return out;
+  }
+
   // First upgrade in plan order that is not maxed, is allowed at this level and
   // is not skipped (skip returns why an offer is not worth buying, or null).
   // Later entries wait until it is bought, so the order is the priority.
@@ -219,6 +231,7 @@
     upgradeOffer,
     parsePlan,
     upgradeRest,
+    withoutOldDefaults,
     nextPurchase,
     betFor,
     energyNow,

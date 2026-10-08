@@ -113,7 +113,7 @@ async function load() {
     'openrouterKey',
     'bank',
   ]);
-  fill({ ...DEFAULTS, ...settings });
+  fill({ ...DEFAULTS, ...G.withoutOldDefaults(settings) });
   $('apiKey').value = apiKey;
   $('openrouterKey').value = openrouterKey;
   showBankSize(bank);
@@ -441,7 +441,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   const keys = Object.keys(changes);
   if (keys.some((key) => key === 'stats' || key.startsWith(STATS_PREFIX) || key.startsWith(ACCOUNT_PREFIX))) showAccounts();
   if (changes.bank) showBankSize(changes.bank.newValue ?? {});
-  if (changes.settings && !saveTimer) fill({ ...DEFAULTS, ...changes.settings.newValue });
+  if (changes.settings && !saveTimer) fill({ ...DEFAULTS, ...G.withoutOldDefaults(changes.settings.newValue) });
 });
 
 async function showLocalStatus(state) {

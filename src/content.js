@@ -176,7 +176,7 @@
     const stored = await chrome.storage.local.get(null);
     spins = stored.spins ?? [];
     capture = stored.capture ?? [];
-    settings = { ...DEFAULT_SETTINGS, ...stored.settings };
+    settings = { ...DEFAULT_SETTINGS, ...G.withoutOldDefaults(stored.settings) };
     bank = stored.bank ?? {};
     statsCache = byPrefix(stored, STATS_PREFIX);
     accounts = byPrefix(stored, ACCOUNT_PREFIX);
@@ -187,7 +187,7 @@
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
     if (changes.settings) {
-      settings = { ...DEFAULT_SETTINGS, ...changes.settings.newValue };
+      settings = { ...DEFAULT_SETTINGS, ...G.withoutOldDefaults(changes.settings.newValue) };
       log = C.createLogger(settings.logLevel);
     }
     if (changes.bank) bank = changes.bank.newValue ?? {};

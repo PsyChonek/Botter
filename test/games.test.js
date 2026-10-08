@@ -132,3 +132,10 @@ test('gameDelta leaves out standup and achievement rewards paid with the round',
   assert.equal(G.gameDelta('/api/slot/spin', { bet: 20 }, data, 1000).net, -580);
   assert.equal(G.rewardTotal({ player: { credits: 1 } }), 0);
 });
+
+test('withoutOldDefaults drops a saved copy of an old default plan only', () => {
+  assert.deepEqual(G.withoutOldDefaults({ upgradePlan: 'crash:sla, blaze:star, blaze:lucky, blaze:wild', xpBudget: 5 }), { xpBudget: 5 });
+  assert.deepEqual(G.withoutOldDefaults({ upgradePlan: 'crash:sla,blaze:star  blaze:lucky;blaze:wild' }), {});
+  assert.deepEqual(G.withoutOldDefaults({ upgradePlan: 'blaze:wild, crash:sla' }), { upgradePlan: 'blaze:wild, crash:sla' });
+  assert.deepEqual(G.withoutOldDefaults(undefined), {});
+});
