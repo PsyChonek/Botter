@@ -37,3 +37,34 @@ test('blazeMode needs enough spins before trusting the richer scatter rule', () 
   assert.equal(O.blazeMode({ symbols: { match: 60, total: 60 }, reels: { match: 40, total: 60 } }), 'symbols');
   assert.equal(O.blazeMode({ symbols: { match: 40, total: 60 }, reels: { match: 60, total: 60 } }), 'reels');
 });
+
+test('chances cover every game and upgrade combination', () => {
+  const sizes = { blaze: 216, skeleton: 100, slotingi: 80, blackjack: 60, roulette: 3 };
+  for (const [game, size] of Object.entries(sizes)) {
+    const rows = O.table(game);
+    assert.equal(rows.length, size, game);
+    for (const row of rows) {
+      assert.ok(row.win > 0 && row.win < 1, `${game} ${JSON.stringify(row)}`);
+      assert.ok(row.ahead >= 0 && row.ahead <= 1, `${game} ${JSON.stringify(row)}`);
+      assert.ok(row.rtp > 0.5, `${game} ${JSON.stringify(row)}`);
+    }
+  }
+  assert.equal(O.table('blaze', 'symbols').length, 216);
+  assert.deepEqual(O.table('roulette')[2].upgrades, { zeros: 2 });
+  assert.equal(O.chances('crash', {}), null);
+});
+
+test('simulated chances match the exact roulette odds', () => {
+  for (const zeros of [0, 1, 2]) {
+    const { win } = O.chances('roulette', { roulette: { zeros } });
+    assert.ok(Math.abs(win - 18 / (39 - zeros)) < 0.005, `zeros ${zeros}: ${win}`);
+  }
+  // A house edge loses most 1,000-round sessions; upgrades lift the chance to end ahead.
+  assert.ok(O.chances('blackjack', {}).ahead < 0.01);
+  assert.ok(O.chances('blackjack', { blackjack: { ties: 4, bjpay: 2, soft17: 1, double: 1 } }).ahead > 0.1);
+});
+
+test('winRates skips games without a model', () => {
+  const wins = O.winRates(['roulette', 'crash'], {});
+  assert.deepEqual(Object.keys(wins), ['roulette']);
+});
