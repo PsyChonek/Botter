@@ -36,6 +36,7 @@
     loanCycle: true,
     loanTrick: true,
     standup: true,
+    achievementHunt: true,
     crashEnabled: true,
     crashBet: 100,
     crashMinEv: 1.05,
@@ -108,6 +109,10 @@
   // refilled points do not keep interrupting the grinder.
   const WORK_MIN_ENERGY = 5;
   const LOGGED_OUT_WAIT_MS = 10_000;
+  // The speedy achievement wants a right answer within 3 seconds of the task
+  // opening, so the hunt aims well inside that.
+  const SPEEDY_MS = 2500;
+  const SPEEDY_MIN_MS = 600;
 
   let settings = { ...DEFAULT_SETTINGS };
   let bank = {};
@@ -303,6 +308,11 @@
       if (path === '/api/work/submit') onSubmitRejected(request?.id, data);
       return;
     }
+    if (path === '/api/profile/reset') {
+      resetStats();
+      render();
+      return;
+    }
     bookRewards(data);
     if (data?.crash) bookCrash(data.crash);
     if (data?.by === 'sprint' && Array.isArray(data.entries)) readSprint(data);
@@ -341,16 +351,26 @@
     render();
   }
 
+  // "Začít úplně od nuly" wipes the whole profile on the server (credits, level,
+  // upgrades, achievements, prestige, debt), so the account's stats start over
+  // too. Only the submit dwell times stay: they describe the server, not the player.
+  function resetStats() {
+    stats = { ...structuredClone(EMPTY_STATS), dwell: stats.dwell };
+    sessionBase = 0;
+    saveStats();
+    log.info('profile_reset', { account: accountId });
+  }
+
   // Standup quest and achievement rewards are paid with whatever response
   // completed them, so they are booked as free income here and left out of that
-  // response's game or work profit. Standup rewards also offset the day's
-  // grinding loss, since the rounds played for a quest pay for themselves.
+  // response's game or work profit. They also offset the day's grinding loss,
+  // since the rounds played for a quest or an achievement pay for themselves.
   function bookRewards(data) {
     const { standup, achievement } = G.rewardsPaid(data);
     if (!standup && !achievement) return;
     if (standup) stats.free.standup = (stats.free.standup ?? 0) + standup;
     if (achievement) stats.free.achievement = (stats.free.achievement ?? 0) + achievement;
-    if (standup && stats.grind.day === A.dayKey()) stats.grind.net += standup;
+    if (stats.grind.day === A.dayKey()) stats.grind.net += standup + achievement;
     saveStats();
     log.info('rewards', {
       standup,
@@ -702,8 +722,14 @@
 
     setStatus('statusAnswering', [C.ticketLabel(current.id), msg(`source_${source}`)]);
     const timeLeft = current.expiresAt - Date.now() - 2000;
-    const dwellLeft = C.minDwellMs(current, stats.dwell[current.type]) - (Date.now() - taskOpenedAt);
-    await sleep(Math.min(Math.max(humanDelay() - (Date.now() - started), dwellLeft), timeLeft));
+    const dwell = C.minDwellMs(current, stats.dwell[current.type]);
+    const dwellLeft = dwell - (Date.now() - taskOpenedAt);
+    // The achievement hunt answers a banked ticket fast for the 3-second
+    // achievement, unless the server has proved it rejects that.
+    const speedy =
+      huntOn() && source === 'bank' && dwell < SPEEDY_MS && A.achievementTier(player, 'speedy') !== null;
+    const wait = speedy ? Math.max(dwellLeft, SPEEDY_MIN_MS) : Math.max(humanDelay() - (Date.now() - started), dwellLeft);
+    await sleep(Math.min(wait, timeLeft));
     if (!workOn() || task?.id !== current.id) return;
 
     if (current.type === 'ticket') {
@@ -752,7 +778,9 @@
     if (normDone()) return false;
     const energy = G.energyNow(player.work, Date.now());
     workRun = A.workDue(energy, player.work.maxEnergy ?? 20, workRun, WORK_MIN_ENERGY, grindReady());
-    return workRun;
+    // The achievement hunt works one ticket on Friday evening, whatever the energy plan.
+    const friday = huntOn() && energy >= 1 && A.fridayEvening(Date.now()) && A.achievementTier(player, 'friday_deploy') !== null;
+    return workRun || friday;
   }
 
   // Whether auto mode can grind XP now. Tickets pay more at a higher level, so
@@ -862,13 +890,13 @@
     return res;
   }
 
-  function playOnScreen(game, bet) {
+  function playOnScreen(game, bet, spot) {
     if (game === 'blackjack') {
       const open = openHand();
       if (open) bjStake = open.stake ?? bjStake;
       return screenPlay.blackjack(bet, open);
     }
-    if (game === 'roulette') return screenPlay.roulette(settings.rouletteBet, bet);
+    if (game === 'roulette') return screenPlay.roulette(spot, bet);
     return screenPlay.slot(game, bet);
   }
 
@@ -879,15 +907,17 @@
   const screenUnsent = (game, error) =>
     SCREEN_UNSENT.includes(error) || (error === 'button_missing' && game !== 'blackjack');
 
-  async function playRound(game, bet) {
-    if (settings.playOnScreen) {
-      const res = await playOnScreen(game, bet);
+  // spot is the roulette bet; the screen can only lay chips on the even-money
+  // spots, so other bets always go through the API.
+  async function playRound(game, bet, spot = settings.rouletteBet) {
+    if (settings.playOnScreen && (game !== 'roulette' || G.ROULETTE_BETS.includes(spot))) {
+      const res = await playOnScreen(game, bet, spot);
       if (res.ok || res.status !== 0) return res;
       log.warn('screen_play_failed', { game, bet, error: res.data?.error });
       if (!screenUnsent(game, res.data?.error)) return res;
     }
     if (game === 'blackjack') return playBlackjack(bet);
-    if (game === 'roulette') return api('/api/roulette/spin', { bets: { [settings.rouletteBet]: bet } });
+    if (game === 'roulette') return api('/api/roulette/spin', { bets: { [spot]: bet } });
     return api(G.GAMES[game].path, { bet });
   }
 
@@ -1132,7 +1162,10 @@
       rest: (keys, upTo) => G.upgradeRest(player.upgrades, offer.game, keys, upTo),
       maxLevels: Object.fromEntries(Object.entries(G.SHOP[offer.game]).map(([key, [max]]) => [key, max])),
       volume: A.grindVolume(limits(), player.credits),
-      betCapped: Boolean(plan) && plan.bet >= player.maxBet,
+      betGame: plan?.game ?? null,
+      betWanted:
+        (settings.grindBet !== 'auto' && Number(settings.grindBet) > player.maxBet) ||
+        (settings.crashEnabled && settings.crashBet > player.maxBet),
       crashOn: settings.crashEnabled,
     });
   }
@@ -1199,9 +1232,12 @@
     return true;
   }
 
-  // One bet per daily round, only when the round history says it pays.
+  // One bet per daily round, only when the round history says it pays, or
+  // for the achievement hunt a smallest bet at 10x while that pays with the
+  // achievement reward counted.
   async function crashStep() {
-    if (!settings.crashEnabled || player.level < CRASH_UNLOCK) return false;
+    const hunting = huntOn() && A.achievementTier(player, 'uptime_hero') !== null;
+    if ((!settings.crashEnabled && !hunting) || player.level < CRASH_UNLOCK) return false;
     if (Date.now() - crashPolledAt < CRASH_POLL_MS) return false;
     crashPolledAt = Date.now();
     const res = await api('/api/crash');
@@ -1209,8 +1245,9 @@
     if (!res.ok || !crash || crash.status !== 'running' || crash.bets?.some((bet) => bet.me)) return true;
 
     const entry = A.crashMult(crash.startAt, crash.serverNow ?? Date.now());
-    const plan = A.bestCrashTarget(crash.history, entry, crash.rate ?? 1);
+    const plan = settings.crashEnabled ? A.bestCrashTarget(crash.history, entry, crash.rate ?? 1) : null;
     if (!plan || plan.ev < settings.crashMinEv) {
+      if (hunting) return crashHunt(crash, entry);
       log.info('crash_skip', { entry, rate: crash.rate, history: crash.history?.length ?? 0, ev: plan?.ev ?? null });
       return true;
     }
@@ -1229,6 +1266,57 @@
     const bet = await api('/api/crash/bet', { stake, auto: plan.target });
     if (!bet.ok) log.warn('crash_bet_failed', { status: bet.status, error: bet.data?.error });
     else log.info('crash_bet', { stake, entry, target: plan.target, ev: plan.ev, kelly: settings.crashKelly });
+    return true;
+  }
+
+  // Achievement hunt bet on crash: the smallest stake, auto cash-out at 10x,
+  // when the chance of getting there from the round history makes the payout
+  // plus the achievement reward beat the stake.
+  async function crashHunt(crash, entry) {
+    const p = A.crashHitChance(crash.history, entry, crash.rate ?? 1, A.CRASH_ACHIEVEMENT_TARGET);
+    const stake = G.BET_LEVELS[0];
+    if (!A.crashHuntWorth(p, stake) || player.credits - stake < limits().reserve) {
+      log.info('hunt_crash_skip', { entry, rate: crash.rate, history: crash.history?.length ?? 0, p });
+      return true;
+    }
+    setStatus('statusHuntCrash', [credits(stake), pct.format(p)]);
+    const bet = await api('/api/crash/bet', { stake, auto: A.CRASH_ACHIEVEMENT_TARGET });
+    if (!bet.ok) log.warn('crash_bet_failed', { status: bet.status, error: bet.data?.error });
+    else log.info('hunt_crash_bet', { stake, entry, p });
+    return true;
+  }
+
+  const huntOn = () => settings.autoMode && settings.achievementHunt;
+
+  // Logged when the hunt's targets change, not on every round.
+  let huntTargets = '';
+
+  // Plays the next round worth it for achievements (BotterAuto.huntPlan) at the
+  // smallest bet. Like the standup it keeps the reserve but not the grinding
+  // budget: the rewards pay for the rounds.
+  async function huntStep() {
+    if (!huntOn() || Date.now() - (claimTried.hunt ?? 0) < CLAIM_RETRY_MS) return false;
+    const reserve = limits().reserve;
+    const plan = A.huntPlan(player, {
+      level: player.level,
+      unlocks: GRIND_UNLOCKS,
+      edges: O.edges(G.GAME_KEYS, player.upgrades, blazeMode()),
+      levels: G.BET_LEVELS.filter((bet) => bet <= player.maxBet && player.credits - bet >= reserve),
+    });
+    const note = plan ? `${plan.game} ${plan.targets}` : '';
+    if (note !== huntTargets) {
+      huntTargets = note;
+      if (plan) log.info('hunt_plan', { game: plan.game, targets: plan.targets, value: plan.value, loss: plan.loss });
+    }
+    if (!plan) return false;
+    const { game, bet, spot } = plan;
+    setStatus('statusHunt', [plan.targets.map((key) => msg(`ach_${key}`)).join(', '), msg(`game_${game}`), credits(bet)]);
+    const res = await playRound(game, bet, spot ?? settings.rouletteBet);
+    if (!res.ok) {
+      log.warn('hunt_failed', { game, bet, spot, status: res.status, error: res.data?.error });
+      claimTried.hunt = Date.now();
+    }
+    await sleep(settings.gameDelayMs);
     return true;
   }
 
@@ -1354,6 +1442,7 @@
     if (await crashStep()) return;
     if (await standupStep()) return;
     if (workAvailable()) return workStep();
+    if (await huntStep()) return;
     if (await grindStep()) return;
     if (await rotateStep()) return;
     return workStep();

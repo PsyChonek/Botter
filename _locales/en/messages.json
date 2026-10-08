@@ -299,6 +299,24 @@
   "free_achievement": {
     "message": "Achievements"
   },
+  "ach_zero_hero": {
+    "message": "zero win"
+  },
+  "ach_uptime_hero": {
+    "message": "crash 10x"
+  },
+  "ach_natural": {
+    "message": "blackjack natural"
+  },
+  "ach_five_cards": {
+    "message": "five-card win"
+  },
+  "ach_night_owl": {
+    "message": "night play"
+  },
+  "ach_regular": {
+    "message": "rounds played"
+  },
   "optionsAutoClaim": {
     "message": "Claim the daily bonus and the hourly wheel of fortune automatically, and the bailout when broke"
   },
@@ -410,6 +428,31 @@
       }
     }
   },
+  "statusHunt": {
+    "message": "Achievement hunt ($P1$) on $P2$ at $P3$ a round",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "statusHuntCrash": {
+    "message": "Achievement hunt: crash bet $P1$ cashing out at 10x ($P2$ chance from the round history)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
   "optionsAutoHeading": {
     "message": "Auto mode"
   },
@@ -430,6 +473,9 @@
   },
   "optionsStandup": {
     "message": "Play the daily standup quests whose reward beats the expected loss of the rounds they need"
+  },
+  "optionsAchievementHunt": {
+    "message": "Hunt credit achievements when their reward beats the expected loss: roulette zero, crash at 10x, blackjack natural and five cards, night play, rounds played, Friday evening work and a fast answer"
   },
   "optionsCrashEnabled": {
     "message": "Bet on crash when the history says it pays"
@@ -548,7 +594,7 @@
     "message": "Buy upgrades automatically when they are worth it"
   },
   "optionsUpgradeHint": {
-    "message": "Priority order: Blaze star, Skeleton team, Blaze lucky, Blaze wild, Skeleton wild, Slotingi gulas, Skeleton deploy, Slotingi crown, Roulette zeros, Blackjack ties and blackjack pay, Crash SLA, global bets. Auto buys the next level of the first upgrade that is worth its price, is not maxed and is allowed at your level, as soon as it fits above the reserve; later ones wait. Skipped as not worth it: upgrades that add less than 0.5 % return per 10,000 credits (blackjack:hint/double/soft17, slotingi:mint), upgrades of a game the XP grinder would not pick even fully upgraded, a game's upgrades when spending the price on plain XP grinding gives more XP (over 14 days of the daily budget, or down to the minimum balance), global:bets while the grinder's bet is below your max bet, and crash:sla while crash betting is off. Maxing any game also pays a one-time 5000 achievement, which the check does not count. Every 10 minutes, and whenever your level or upgrades change, the whole plan is judged again; the first upgrade worth buying becomes the goal, shown in the panel under Upgrade queue. With saving on, the XP grinder leaves the goal's price untouched on top of the reserve, so work pay builds up to it, and once it is bought the next goal is bought right away if it fits too. Saving pauses past a planned bankruptcy, which would wipe the savings."
+    "message": "Priority order: Blaze star, Skeleton team, Blaze lucky, Blaze wild, Skeleton wild, Slotingi gulas, Skeleton deploy, Slotingi crown, Roulette zeros, Blackjack ties and blackjack pay, Crash SLA, global bets. Auto buys the next level of the first upgrade that is worth its price, is not maxed and is allowed at your level, as soon as it fits above the reserve; later ones wait. Skipped as not worth it: upgrades that add less than 0.5 % return per 10,000 credits (blackjack:hint/double/soft17, slotingi:mint), upgrades of a game the XP grinder would not pick even fully upgraded, a game's upgrades when spending the price on plain XP grinding gives more XP (over 14 days of the daily budget, or down to the minimum balance), global:bets unless a bigger bet would buy XP cheaper (XP per round grows with the bet, so above 100 it never does) or a fixed grind or crash bet is set above your max bet, and crash:sla while crash betting is off. Maxing any game also pays a one-time 5000 achievement, which the check does not count. Every 10 minutes, and whenever your level or upgrades change, the whole plan is judged again; the first upgrade worth buying becomes the goal, shown in the panel under Upgrade queue. With saving on, the XP grinder leaves the goal's price untouched on top of the reserve, so work pay builds up to it, and once it is bought the next goal is bought right away if it fits too. Saving pauses past a planned bankruptcy, which would wipe the savings."
   },
   "optionsModelHeading": {
     "message": "Blaze model check"
@@ -1079,8 +1125,8 @@
   "shopState_queued": {
     "message": "queued"
   },
-  "shopState_betNotCapped": {
-    "message": "bet below max"
+  "shopState_noBetGain": {
+    "message": "bigger bet gives no XP"
   },
   "shopState_crashOff": {
     "message": "crash off"

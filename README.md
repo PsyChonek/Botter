@@ -103,6 +103,23 @@ progress shows at `chrome://on-device-internals`.
   rewards are booked as free income, kept out of game and work profit, and the standup
   reward offsets the day's grinding loss. Quests it cannot read, crash quests and ones
   on a locked game are skipped and logged as `standup_skipped`.
+- **Achievement hunt** (settings Auto tab, on by default; `huntPlan` in `src/auto.js`):
+  goes after the credit achievements the bot can steer, read from `player.achievements`,
+  and only while the reward beats the expected loss. Each round is valued at the
+  rewards it can unlock times their chance and played at the smallest bet on the game
+  where that margin is biggest: a straight bet on 0 in roulette (Nula od nuly, 1,000,
+  1 in 39 unupgraded), blackjack hands for a natural (300, 4.8 %) and a five-card win
+  (1,000, 0.5 %, both from a simulation of the bot's strategy), any round between 2:00
+  and 5:00 (Ponocování, 300), and the next rounds-played tier (1,000 / 5,000 / 25,000
+  at 1,000 / 10,000 / 100,000 rounds) spread over the rounds it still needs. On crash it
+  bets the smallest stake with auto cash-out at 10x (Uptime hrdina, 2,000) when the
+  round history gives a chance that pays with the reward counted, even with crash
+  betting off. It works one ticket on Friday after 17:00 (Deploy v pátek, 200) and
+  answers a banked bug or output ticket inside 3 seconds (Rychloprsťák, 200) unless the
+  server has rejected that fast a submit. Like the standup it keeps the reserve but not
+  the grinding budget, and achievement rewards offset the day's grinding loss. The slot
+  achievements (wild, star, cascade and jackpot events, big wins) are left to the
+  grinder: their chances are not modelled yet.
 - **Wheel of fortune** (Kolo štěstí, `/api/wheel/spin`): free once an hour, paid in
   multiples of a base set by the player's title (100 to 300) or a coffee that refills
   energy. It is spun as soon as `player.wheelNextAt` has passed, with the other free
@@ -150,7 +167,9 @@ progress shows at `chrome://on-device-internals`.
   more XP than grinding the rest at the cheaper cost (volume: 14 days of the daily
   budget, or the credits above the minimum balance; judged for the next levels alone
   and for the game's useful upgrades maxed together). `global:bets` is bought only
-  while the grinder's bet is at the max bet, `crash:sla` only while crash betting is
+  when a bigger bet would buy XP cheaper (the grinder's bet ladder settled on the max
+  bet below 100; from 100 up XP per round is proportional to the bet, so it never
+  does) or a fixed grind or crash bet is set above the max bet, `crash:sla` only while crash betting is
   on. The whole plan is judged again every 10 minutes and as soon as the level, the
   upgrades or the max bet change (`G.shopQueue` with `reviewShop` in `src/content.js`);
   the first entry worth buying at the current level is the goal, logged as
@@ -168,6 +187,10 @@ progress shows at `chrome://on-device-internals`.
   from the win. The panel shows rounds, net and return rate per game; the settings
   Profit tab shows wagered, returned, net, return rate, net per round and XP, plus credits
   earned per work ticket. Crash bets are booked when they settle, from the round's bet list.
+  A profile reset (Začít úplně od nuly, `/api/profile/reset`) wipes the account on the
+  server, so its stats start over too: profit, XP per bet, free income and the
+  achievement flags, so the clean-loan trick and the podium run again. Only the submit
+  dwell times are kept.
 - **Odds per upgrade** (settings, Games tab): for every game and every combination of
   its shop upgrades the return to player, the share of rounds won (more back than the
   bet) and the chance that 1,000 rounds end ahead, all from the simulation in

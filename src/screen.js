@@ -87,19 +87,27 @@
       }, ms);
 
     // Walks to the game: the casino view, back to the lobby, then the game card.
+    // The game's own screen can show before it is ready (Blaze's canvas comes
+    // later), so it is waited for, never left through its back button. After
+    // the card click the card itself is still in the DOM until React renders,
+    // so only the game counts as arrived.
     async function open(game) {
       const card = `.lobby-screen button.game-card.${game}`;
       for (let step = 0; step < NAV_STEPS; step++) {
         if (ready(game)) return idle(game);
         ctx.dismissModal();
         const casino = document.querySelector('nav.views button');
+        const target = document.querySelector(card);
+        const loading = document.querySelector(SCREENS[game]);
         const button =
           casino?.getAttribute('aria-pressed') === 'false'
             ? casino
-            : (document.querySelector(card) ?? document.querySelector('.pill.back') ?? casino);
-        if (!button) return null;
-        button.click();
-        await until(() => ready(game) || document.querySelector(card), NAV_MS);
+            : loading
+              ? null
+              : (target ?? document.querySelector('.pill.back') ?? casino);
+        if (!button && !loading) return null;
+        button?.click();
+        await until(() => ready(game) || (button && button !== target && document.querySelector(card)), NAV_MS);
       }
       return ready(game) && idle(game);
     }

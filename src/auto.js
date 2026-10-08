@@ -205,6 +205,17 @@
     return ladder(null, null);
   }
 
+  // Whether a bigger max bet would buy XP cheaper on this game: its bet ladder
+  // is done and settled on the biggest allowed level, so XP per credit was still
+  // rising there. From XP_SAMPLE_MAX_BET up XP per round is proportional to the
+  // bet, so a bigger bet costs the same per XP and only risks more per round.
+  function biggerBetPays(cells, levels) {
+    const top = levels.at(-1);
+    if (top === undefined || top >= XP_SAMPLE_MAX_BET) return false;
+    const ladder = betLadder(cells, levels);
+    return ladder.next === null && ladder.stop === null && ladder.best?.bet === top;
+  }
+
   // House edge of a game measured from its tracked rounds (0 when it is ahead).
   const gameEdge = (row) => (row?.wagered > 0 ? Math.max(0, -row.net) / row.wagered : null);
 
@@ -308,8 +319,9 @@
   // (bet levels allowed now), edge(game, upgrades) (modelled house edge or null),
   // rest(keys, upTo) ({ price, upgrades } after buying those upgrades of the
   // offer's game up to level upTo, default max), maxLevels ({ key: max } of the
-  // game), volume (see grindVolume), betCapped (the grinder's bet is the biggest
-  // allowed) and crashOn (crash betting is on).
+  // game), volume (see grindVolume), betGame (the game the grinder plays, or
+  // null), betWanted (a fixed grind or crash bet asks for more than the max bet)
+  // and crashOn (crash betting is on).
   // Credits spent on upgrades are not there to grind with, so they are bought
   // only if the XP from the remaining volume at the cheaper cost beats the XP
   // from the whole volume at today's best cost. That is checked for the next
@@ -317,7 +329,10 @@
   // and for every worthwhile upgrade of the game maxed together.
   function upgradeVerdict(offer, ctx) {
     const { game } = offer;
-    if (game === 'global') return ctx.betCapped ? null : 'betNotCapped';
+    if (game === 'global') {
+      const pays = ctx.betWanted || (ctx.betGame !== null && biggerBetPays(ctx.betXp?.[ctx.betGame], ctx.levels));
+      return pays ? null : 'noBetGain';
+    }
     if (game === 'crash') return ctx.crashOn ? null : 'crashOff';
     const now = (g) => ctx.edge(g, ctx.upgrades);
     if (now(game) === null) return null;
@@ -510,6 +525,118 @@
     return best;
   }
 
+  // Credit-paying achievements the hunt goes after, copied from the client's
+  // catalog (reward per tier, and the tier thresholds of counted ones). The
+  // rest either happen on their own, are claimed elsewhere (clean loan,
+  // podium, standup, wheel, attendance, maxed) or hinge on rare slot events.
+  const HUNT_ACHIEVEMENTS = {
+    zero_hero: { reward: 1000 }, // win a roulette bet on a zero
+    uptime_hero: { reward: 2000 }, // cash out a crash bet at 10x or more
+    natural: { reward: 300 }, // blackjack from the first two cards
+    five_cards: { reward: 1000 }, // win a blackjack hand with five or more cards
+    night_owl: { reward: 300 }, // play between 2:00 and 5:00
+    regular: { reward: [1000, 5000, 25000], tiers: [1000, 10_000, 100_000] }, // rounds played
+    friday_deploy: { reward: 200 }, // work on Friday after 17:00
+    speedy: { reward: 200 }, // a right answer within 3 seconds
+  };
+  // Per hand of the bot's strategy, from 2,000,000 simulated hands with no
+  // upgrades (natural 4.76 %, five-card win 0.51 %; maxed upgrades 0.65 %).
+  const BJ_NATURAL = 0.0476;
+  const BJ_FIVE_CARD_WIN = 0.005;
+  const CRASH_ACHIEVEMENT_TARGET = 10;
+  const ROULETTE_ZERO_SPOT = 'n:0';
+
+  // Tier still to unlock of a hunted achievement, or null when it is done or
+  // the player snapshot does not list achievements.
+  function achievementTier(player, key) {
+    const def = HUNT_ACHIEVEMENTS[key];
+    if (!def || !player?.achievements) return null;
+    const tier = player.achievements[key]?.tier ?? 0;
+    return tier < (def.tiers?.length ?? 1) ? tier : null;
+  }
+
+  const achievementReward = (key, tier) => {
+    const { reward } = HUNT_ACHIEVEMENTS[key];
+    return Array.isArray(reward) ? reward[tier] : reward;
+  };
+
+  const nightHours = (now) => {
+    const hour = new Date(now).getHours();
+    return hour >= 2 && hour < 5;
+  };
+  const fridayEvening = (now) => {
+    const d = new Date(now);
+    return d.getDay() === 5 && d.getHours() >= 17;
+  };
+
+  // Next game round worth playing for achievements, or null. Every round is
+  // valued at the rewards it can unlock times their chance: a natural and a
+  // five-card win per blackjack hand, a straight bet on 0 per roulette spin,
+  // any round at night, and the next rounds-played tier spread over the rounds
+  // it still needs (finishing it costs those rounds, so a round is worth the
+  // reward over that count). A round is played when that beats its expected
+  // loss, on the game where the margin is biggest, at the smallest bet.
+  // ctx: level, unlocks, edges (house edge per game), levels (affordable bet
+  // levels), now.
+  function huntPlan(player, ctx) {
+    const bet = Math.min(...(ctx.levels ?? []));
+    if (!Number.isFinite(bet)) return null;
+    const now = ctx.now ?? Date.now();
+    const open = (key) => achievementTier(player, key) !== null;
+
+    const shared = [];
+    if (open('night_owl') && nightHours(now)) shared.push({ key: 'night_owl', value: achievementReward('night_owl', 0) });
+    const tier = achievementTier(player, 'regular');
+    const left = tier === null ? 0 : HUNT_ACHIEVEMENTS.regular.tiers[tier] - (player.totalSpins ?? Infinity);
+    if (left > 0) shared.push({ key: 'regular', value: achievementReward('regular', tier) / left });
+
+    let best = null;
+    for (const game of Object.keys(ctx.unlocks)) {
+      const edge = ctx.edges[game];
+      if (edge === undefined || ctx.level < ctx.unlocks[game]) continue;
+      const own = [];
+      if (game === 'blackjack') {
+        if (open('natural')) own.push({ key: 'natural', value: BJ_NATURAL * achievementReward('natural', 0) });
+        if (open('five_cards')) own.push({ key: 'five_cards', value: BJ_FIVE_CARD_WIN * achievementReward('five_cards', 0) });
+      }
+      let spot = null;
+      if (game === 'roulette' && open('zero_hero')) {
+        // A straight bet pays 36 like the outside bets, so it has the same edge.
+        const pockets = 36 / (1 - edge);
+        own.push({ key: 'zero_hero', value: achievementReward('zero_hero', 0) / pockets });
+        spot = ROULETTE_ZERO_SPOT;
+      }
+      const targets = [...shared, ...own];
+      if (!targets.length) continue;
+      const value = targets.reduce((sum, t) => sum + t.value, 0);
+      const loss = bet * Math.max(0, edge);
+      if (value <= loss) continue;
+      const plan = { game, bet, spot, targets: targets.map((t) => t.key), value, loss };
+      if (!best || value - loss > best.value - best.loss) best = plan;
+    }
+    return best;
+  }
+
+  // Chance that a crash bet placed now reaches its own multiplier target,
+  // from the round history like bestCrashTarget. A target past the planned
+  // outage is paid at that level instead, so it never reaches the target.
+  function crashHitChance(history, entry, rate, target) {
+    const outcomes = (history ?? [])
+      .map((round) => (round.planned ? Infinity : Number(round.mult)))
+      .filter((mult) => (Number.isFinite(mult) || mult === Infinity) && mult > entry);
+    if (outcomes.length < CRASH_MIN_HISTORY) return null;
+    const production = (target * entry) / rate;
+    if (production > CRASH_PLANNED_MULT) return 0;
+    return outcomes.filter((mult) => mult >= production).length / outcomes.length;
+  }
+
+  // Whether a crash bet of stake at the achievement's 10x target pays on
+  // average, counting the achievement reward on top of the payout.
+  function crashHuntWorth(p, stake) {
+    if (!(p > 0) || !(stake > 0)) return false;
+    return p * (CRASH_ACHIEVEMENT_TARGET * stake + achievementReward('uptime_hero', 0)) > stake;
+  }
+
   // Local calendar day, used to reset daily budgets and checks.
   function dayKey(now = Date.now()) {
     const d = new Date(now);
@@ -542,6 +669,12 @@
     questGame,
     questKind,
     standupPlan,
+    CRASH_ACHIEVEMENT_TARGET,
+    achievementTier,
+    fridayEvening,
+    huntPlan,
+    crashHitChance,
+    crashHuntWorth,
     dayKey,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

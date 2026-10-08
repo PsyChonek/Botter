@@ -355,7 +355,8 @@ function verdictCtx(overrides = {}) {
     },
     maxLevels: { team: 4, wild: 4, hint: 1 },
     volume: 1_000_000,
-    betCapped: false,
+    betGame: null,
+    betWanted: false,
     crashOn: true,
     ...overrides,
   };
@@ -388,10 +389,24 @@ test('upgradeVerdict prefers plain XP grinding when the volume is too small to p
 });
 
 test('upgradeVerdict judges bets and crash upgrades by their own use', () => {
-  assert.equal(A.upgradeVerdict(offer('global', 'bets'), verdictCtx()), 'betNotCapped');
-  assert.equal(A.upgradeVerdict(offer('global', 'bets'), verdictCtx({ betCapped: true })), null);
+  assert.equal(A.upgradeVerdict(offer('global', 'bets'), verdictCtx()), 'noBetGain');
+  assert.equal(A.upgradeVerdict(offer('global', 'bets'), verdictCtx({ betWanted: true })), null);
   assert.equal(A.upgradeVerdict(offer('crash', 'sla'), verdictCtx()), null);
   assert.equal(A.upgradeVerdict(offer('crash', 'sla'), verdictCtx({ crashOn: false })), 'crashOff');
+});
+
+test('upgradeVerdict buys bigger bets only while XP per credit still rises at the max bet', () => {
+  const xp = (perRound) => Object.fromEntries(Object.entries(perRound).map(([bet, x]) => [bet, { rounds: 10, xp: x * 10 }]));
+  const ctx = (levels, perRound) => verdictCtx({ betGame: 'skeleton', levels, betXp: { skeleton: xp(perRound) } });
+  const bets = offer('global', 'bets');
+  // XP per round proportional to the bet: the max bet is no cheaper per XP.
+  assert.equal(A.upgradeVerdict(bets, ctx([20, 40, 100], { 20: 2, 40: 4, 100: 10 })), 'noBetGain');
+  // Still rising at a max bet of 40: the next level may be cheaper.
+  assert.equal(A.upgradeVerdict(bets, ctx([20, 40], { 20: 2, 40: 6 })), null);
+  // Rising up to 100, but above it XP per round only scales with the bet.
+  assert.equal(A.upgradeVerdict(bets, ctx([20, 40, 100], { 20: 2, 40: 6, 100: 20 })), 'noBetGain');
+  // The ladder is still sampling the max bet: nothing to judge yet.
+  assert.equal(A.upgradeVerdict(bets, ctx([20, 40], { 20: 2 })), 'noBetGain');
 });
 
 test('grindVolume is the budget over the horizon or what is above the floor', () => {
@@ -627,4 +642,74 @@ test('bankruptcy waits for the sprint end on the podium, loans start 12 hours be
   assert.equal(A.loanSprintSafe(podium, endAt - 13 * hour), false);
   assert.equal(A.loanSprintSafe(podium, endAt - 12 * hour), true);
   assert.equal(A.loanSprintSafe(off, 0), true);
+});
+
+// Player with every hunted achievement open, at level 20 with 500 rounds played.
+const hunter = (extra = {}) => ({ achievements: {}, totalSpins: 500, ...extra });
+const huntCtx = (extra = {}) => ({
+  level: 20,
+  unlocks: { blaze: 1, blackjack: 10, roulette: 15 },
+  edges: { blaze: 0.3, blackjack: 0.124, roulette: 1 - 36 / 39 },
+  levels: [20, 40, 100],
+  now: new Date(2026, 9, 8, 12).getTime(), // a Thursday noon
+  ...extra,
+});
+
+test('achievementTier reads the next tier, null when done or unknown', () => {
+  assert.equal(A.achievementTier({ achievements: {} }, 'regular'), 0);
+  assert.equal(A.achievementTier({ achievements: { regular: { tier: 2 } } }, 'regular'), 2);
+  assert.equal(A.achievementTier({ achievements: { regular: { tier: 3 } } }, 'regular'), null);
+  assert.equal(A.achievementTier({ achievements: { natural: { tier: 1 } } }, 'natural'), null);
+  assert.equal(A.achievementTier({}, 'natural'), null);
+});
+
+test('huntPlan bets on zero at the smallest bet while roulette pays it best', () => {
+  const plan = A.huntPlan(hunter(), huntCtx());
+  assert.equal(plan.game, 'roulette');
+  assert.equal(plan.spot, 'n:0');
+  assert.equal(plan.bet, 20);
+  // 1000 / 39 for the zero plus 1000 / 500 for the rounds tier, against 20 * 3/39.
+  assert.ok(Math.abs(plan.value - (1000 / 39 + 2)) < 1e-9, `value ${plan.value}`);
+  assert.deepEqual(plan.targets, ['regular', 'zero_hero']);
+});
+
+test('huntPlan moves to blackjack once the zero is done and stops when nothing pays', () => {
+  const plan = A.huntPlan(hunter({ achievements: { zero_hero: { tier: 1 } } }), huntCtx());
+  assert.equal(plan.game, 'blackjack');
+  assert.deepEqual(plan.targets, ['regular', 'natural', 'five_cards']);
+  const done = { zero_hero: { tier: 1 }, natural: { tier: 1 }, five_cards: { tier: 1 } };
+  // The rounds tier alone is worth 1000 / 500 = 2 a round, above roulette's 20 * 3/39 loss.
+  assert.equal(A.huntPlan(hunter({ achievements: done }), huntCtx()).game, 'roulette');
+  assert.equal(A.huntPlan(hunter({ achievements: done, totalSpins: 100 }), huntCtx()), null);
+});
+
+test('huntPlan plays a round at night and skips locked games and missing data', () => {
+  const done = { zero_hero: { tier: 1 }, natural: { tier: 1 }, five_cards: { tier: 1 }, regular: { tier: 3 } };
+  assert.equal(A.huntPlan(hunter({ achievements: done }), huntCtx()), null);
+  const night = A.huntPlan(hunter({ achievements: done }), huntCtx({ now: new Date(2026, 9, 8, 3).getTime() }));
+  assert.deepEqual(night.targets, ['night_owl']);
+  assert.equal(night.game, 'roulette');
+  assert.equal(A.huntPlan(hunter(), huntCtx({ level: 5 })), null);
+  assert.equal(A.huntPlan({ totalSpins: 500 }, huntCtx()), null);
+  assert.equal(A.huntPlan(hunter(), huntCtx({ levels: [] })), null);
+});
+
+test('crashHitChance reads the share of rounds that reach the target', () => {
+  const history = [2, 5, 12, 20, { planned: true }].map((m) => (typeof m === 'number' ? { mult: m } : m));
+  assert.equal(A.crashHitChance(history, 1, 1, 10), 3 / 5);
+  assert.equal(A.crashHitChance(history.slice(0, 3), 1, 1, 10), null);
+  // Past the planned outage level the bet is paid there, short of the target.
+  assert.equal(A.crashHitChance(history, 1, 0.1, 10), 0);
+});
+
+test('crashHuntWorth counts the achievement reward on top of the payout', () => {
+  assert.equal(A.crashHuntWorth(0.02, 20), true); // 0.02 * (200 + 2000) = 44 > 20
+  assert.equal(A.crashHuntWorth(0.005, 20), false); // 11 < 20
+  assert.equal(A.crashHuntWorth(null, 20), false);
+});
+
+test('fridayEvening is Friday from 17:00', () => {
+  assert.equal(A.fridayEvening(new Date(2026, 9, 9, 17).getTime()), true);
+  assert.equal(A.fridayEvening(new Date(2026, 9, 9, 16, 59).getTime()), false);
+  assert.equal(A.fridayEvening(new Date(2026, 9, 10, 18).getTime()), false);
 });
