@@ -107,7 +107,7 @@
 
   // Weekly sprint: story points are the XP earned since Monday 9:00, and when it
   // ends the top three are paid these prizes. Bankruptcy wipes the week's points.
-  const SPRINT_PRIZES = [10_000, 5_000, 2_500];
+  const SPRINT_PRIZES = [5_000, 3_500, 2_000];
   // From taking a loan until its debt hits the cap and execution starts.
   const LOAN_EXECUTION_MS = 12 * 60 * 60 * 1000;
 
@@ -438,6 +438,11 @@
     regular: { reward: [1000, 5000, 25000], tiers: [1000, 10_000, 100_000] }, // rounds played
     friday_deploy: { reward: 200 }, // work on Friday after 17:00
     speedy: { reward: 200 }, // a right answer within 3 seconds
+    lottery_3: { reward: 1000 }, // 3 or more numbers on one lottery ticket
+    lottery_4: { reward: 5000 }, // 4 numbers on one ticket
+    lottery_5: { reward: 20_000 }, // 5 numbers on one ticket (secret)
+    lottery_full: { reward: 300 }, // all 5 tickets on one draw
+    lottery_days: { reward: [300, 2000, 5000], tiers: [1, 7, 30] }, // tickets on 1 / 7 / 30 draws
   };
   // Per hand of the bot's strategy, from 2,000,000 simulated hands with no
   // upgrades (natural 4.76 %, five-card win 0.51 %; maxed upgrades 0.65 %).
@@ -519,6 +524,148 @@
     return best;
   }
 
+  // Lottery (Loterie, from level 4): 6 of 49, drawn every day at 20:00, at most
+  // five tickets per draw. A ticket pays its price times LOTTERY_PAYS[hits],
+  // the same odds at every price.
+  const LOTTERY_PAYS = { 2: 1, 3: 20, 4: 200, 5: 2000, 6: 10_000 };
+  const LOTTERY_MAX_TICKETS = 5;
+  const choose = (n, k) => {
+    let out = 1;
+    for (let i = 1; i <= k; i++) out = (out * (n - k + i)) / i;
+    return out;
+  };
+  const lotteryChance = (hits) => (choose(6, hits) * choose(43, 6 - hits)) / choose(49, 6);
+  const lotteryAtLeast = (hits) => [3, 4, 5, 6].filter((h) => h >= hits).reduce((sum, h) => sum + lotteryChance(h), 0);
+  // About 71.7 %: the lottery alone never pays, only its achievements do.
+  const LOTTERY_RTP = Object.entries(LOTTERY_PAYS).reduce((sum, [hits, pay]) => sum + lotteryChance(Number(hits)) * pay, 0);
+
+  // Lottery tickets worth buying for the next draw, or null: { price, tickets,
+  // value }. Every ticket is valued at the achievements it can unlock times
+  // their chance (3+, 4 and exactly 5 numbers), the first ticket of a draw at
+  // the next draws-played tier spread over the draws it still needs, and the
+  // fifth at the all-five achievement, against the ticket's expected loss.
+  // Tickets go at the cheapest price: the rewards do not grow with it, the loss
+  // does. ctx: mine (tickets already on this draw), prices (affordable prices).
+  function lotteryPlan(player, ctx) {
+    const price = Math.min(...(ctx.prices ?? []));
+    const mine = ctx.mine ?? 0;
+    const room = LOTTERY_MAX_TICKETS - mine;
+    if (!Number.isFinite(price) || room <= 0) return null;
+    const open = (key) => achievementTier(player, key) !== null;
+    let perTicket = -price * (1 - LOTTERY_RTP);
+    if (open('lottery_3')) perTicket += lotteryAtLeast(3) * achievementReward('lottery_3', 0);
+    if (open('lottery_4')) perTicket += lotteryAtLeast(4) * achievementReward('lottery_4', 0);
+    if (open('lottery_5')) perTicket += lotteryChance(5) * achievementReward('lottery_5', 0);
+    let first = 0;
+    const tier = achievementTier(player, 'lottery_days');
+    if (!mine && tier !== null) {
+      const played = player.achProgress?.lottery_days ?? player.stats?.lotteryDays ?? 0;
+      const left = HUNT_ACHIEVEMENTS.lottery_days.tiers[tier] - played;
+      if (left > 0) first = achievementReward('lottery_days', tier) / left;
+    }
+    const full = open('lottery_full') ? achievementReward('lottery_full', 0) : 0;
+    let best = null;
+    for (let n = 1; n <= room; n++) {
+      const value = n * perTicket + first + (mine + n === LOTTERY_MAX_TICKETS ? full : 0);
+      if (value > 0 && (!best || value > best.value)) best = { price, tickets: n, value };
+    }
+    return best;
+  }
+
+  // Mzdový fond: 1 % of every bet goes into a shared fund that must drop by its
+  // cap, and the bet that drops it takes it all. Modelled as a drop point
+  // uniform between the fund now and the cap, so a bet drops it with chance
+  // 1 % of the bet over the room left, and surely once that covers the room.
+  const PAYROLL_SHARE = 0.01;
+  function payrollChance(payroll, bet) {
+    if (!(payroll?.amount > 0) || !(payroll.cap > 0)) return 0;
+    const room = payroll.cap - payroll.amount;
+    return room > 0 ? Math.min(1, (PAYROLL_SHARE * bet) / room) : 1;
+  }
+
+  // Konec kvartálu weekend: +50 % on the net profit of every round that ends
+  // ahead, up to a weekend limit.
+  const WINS_BONUS = 0.5;
+
+  // A round worth playing for its own expected profit, or null: the payroll
+  // fund close to its cap, or the Konec kvartálu bonus on wins. Per credit a
+  // round returns -edge, plus winsBonus times gain (the mean net profit per
+  // credit staked of the rounds that end ahead), plus the fund's chance times
+  // the fund over the bet. The bet is sized by fractional Kelly on that edge
+  // over the game's variance per round; the fund only ever adds, so its
+  // variance is no risk. The smallest level is always allowed, and the pick is
+  // the biggest expected profit per round. ctx: level, unlocks, edges, gains and variances per game,
+  // levels (affordable bets, ascending), bankroll (credits above the reserve),
+  // kelly, winsBonus (0 off the weekend or past its limit), payroll
+  // ({ amount, cap } or null).
+  function edgePlan(ctx) {
+    const levels = ctx.levels ?? [];
+    let best = null;
+    for (const game of Object.keys(ctx.unlocks)) {
+      const edge = ctx.edges[game];
+      if (edge === undefined || ctx.level < ctx.unlocks[game]) continue;
+      const base = -edge + (ctx.winsBonus ?? 0) * (ctx.gains?.[game] ?? 0);
+      for (const bet of levels) {
+        const chance = payrollChance(ctx.payroll, bet);
+        const fund = chance > 0 ? (chance * ctx.payroll.amount) / bet : 0;
+        const ev = base + fund;
+        if (!(ev > 0)) continue;
+        if (bet !== levels[0] && bet > (ev / (ctx.variances?.[game] ?? 1)) * ctx.kelly * ctx.bankroll) continue;
+        const value = ev * bet;
+        if (!best || value > best.value) best = { game, bet, ev, value, payroll: fund > 0 };
+      }
+    }
+    return best;
+  }
+
+  // Weekend events, one per weekend from Friday 17:00 to Monday 9:00 (Prague
+  // time, when the sprint ends), in this order from the week of 2026-10-05:
+  // Hackathon +50 % XP, Konec kvartálu +50 % on wins, Teambuilding double
+  // wheel, Placené přesčasy double work pay and XP. Same rule as the client.
+  const WEEKEND_EVENTS = ['xp', 'wins', 'wheel', 'overtime'];
+  const WEEKEND_EPOCH = Date.parse('2026-10-05T12:00:00Z');
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  const pragueDay = (ms) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Prague' }).format(ms);
+  const addDays = (day, n) => {
+    const d = new Date(`${day}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+  function pragueOffset(ms) {
+    const zone = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Prague', timeZoneName: 'shortOffset' })
+      .formatToParts(new Date(ms))
+      .find((part) => part.type === 'timeZoneName').value;
+    const m = /GMT([+-])(\d{1,2})(?::(\d{2}))?/.exec(zone);
+    return m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3] ?? 0)) * 60_000 : 0;
+  }
+  // Moment of the given Prague hour on a Prague day (YYYY-MM-DD).
+  function pragueAt(day, hour) {
+    const [y, m, d] = day.split('-').map(Number);
+    const local = Date.UTC(y, m - 1, d, hour);
+    return local - pragueOffset(local - pragueOffset(local));
+  }
+
+  // This week's event: { key, startAt, endAt, active }. A week runs from
+  // Monday 9:00, like the sprint.
+  function weekendEvent(now = Date.now()) {
+    let day = pragueDay(now);
+    if (now < pragueAt(day, 9)) day = addDays(day, -1);
+    const monday = addDays(day, -((new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7));
+    const weeks = Math.round((Date.parse(`${monday}T12:00:00Z`) - WEEKEND_EPOCH) / WEEK_MS);
+    const n = WEEKEND_EVENTS.length;
+    const startAt = pragueAt(addDays(monday, 4), 17);
+    const endAt = pragueAt(addDays(monday, 7), 9);
+    return { key: WEEKEND_EVENTS[((weeks % n) + n) % n], startAt, endAt, active: now >= startAt && now < endAt };
+  }
+
+  // Before a Placené přesčasy weekend, work waits while the energy it would
+  // spend refills to no more than the cap by the start, so the start finds a
+  // full bar to work at double pay. energyMs is one point's refill time.
+  function overtimeHold(energy, maxEnergy, event, now, energyMs) {
+    if (event?.key !== 'overtime' || now >= event.startAt) return false;
+    return energy + (event.startAt - now) / energyMs <= maxEnergy;
+  }
+
   // Chance that a crash bet placed now reaches its own multiplier target,
   // from the round history like bestCrashTarget. A target past the planned
   // outage is paid at that level instead, so it never reaches the target.
@@ -580,6 +727,14 @@
     huntPlan,
     crashHitChance,
     crashHuntWorth,
+    LOTTERY_RTP,
+    lotteryChance,
+    lotteryPlan,
+    payrollChance,
+    WINS_BONUS,
+    edgePlan,
+    weekendEvent,
+    overtimeHold,
     dayKey,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

@@ -11,10 +11,15 @@ Chrome extension (Manifest V3) that solves the work tickets ("Práce") in
   each response is booked to the right account.
 - `src/content.js` runs the loop: open the work screen, pick a ticket card,
   choose an answer, click the app's own button, dismiss the result with Escape, repeat.
-  There are three ticket types: bug hunt (click the buggy line), "Co to vypíše?"
-  (pick the printed output) and "Založ task" (read a help-desk message and pick type,
-  priority and team; the app submits it as one number, `type*100 + priority*10 + team`).
-  **Alternate** cycles through all three.
+  There are four ticket types: bug hunt (click the buggy line), "Co to vypíše?"
+  (pick the printed output), "Založ task" (read a help-desk message and pick type,
+  priority and team; the app submits it as one number, `type*100 + priority*10 + team`)
+  and "Přepiš kód" (retype a line of code character by character; the app blocks
+  pasting, so the bot types the line from the task at a quick typist's pace through the
+  input's native value setter and sends it with Enter). **Alternate** cycles through
+  all four. In auto mode **Alternate** works only "Přepiš kód": its answer is in the
+  task, so it is never wrong, and a wrong answer spends the energy without pay. Pick a
+  type in the panel to override that.
   When energy runs out it waits for the refill. It also dismisses the level-up
   and daily-bonus modals, which would otherwise block the screen.
 - The answer is chosen in this order:
@@ -72,7 +77,7 @@ progress shows at `chrome://on-device-internals`.
   clean-loan achievement (borrow 500, repay inside the free hour), open every
   leaderboard once a day (the podium achievement pays +1000 for top 3 on any board,
   debtors included), bet on crash only when the round history gives an expected
-  return above the threshold, work every ticket, and gamble other games only to grind
+  return above the threshold (stakes up to 10x the slot max bet, 10,000 from level 15), work every ticket, and gamble other games only to grind
   XP within a daily loss budget, down to a minimum account balance, or with the
   limit off down to the reserve (grinding is off by default). The grinder plans
   with the long-run house edge of each game at the account's current upgrades
@@ -121,8 +126,8 @@ progress shows at `chrome://on-device-internals`.
   achievements (wild, star, cascade and jackpot events, big wins) are left to the
   grinder: their chances are not modelled yet.
 - **Wheel of fortune** (Kolo štěstí, `/api/wheel/spin`): free once an hour, paid in
-  multiples of a base set by the player's title (100 to 300) or a coffee that refills
-  energy. It is spun as soon as `player.wheelNextAt` has passed, with the other free
+  multiples of the player's work pay (100 for Stážista up to 500 for Architekt) or a
+  coffee that refills energy. It is spun as soon as `player.wheelNextAt` has passed, with the other free
   claims (also outside auto mode), and booked as free income. Account rotation visits
   another account whose wheel is ready, right after accounts not seen today.
 - **Personal bankruptcy** (Insolvence, `/api/loan/bankrupt`, settings Auto tab, on by
@@ -149,7 +154,7 @@ progress shows at `chrome://on-device-internals`.
     it. A test checks the formula against a Monte Carlo run. At most once a week,
     because of the block. The loan is booked as free income.
   - **Sprint**: story points are the XP earned since Monday 9:00, and the top three
-    are paid 10,000 / 5,000 / 2,500 when the sprint ends. Bankruptcy wipes the week's
+    are paid 5,000 / 3,500 / 2,000 when the sprint ends. Bankruptcy wipes the week's
     points. Off the podium that is only this week's progress, so it is ignored. On the
     podium (read from the sprint leaderboard, refreshed every 10 minutes) the
     bankruptcy waits for the sprint to end and lands on the new sprint's first
@@ -157,6 +162,42 @@ progress shows at `chrome://on-device-internals`.
     execution comes after the prize. Each bankruptcy marks the name on the
     leaderboards for a week. The sprint board is also opened with the others for the
     podium achievement.
+- **Lottery** (Loterie, from level 4, part of the achievement hunt; `lotteryPlan` in
+  `src/auto.js`): 6 of 49, drawn every day at 20:00, at most five tickets per draw. A
+  ticket pays 1 / 20 / 200 / 2,000 / 10,000 times its price for 2 to 6 numbers, the
+  same odds at every price, so it returns about 71.7 % and never pays on its own. Its
+  achievements do: 3+ numbers (1,000), 4 numbers (5,000), 5 numbers (20,000, secret),
+  all five tickets on one draw (300) and tickets on 1 / 7 / 30 draws (300 / 2,000 /
+  5,000). Each ticket is valued at those rewards times their chance against its
+  expected loss, always at the cheapest price. That means five tickets a draw until 3
+  numbers hit once, then one ticket a draw for the draws-played tiers, then none. Ticket
+  purchases and the payouts of each draw are booked as the Lottery game.
+- **Payroll fund** (Mzdový fond, settings Auto tab, on by default; `edgePlan` in
+  `src/auto.js`): 1 % of every bet goes into a shared fund that must drop by its cap
+  (12,000), and the bet that drops it takes it all. The bot reads the fund from every
+  response that carries it and polls the feed once a minute otherwise. It models the
+  drop point as uniform between the fund and the cap, so a bet of `b` drops it with
+  chance `0.01 b / (cap - fund)`, worth that chance times the fund. Near the cap that
+  beats the house edge (from about 10,600 of 12,000 on roulette), and the bot bets on
+  the lowest-edge game. The bet is sized by half Kelly on the game's own variance only:
+  the fund can only add, so it is no risk. The client shows no sign that the player
+  pays the 1 %, so the house most likely funds it. A fund win is booked as free income.
+- **Weekend events** (`weekendEvent` in `src/auto.js`, same rotation as the client):
+  Friday 17:00 to Monday 9:00, Prague time, one per weekend from the week of
+  2026-10-05: Hackathon (+50 % XP), Konec kvartálu (+50 % on the net profit of every
+  round that ends ahead, up to a weekend limit the client does not show), Teambuilding
+  (the wheel pays double) and Placené přesčasy (work pays double credits and XP).
+  - Konec kvartálu turns the games positive: an even-money roulette bet returns
+    about +21.6 % a credit unupgraded. With the payroll setting on, the bot bets on the
+    game where `rtp + 0.5 * gain` is best (gain is the simulated mean net profit per
+    credit of the rounds that end ahead), half Kelly on its simulated variance, until a
+    winning round comes back without the bonus, which means the limit is reached. The
+    bonus is booked as free income so it does not inflate the game's measured return.
+  - Before Placené přesčasy, work waits while the energy refilling until Friday 17:00
+    still fits under the cap, so the event starts with a full bar, and during it work
+    drains energy at once instead of keeping it for the grinder.
+  - Hackathon and Teambuilding need nothing: XP per credit improves by the same factor
+    in every game, and the wheel is spun anyway.
 - **Settings for the rest** (settings, Auto tab): XP grinding game (cheapest
   per XP or a fixed game), bet (a fixed level, 20 by default); automatic shop purchases from
   a priority plan (`game:key` list, off by default) using the client's price and
@@ -191,8 +232,8 @@ progress shows at `chrome://on-device-internals`.
   dwell times are kept.
 - **Odds per upgrade** (settings, Games tab): for every game and every combination of
   its shop upgrades the return to player, the share of rounds won (more back than the
-  bet) and the chance that 1,000 rounds end ahead, all from the simulation in
-  `scripts/odds.mjs`. Roulette is an even-money bet, blackjack the bot's own strategy,
+  bet), the chance that 1,000 rounds end ahead and the return on a Konec kvartálu
+  weekend, all from the simulation in `scripts/odds.mjs`. Roulette is an even-money bet, blackjack the bot's own strategy,
   Blaze is listed per scatter rule. The current account's upgrades are marked.
 - **XP per game** (panel): for each game the house edge the grinder plans with, XP per
   100 credits wagered, credits lost per XP point and its state (locked or playing at
@@ -264,8 +305,10 @@ npm run check
 `node scripts/odds.mjs [spins]` regenerates `src/odds-table.js` (about 10 minutes at
 the default 300,000 spins per combination). Besides the slot returns it records, for
 every game and upgrade combination (roulette and blackjack included), the share of
-rounds that return more than the bet and the share of 10,000 sessions of 1,000 rounds,
-drawn from those spins, that end ahead. Rerun it when the casino changes a slot's
+rounds that return more than the bet, the share of 10,000 sessions of 1,000 rounds,
+drawn from those spins, that end ahead, the mean net profit per credit of the rounds
+that end ahead (what the Konec kvartálu bonus pays on) and the variance of one round's
+return (for Kelly sizing). Rerun it when the casino changes a slot's
 weights, paytable or upgrade effects. Skeleton Slots and Slotingi are evaluated on the
 server, so their models follow the client's rules text where it leaves details open:
 Skeleton counts rockets after the last cascade and lets free spins retrigger, Slotingi
@@ -278,7 +321,7 @@ press reload on the extension card in `chrome://extensions` and refresh the
 casino tab.
 
 Selectors the bot relies on (from the app bundle): `nav.views button` (2nd is
-Práce), `.work-screen`, `.work-pick .job-card` (bug hunt, output, then ticket),
+Práce), `.work-screen`, `.work-pick .job-card` (bug hunt, output, ticket, then typing), `.typing-input`,
 `section.task`, `.ticket`, `ol.code.lines > li button`, `.options button`,
 `.ticket-field .ticket-options button` and `.ticket-submit` (the triage rules are
 copied into `TICKET_FIELDS` in `src/core.js`),

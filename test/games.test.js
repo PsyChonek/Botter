@@ -118,7 +118,7 @@ test('gameDelta leaves out standup and achievement rewards paid with the round',
     quests: [{ key: 'a', reward: 480 }, { key: 'all', all: true, reward: 100 }],
     achievements: [{ key: 'standup', reward: 500 }],
   };
-  assert.deepEqual(G.rewardsPaid(data), { levelUp: 0, standup: 580, achievement: 500 });
+  assert.deepEqual(G.rewardsPaid(data), { levelUp: 0, standup: 580, achievement: 500, payroll: 0, event: 0 });
   assert.equal(G.rewardTotal(data), 1080);
   // 1500 - 1000 - 1080: the spin itself lost 580.
   assert.equal(G.gameDelta('/api/slot/spin', { bet: 20 }, data, 1000).net, -580);
@@ -129,4 +129,30 @@ test('UPGRADE_PLAN only names upgrades in the shop, each once', () => {
   const names = G.UPGRADE_PLAN.map(({ game, key }) => `${game}:${key}`);
   assert.ok(G.UPGRADE_PLAN.every(({ game, key }) => G.SHOP[game]?.[key]));
   assert.equal(new Set(names).size, names.length);
+});
+
+test('a payroll fund drop is booked as a reward, net of the garnish', () => {
+  const data = { player: { credits: 12_980 }, payrollWin: { amount: 12_000, garnished: 0 } };
+  assert.equal(G.rewardsPaid(data).payroll, 12_000);
+  assert.equal(G.gameDelta('/api/slot/spin', { bet: 20 }, data, 1000).net, -20);
+  assert.equal(G.rewardsPaid({ payrollWin: { amount: 12_000, garnished: 6000 } }).payroll, 6000);
+});
+
+test('the Konec kvartálu bonus is kept out of the game return', () => {
+  // A 100 bet won 200 back plus a 50 bonus.
+  const data = { player: { credits: 1150 }, eventBonus: 50 };
+  assert.equal(G.rewardsPaid(data).event, 50);
+  assert.equal(G.gameDelta('/api/roulette/spin', { bets: { red: 100 } }, data, 1000).net, 100);
+});
+
+test('lottery tickets are booked as lottery rounds at their price', () => {
+  const delta = G.gameDelta('/api/lottery/buy', { numbers: [1, 2, 3, 4, 5, 6], price: 20 }, { player: { credits: 980 } }, 1000);
+  assert.deepEqual([delta.game, delta.rounds, delta.wagered, delta.net], ['lottery', 1, 20, -20]);
+});
+
+test('crash stakes go up to 10x the slot max bet', () => {
+  assert.equal(G.betFor(5000, G.CRASH_MAX_BET(1000), G.CRASH_LEVELS), 4000);
+  assert.equal(G.betFor(50_000, G.CRASH_MAX_BET(1000), G.CRASH_LEVELS), 10_000);
+  assert.equal(G.betFor(5000, G.CRASH_MAX_BET(100), G.CRASH_LEVELS), 1000);
+  assert.equal(G.betFor(5000, 1000), 1000);
 });

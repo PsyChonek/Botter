@@ -2,7 +2,9 @@
 // Loaded as a classic script in the extension (exposes globalThis.BotterCore)
 // and via require() in Node.
 (function (root) {
-  const TYPES = ['bughunt', 'output', 'ticket'];
+  // Same order as the job cards on the work screen. "Přepiš kód" (typing) has
+  // its answer in the task, so it is never wrong.
+  const TYPES = ['bughunt', 'output', 'ticket', 'typing'];
 
   // Triage fields of the "Založ task" ticket, copied from the app. The answer is
   // one number with a digit per field: type * 100 + priority * 10 + team.

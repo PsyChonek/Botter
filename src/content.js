@@ -37,6 +37,7 @@
     loanTrick: true,
     standup: true,
     achievementHunt: true,
+    edgeBets: true,
     crashEnabled: true,
     crashBet: 100,
     crashMinEv: 1.05,
@@ -68,7 +69,7 @@
     free: { daily: 0, bailout: 0 },
     crashBooked: [],
     grind: { day: '', net: 0 },
-    flags: { cleanDone: false, cleanTaken: false, boardsDay: '' },
+    flags: { cleanDone: false, cleanTaken: false, boardsDay: '', lotteryDraw: '', winsCapped: 0 },
     dwell: {}, // task type -> least ms open before a submit the server accepts
   };
   const MAX_SUBMIT_TRIES = 3;
@@ -110,6 +111,16 @@
   // opening, so the hunt aims well inside that.
   const SPEEDY_MS = 2500;
   const SPEEDY_MIN_MS = 600;
+  // Delay between keystrokes on a "Přepiš kód" ticket, a quick typist's pace.
+  const TYPING_MIN_MS = 70;
+  const TYPING_MAX_MS = 190;
+  // The payroll fund is read from every response that carries it; while no
+  // bet brings a fresh amount, the feed is polled this often.
+  const PAYROLL_POLL_MS = 60_000;
+  // Fraction of the Kelly stake bet on rounds that pay by themselves.
+  const EDGE_KELLY = 0.5;
+  // workAvailable treats edge betting as grinding this long after a round was found worth it.
+  const EDGE_ACTIVE_MS = 30_000;
 
   let settings = { ...DEFAULT_SETTINGS };
   let bank = {};
@@ -139,6 +150,9 @@
   let crashPolledAt = 0;
   let shopReview = null; // { at, key, queue, goal } of the last shop review
   let sprint = null; // { rank, score, endAt, at } of this account in the weekly sprint
+  let payroll = null; // { amount, seed, cap, at } of the shared payroll fund
+  let lottery = null; // last lottery state from /api/lottery, with the local time it came
+  let edgeAt = 0; // when edgeStep last found a round that pays by itself
   let spins = []; // recorded Blaze spins for the model check
   let capture = []; // raw responses of rarely seen endpoints, for debugging
   let unsavedSpins = 0;
@@ -310,6 +324,8 @@
       return;
     }
     bookRewards(data);
+    if (data?.payroll && typeof data.payroll.amount === 'number') payroll = { ...data.payroll, at: Date.now() };
+    if (data?.lottery) readLottery(data.lottery);
     if (data?.crash) bookCrash(data.crash);
     if (data?.by === 'sprint' && Array.isArray(data.entries)) readSprint(data);
     if (path === '/api/slot/spin' && data.result) recordSpin(request, data);
@@ -334,6 +350,7 @@
         bjStake = data.hand && !data.hand.done ? delta.stake : 0;
         G.addDelta(stats.games, delta);
         if (stats.grind.day === A.dayKey()) stats.grind.net += delta.net;
+        checkWinsLimit(delta, data);
         saveStats();
         log.debug('game_round', delta);
       }
@@ -356,15 +373,19 @@
   // response's game or work profit. They also offset the day's grinding loss,
   // since the rounds played for a quest or an achievement pay for themselves.
   function bookRewards(data) {
-    const { standup, achievement } = G.rewardsPaid(data);
-    if (!standup && !achievement) return;
+    const { standup, achievement, payroll: fund, event } = G.rewardsPaid(data);
+    if (!standup && !achievement && !fund && !event) return;
     if (standup) stats.free.standup = (stats.free.standup ?? 0) + standup;
     if (achievement) stats.free.achievement = (stats.free.achievement ?? 0) + achievement;
-    if (stats.grind.day === A.dayKey()) stats.grind.net += standup + achievement;
+    if (fund) stats.free.payroll = (stats.free.payroll ?? 0) + fund;
+    if (event) stats.free.event = (stats.free.event ?? 0) + event;
+    if (stats.grind.day === A.dayKey()) stats.grind.net += standup + achievement + fund + event;
     saveStats();
+    if (!standup && !achievement && !fund) return;
     log.info('rewards', {
       standup,
       achievement,
+      payroll: fund,
       quests: data.quests?.map((quest) => quest.text),
       achievements: data.achievements?.map((item) => item.key),
     });
@@ -400,6 +421,29 @@
     }
   }
 
+  // The lottery state, and the payouts of the last draw once per draw: the
+  // server credits them at the draw, so they show up only here.
+  function readLottery(state) {
+    lottery = { ...state, at: Date.now() };
+    const last = state.last;
+    if (!last?.id || !last.mine?.length || stats.flags.lotteryDraw === last.id) return;
+    stats.flags.lotteryDraw = last.id;
+    const paid = last.mine.reduce((sum, ticket) => sum + (Number(ticket.payout) || 0), 0);
+    G.addDelta(stats.games, { game: 'lottery', rounds: 0, wagered: 0, net: paid, xp: 0 });
+    saveStats();
+    log.info('lottery_draw', { draw: last.id, numbers: last.numbers, hits: last.mine.map((t) => t.hits), paid });
+  }
+
+  // On a Konec kvartálu weekend every round that ends ahead gets a bonus until
+  // the weekend limit is reached. A winning round without one means it has been.
+  function checkWinsLimit(delta, data) {
+    const event = A.weekendEvent();
+    if (!event.active || event.key !== 'wins' || stats.flags.winsCapped === event.startAt) return;
+    if (data.eventBonus > 0 || !(delta.net > 0) || delta.game === 'lottery') return;
+    stats.flags.winsCapped = event.startAt;
+    log.info('wins_limit_reached', { game: delta.game, net: delta.net });
+  }
+
   // The account's place in the weekly sprint, from the sprint leaderboard. An
   // account missing from the board is off the podium.
   function readSprint(data) {
@@ -420,6 +464,9 @@
       stats[source][result.correct ? 'correct' : 'wrong'] += 1;
       pending = null;
       log.info('task_result', { ticket: C.ticketLabel(task.id), type: task.type, source, correct: result.correct });
+    } else if (task && task.id === taskId && task.type === 'typing') {
+      pending = null;
+      log.info('task_result', { ticket: C.ticketLabel(task.id), type: task.type, source: 'typed', correct: result.correct });
     }
     chrome.storage.local.set({ bank, ...statsEntry() });
   }
@@ -703,6 +750,7 @@
   async function solve(taskEl) {
     const current = task;
     answeredTaskId = current.id;
+    if (current.type === 'typing') return typeCode(taskEl, current);
     const started = Date.now();
     const { index, source } = await pickAnswer(current);
     if (index === null) {
@@ -733,6 +781,38 @@
     }
     pending = { taskId: current.id, source };
     button.click();
+  }
+
+  // "Přepiš kód": the line is in the task, so it is typed out key by key at a
+  // human pace (the app blocks pasting) and sent with Enter. The value is set
+  // through the native setter, which React's change tracking sees as typing.
+  const setInputValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  async function typeCode(taskEl, current) {
+    const input = taskEl.querySelector('.typing-input');
+    const code = String(current.code ?? '');
+    if (!input || input.disabled || !code) {
+      log.warn('answer_button_missing', { ticket: C.ticketLabel(current.id), field: 'typing' });
+      return;
+    }
+    setStatus('statusTyping', [C.ticketLabel(current.id), num.format([...code].length)]);
+    input.focus();
+    setInputValue.call(input, '');
+    for (const ch of code) {
+      setInputValue.call(input, input.value + ch);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      await sleep(C.delayBetween(TYPING_MIN_MS, TYPING_MAX_MS));
+      if (!workOn() || task?.id !== current.id) return;
+    }
+    const dwellLeft = C.minDwellMs(current, stats.dwell[current.type]) - (Date.now() - taskOpenedAt);
+    await sleep(Math.max(dwellLeft, C.delayBetween(200, 500)));
+    if (!workOn() || task?.id !== current.id) return;
+    if (input.value !== code) {
+      log.warn('typing_mismatch', { ticket: C.ticketLabel(current.id) });
+      answeredTaskId = null;
+      return;
+    }
+    pending = { taskId: current.id, source: 'typed' };
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
   }
 
   // A ticket is answered by picking one option per field, then submitting. React
@@ -766,10 +846,18 @@
     if (document.querySelector('.work-screen section.task')) return true;
     if (!player) return true;
     if (normDone()) return false;
-    const energy = G.energyNow(player.work, Date.now());
-    workRun = A.workDue(energy, player.work.maxEnergy ?? 20, workRun, WORK_MIN_ENERGY, grindReady());
+    const now = Date.now();
+    const energy = G.energyNow(player.work, now);
+    const maxEnergy = player.work.maxEnergy ?? 20;
     // The achievement hunt works one ticket on Friday evening, whatever the energy plan.
-    const friday = huntOn() && energy >= 1 && A.fridayEvening(Date.now()) && A.achievementTier(player, 'friday_deploy') !== null;
+    const friday = huntOn() && energy >= 1 && A.fridayEvening(now) && A.achievementTier(player, 'friday_deploy') !== null;
+    // Placené přesčasy pays double: energy is saved up for its start and then
+    // worked down at once. Rounds that pay by themselves count as grinding.
+    const event = settings.autoMode ? A.weekendEvent(now) : null;
+    if (event && A.overtimeHold(energy, maxEnergy, event, now, G.ENERGY_MS)) return friday;
+    const overtime = event?.active && event.key === 'overtime';
+    const grinding = !overtime && (grindReady() || now - edgeAt < EDGE_ACTIVE_MS);
+    workRun = A.workDue(energy, maxEnergy, workRun, WORK_MIN_ENERGY, grinding);
     return workRun || friday;
   }
 
@@ -840,7 +928,10 @@
 
     const pick = screen.querySelector('.work-pick');
     if (!pick) return;
-    const type = C.nextType(settings.taskType, lastType);
+    // Auto mode works "Přepiš kód" unless a type is pinned: it is never wrong,
+    // and a wrong answer spends the energy without pay.
+    const preference = settings.autoMode && settings.taskType === 'alternate' ? 'typing' : settings.taskType;
+    const type = C.nextType(preference, lastType);
     const card = pick.querySelectorAll('.job-card')[C.TYPES.indexOf(type)];
     if (!card || card.disabled) {
       setStatus('statusNoEnergy');
@@ -1233,8 +1324,8 @@
     // crash bet, the table max, and the reserve. A fatter edge bets more.
     const bankroll = Math.max(0, player.credits - settings.reserve);
     const wanted = A.crashStake(plan, bankroll, settings.crashKelly);
-    const cap = Math.min(settings.crashBet, player.maxBet);
-    const stake = G.betFor(wanted, cap);
+    const cap = Math.min(settings.crashBet, G.CRASH_MAX_BET(player.maxBet));
+    const stake = G.betFor(wanted, cap, G.CRASH_LEVELS);
     if (player.credits - stake < settings.reserve) return true;
     setStatus('statusCrashBet', [
       credits(stake),
@@ -1293,6 +1384,98 @@
     if (!res.ok) {
       log.warn('hunt_failed', { game, bet, spot, status: res.status, error: res.data?.error });
       claimTried.hunt = Date.now();
+    }
+    await sleep(settings.gameDelayMs);
+    return true;
+  }
+
+  // Lottery tickets for the next draw while their achievements pay for them
+  // (BotterAuto.lotteryPlan), one ticket a tick at the cheapest price on
+  // random numbers. The state is read again every ten minutes and after a draw.
+  async function lotteryStep() {
+    if (!huntOn() || player.level < G.LOTTERY_UNLOCK) return false;
+    const now = Date.now();
+    if (!lottery?.next || now - lottery.at > CLAIM_RETRY_MS || now >= lottery.next.drawAt) {
+      if (now - (claimTried.lottery ?? 0) < CRASH_POLL_MS) return false;
+      claimTried.lottery = now;
+      await api('/api/lottery');
+      return true;
+    }
+    if (now - (claimTried.lotteryBuy ?? 0) < CLAIM_RETRY_MS) return false;
+    const reserve = limits().reserve;
+    const mine = lottery.next.mine?.length ?? 0;
+    const plan = A.lotteryPlan(player, {
+      mine,
+      prices: (lottery.prices ?? []).filter((price) => player.credits - price >= reserve),
+    });
+    if (!plan) return false;
+    const numbers = lotteryNumbers();
+    setStatus('statusLottery', [String(mine + 1), String(mine + plan.tickets), credits(plan.price)]);
+    const res = await api('/api/lottery/buy', { numbers, price: plan.price });
+    if (!res.ok) {
+      claimTried.lotteryBuy = Date.now();
+      log.warn('lottery_buy_failed', { price: plan.price, status: res.status, error: res.data?.error });
+    } else {
+      log.info('lottery_ticket', { numbers, price: plan.price, tickets: mine + 1, value: plan.value });
+    }
+    return true;
+  }
+
+  // Six distinct numbers of 1 to 49; every ticket has the same odds.
+  function lotteryNumbers() {
+    const pool = Array.from({ length: 49 }, (_, i) => i + 1);
+    const out = [];
+    while (out.length < 6) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    return out.sort((a, b) => a - b);
+  }
+
+  // Logged when what edgeStep bets on changes, not on every round.
+  let edgeNote = '';
+
+  // Rounds that pay by themselves (BotterAuto.edgePlan): the payroll fund near
+  // its cap, or wins on a Konec kvartálu weekend until its limit. Sized by
+  // fractional Kelly; like the standup they keep the reserve but not the
+  // grinding budget. A stale fund amount is read from the feed first.
+  async function edgeStep() {
+    if (!settings.edgeBets) return false;
+    const now = Date.now();
+    if ((!payroll || now - payroll.at > PAYROLL_POLL_MS) && now - (claimTried.payroll ?? 0) > PAYROLL_POLL_MS) {
+      claimTried.payroll = now;
+      await api('/api/feed');
+      if (!payroll) log.info('payroll_unknown');
+      return true;
+    }
+    if (now - (claimTried.edge ?? 0) < CLAIM_RETRY_MS) return false;
+    const event = A.weekendEvent(now);
+    const winsOn = event.active && event.key === 'wins' && stats.flags.winsCapped !== event.startAt;
+    const reserve = limits().reserve;
+    const mode = blazeMode();
+    const plan = A.edgePlan({
+      level: player.level,
+      unlocks: GRIND_UNLOCKS,
+      edges: O.edges(G.GAME_KEYS, player.upgrades, mode),
+      gains: O.gains(G.GAME_KEYS, player.upgrades, mode),
+      variances: O.variances(G.GAME_KEYS, player.upgrades, mode),
+      levels: G.BET_LEVELS.filter((bet) => bet <= player.maxBet && player.credits - bet >= reserve),
+      bankroll: Math.max(0, player.credits - reserve),
+      kelly: EDGE_KELLY,
+      winsBonus: winsOn ? A.WINS_BONUS : 0,
+      payroll: payroll && now - payroll.at <= PAYROLL_POLL_MS ? payroll : null,
+    });
+    const note = plan ? `${plan.game} ${plan.bet} ${plan.payroll}` : '';
+    if (note !== edgeNote) {
+      edgeNote = note;
+      if (plan) log.info('edge_plan', { ...plan, fund: payroll?.amount, cap: payroll?.cap, wins: winsOn });
+    }
+    if (!plan) return false;
+    edgeAt = now;
+    const { game, bet } = plan;
+    if (plan.payroll) setStatus('statusPayrollBet', [credits(payroll.amount), credits(payroll.cap), msg(`game_${game}`), credits(bet)]);
+    else setStatus('statusWinsBet', [msg(`game_${game}`), credits(bet), signedPct.format(plan.ev)]);
+    const res = await playRound(game, bet);
+    if (!res.ok) {
+      log.warn('edge_failed', { game, bet, status: res.status, error: res.data?.error });
+      claimTried.edge = Date.now();
     }
     await sleep(settings.gameDelayMs);
     return true;
@@ -1415,8 +1598,10 @@
     if (await buyStep()) return;
     if (await leaderboardStep()) return;
     if (await crashStep()) return;
+    if (await lotteryStep()) return;
     if (await standupStep()) return;
     if (workAvailable()) return workStep();
+    if (await edgeStep()) return;
     if (await huntStep()) return;
     if (await grindStep()) return;
     if (await rotateStep()) return;
@@ -1527,6 +1712,7 @@
             <option value="bughunt"></option>
             <option value="output"></option>
             <option value="ticket"></option>
+            <option value="typing"></option>
           </select>
           <button type="button" class="work-toggle"></button>
         </div>

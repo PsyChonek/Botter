@@ -65,7 +65,8 @@ test('nextType cycles through every type unless one is pinned', () => {
   assert.equal(C.nextType('alternate', null), 'bughunt');
   assert.equal(C.nextType('alternate', 'bughunt'), 'output');
   assert.equal(C.nextType('alternate', 'output'), 'ticket');
-  assert.equal(C.nextType('alternate', 'ticket'), 'bughunt');
+  assert.equal(C.nextType('alternate', 'ticket'), 'typing');
+  assert.equal(C.nextType('alternate', 'typing'), 'bughunt');
   assert.equal(C.nextType('output', 'output'), 'output');
   assert.equal(C.nextType('ticket', 'bughunt'), 'ticket');
 });

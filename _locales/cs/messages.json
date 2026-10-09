@@ -1091,7 +1091,7 @@
     "message": "Šance podle vylepšení"
   },
   "optionsOddsHint": {
-    "message": "Simulováno pro každou hru a každou kombinaci jejích vylepšení z obchodu: návratnost, podíl kol, která vrátí víc než sázku, a podíl sérií po 1 000 kolech, které skončí v plusu. Ruleta je sázka 1:1, blackjack strategie bota. Vylepšení aktuálního účtu jsou označená."
+    "message": "Simulováno pro každou hru a každou kombinaci jejích vylepšení z obchodu: návratnost, podíl kol, která vrátí víc než sázku, a podíl sérií po 1 000 kolech, které skončí v plusu. Ruleta je sázka 1:1, blackjack strategie bota. Vylepšení aktuálního účtu jsou označená. Poslední sloupec je návratnost o víkendu Konec kvartálu, kdy každé kolo v plusu dostane o 50 % víc zisku až do víkendového limitu."
   },
   "oddsGame": {
     "message": "$GAME$, $COUNT$ kombinací",
@@ -1126,5 +1126,79 @@
   },
   "colAhead1000": {
     "message": "V plusu po 1 000"
+  },
+  "type_typing": {
+    "message": "Přepiš kód"
+  },
+  "game_lottery": {
+    "message": "Loterie"
+  },
+  "free_payroll": {
+    "message": "Mzdový fond"
+  },
+  "free_event": {
+    "message": "Víkendový bonus z výher"
+  },
+  "statusTyping": {
+    "message": "Opisuji $P1$ ($P2$ znaků)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "statusLottery": {
+    "message": "Loterie: tiket $P1$ z $P2$ za $P3$ kvůli achievementům",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "statusPayrollBet": {
+    "message": "Mzdový fond na $P1$ z $P2$: sázím na $P3$ po $P4$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      },
+      "p4": {
+        "content": "$4"
+      }
+    }
+  },
+  "statusWinsBet": {
+    "message": "Bonus Konec kvartálu: $P1$ po $P2$, čekaný zisk $P3$ na kredit",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "optionsEdgeBets": {
+    "message": "Sázet, když se kolo samo vyplatí (mzdový fond blízko stropu, víkend Konec kvartálu)"
+  },
+  "colWinsRtp": {
+    "message": "Konec kvartálu"
   }
 }

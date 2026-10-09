@@ -460,8 +460,8 @@ test('standupPlan skips quests that cost more than they pay or cannot be played'
 });
 
 test('sprint prize at stake only on the podium with points', () => {
-  assert.equal(A.sprintAtStake({ rank: 1, score: 900 }), 10_000);
-  assert.equal(A.sprintAtStake({ rank: 3, score: 900 }), 2_500);
+  assert.equal(A.sprintAtStake({ rank: 1, score: 900 }), 5_000);
+  assert.equal(A.sprintAtStake({ rank: 3, score: 900 }), 2_000);
   assert.equal(A.sprintAtStake({ rank: 4, score: 900 }), 0);
   assert.equal(A.sprintAtStake({ rank: 1, score: 0 }), 0);
   assert.equal(A.sprintAtStake(null), 0);
@@ -550,4 +550,105 @@ test('fridayEvening is Friday from 17:00', () => {
   assert.equal(A.fridayEvening(new Date(2026, 9, 9, 17).getTime()), true);
   assert.equal(A.fridayEvening(new Date(2026, 9, 9, 16, 59).getTime()), false);
   assert.equal(A.fridayEvening(new Date(2026, 9, 10, 18).getTime()), false);
+});
+
+test('lottery tickets pay about 71.7 % back', () => {
+  assert.ok(Math.abs(A.LOTTERY_RTP - 0.7167) < 0.0005);
+  const all = [0, 1, 2, 3, 4, 5, 6].reduce((sum, hits) => sum + A.lotteryChance(hits), 0);
+  assert.ok(Math.abs(all - 1) < 1e-12);
+});
+
+test('lotteryPlan buys five cheap tickets while the hit achievements are open', () => {
+  const plan = A.lotteryPlan({ achievements: {} }, { mine: 0, prices: [100, 20, 40] });
+  assert.deepEqual([plan.price, plan.tickets], [20, 5]);
+  // Two tickets already on the draw: three more fill it.
+  assert.equal(A.lotteryPlan({ achievements: {} }, { mine: 2, prices: [20] }).tickets, 3);
+  assert.equal(A.lotteryPlan({ achievements: {} }, { mine: 5, prices: [20] }), null);
+  assert.equal(A.lotteryPlan({ achievements: {} }, { mine: 0, prices: [] }), null);
+});
+
+test('lotteryPlan buys one ticket per draw for the draws-played tiers only', () => {
+  const done = { lottery_3: { tier: 1 }, lottery_full: { tier: 1 } };
+  const plan = A.lotteryPlan({ achievements: { ...done, lottery_days: { tier: 1 } }, achProgress: { lottery_days: 3 } }, { mine: 0, prices: [20] });
+  assert.equal(plan.tickets, 1);
+  // A ticket already on this draw counted it.
+  assert.equal(A.lotteryPlan({ achievements: done }, { mine: 1, prices: [20] }), null);
+  const allDone = { ...done, lottery_days: { tier: 3 } };
+  assert.equal(A.lotteryPlan({ achievements: allDone }, { mine: 0, prices: [20] }), null);
+});
+
+test('payrollChance grows with the bet and is sure once 1 % covers the room left', () => {
+  const fund = { amount: 11_500, cap: 12_000 };
+  assert.equal(A.payrollChance(fund, 1000), 0.02);
+  assert.equal(A.payrollChance({ amount: 11_995, cap: 12_000 }, 1000), 1);
+  assert.equal(A.payrollChance(null, 1000), 0);
+  assert.equal(A.payrollChance({ amount: 12_000, cap: 12_000 }, 20), 1);
+});
+
+test('edgePlan bets on the payroll fund only near its cap', () => {
+  const ctx = {
+    level: 20,
+    unlocks: { blaze: 1, roulette: 15 },
+    edges: { blaze: 0.3, roulette: 0.027 },
+    variances: { roulette: 1 },
+    levels: [20, 40, 100, 200, 400, 1000],
+    bankroll: 20_000,
+    kelly: 0.5,
+    winsBonus: 0,
+  };
+  // Far from the cap the fund adds 0.01 * 6000 / 6000 = 1 % per credit, less than the edge.
+  assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 6000, cap: 12_000 } }), null);
+  // At 11,500 it adds 23 %: the biggest bet Kelly allows on roulette.
+  const plan = A.edgePlan({ ...ctx, payroll: { amount: 11_500, cap: 12_000 } });
+  assert.deepEqual([plan.game, plan.bet, plan.payroll], ['roulette', 1000, true]);
+  // A small bankroll keeps the bet small.
+  assert.equal(A.edgePlan({ ...ctx, bankroll: 1000, payroll: { amount: 11_500, cap: 12_000 } }).bet, 100);
+  assert.equal(A.edgePlan({ ...ctx, payroll: null }), null);
+});
+
+test('edgePlan plays the Konec kvartálu bonus on the game with the best edge', () => {
+  const ctx = {
+    level: 20,
+    unlocks: { blaze: 1, roulette: 15 },
+    edges: { blaze: 0.3, roulette: 0.027 },
+    gains: { blaze: 0.2, roulette: 0.486 },
+    variances: { blaze: 20, roulette: 1 },
+    levels: [20, 40, 100, 200, 400, 1000],
+    bankroll: 5000,
+    kelly: 0.5,
+    winsBonus: A.WINS_BONUS,
+    payroll: null,
+  };
+  const plan = A.edgePlan(ctx);
+  // 0.5 * 0.486 - 0.027 = +21.6 % a credit; half Kelly on 5,000 allows 540.
+  assert.equal(plan.game, 'roulette');
+  assert.equal(plan.bet, 400);
+  assert.ok(Math.abs(plan.ev - 0.216) < 1e-9);
+  assert.equal(A.edgePlan({ ...ctx, winsBonus: 0 }), null);
+});
+
+test('weekendEvent follows the client rotation from Friday 17:00 to Monday 9:00 Prague time', () => {
+  const at = (iso) => A.weekendEvent(Date.parse(iso));
+  const first = at('2026-10-09T16:00:00Z');
+  assert.equal(first.key, 'xp');
+  assert.equal(first.active, true);
+  assert.equal(new Date(first.startAt).toISOString(), '2026-10-09T15:00:00.000Z');
+  assert.equal(new Date(first.endAt).toISOString(), '2026-10-12T07:00:00.000Z');
+  assert.equal(at('2026-10-09T14:59:00Z').active, false);
+  assert.equal(at('2026-10-12T06:59:00Z').active, true);
+  assert.deepEqual(
+    ['2026-10-17', '2026-10-24', '2026-10-31', '2026-11-07'].map((day) => at(`${day}T12:00:00Z`).key),
+    ['wins', 'wheel', 'overtime', 'xp'],
+  );
+  // Winter time: 17:00 Prague is 16:00 UTC.
+  assert.equal(new Date(at('2026-10-31T12:00:00Z').startAt).toISOString(), '2026-10-30T16:00:00.000Z');
+});
+
+test('overtimeHold saves energy for the start of a double-pay weekend', () => {
+  const event = { key: 'overtime', startAt: 100 * 120_000 };
+  // 10 points refill by the start: holding 10 ends at the cap of 20.
+  assert.equal(A.overtimeHold(10, 20, event, 90 * 120_000, 120_000), true);
+  assert.equal(A.overtimeHold(11, 20, event, 90 * 120_000, 120_000), false);
+  assert.equal(A.overtimeHold(10, 20, event, 100 * 120_000, 120_000), false);
+  assert.equal(A.overtimeHold(10, 20, { ...event, key: 'xp' }, 90 * 120_000, 120_000), false);
 });

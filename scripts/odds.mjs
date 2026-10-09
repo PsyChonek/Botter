@@ -38,24 +38,34 @@ function combos(maxLevels) {
 
 const round3 = (x) => Math.round(x * 1000) / 1000;
 
-// Return to player, share of rounds that return more than the bet, and share
-// of SESSION_ROUNDS-round sessions that end ahead, from the per-round returns
-// (per unit bet) of one combination. Sessions are drawn from those returns with
-// replacement, so a payout rarer than one in SPINS rounds is left out.
+// Return to player, share of rounds that return more than the bet, share of
+// SESSION_ROUNDS-round sessions that end ahead, the mean net profit per unit
+// bet of the rounds that end ahead (what a bonus on wins pays on) and the
+// variance of one round's return, from the per-round returns (per unit bet) of
+// one combination. Sessions are drawn from those returns with replacement, so
+// a payout rarer than one in SPINS rounds is left out.
 function summary(returns) {
   let paid = 0;
   let won = 0;
+  let gain = 0;
+  let squares = 0;
   for (const r of returns) {
     paid += r;
-    if (r > 1 + 1e-9) won++;
+    squares += r * r;
+    if (r > 1 + 1e-9) {
+      won++;
+      gain += r - 1;
+    }
   }
+  const n = returns.length;
+  const variance = squares / n - (paid / n) ** 2;
   let ahead = 0;
   for (let s = 0; s < SESSIONS; s++) {
     let total = 0;
     for (let n = 0; n < SESSION_ROUNDS; n++) total += returns[(rand() * returns.length) | 0];
     if (total > SESSION_ROUNDS + 1e-6) ahead++;
   }
-  return { rtp: round3(paid / returns.length), chances: [round3(won / returns.length), round3(ahead / SESSIONS)] };
+  return { rtp: round3(paid / n), chances: [round3(won / n), round3(ahead / SESSIONS), round3(gain / n), round3(variance)] };
 }
 
 // ---------- Blaze 20 Wild (model in src/blaze.js) ----------
@@ -358,8 +368,10 @@ writeFileSync(
 // Slot return to player per upgrade combination. Keys are the upgrade levels in
 // order: blaze lucky/wild/star (per scatter rule), skeleton team/wild/deploy,
 // slotingi crown/gulas/mint. chances holds [share of rounds that end ahead,
-// share of ${SESSION_ROUNDS.toLocaleString('en')}-round sessions that end ahead] per game and combination,
-// also for roulette zeros (an even-money bet) and blackjack bjpay/ties/soft17/double.
+// share of ${SESSION_ROUNDS.toLocaleString('en')}-round sessions that end ahead, mean net profit per unit
+// bet of the rounds that end ahead, variance of one round's return] per game and
+// combination, also for roulette zeros (an even-money bet) and blackjack
+// bjpay/ties/soft17/double.
 (function (root) {
   const table = ${JSON.stringify(table)};
   if (typeof module !== 'undefined' && module.exports) module.exports = table;

@@ -1091,7 +1091,7 @@
     "message": "Odds per upgrade"
   },
   "optionsOddsHint": {
-    "message": "Simulated for every game and every combination of its shop upgrades: the return to player, the share of rounds that pay more than the bet, and the share of 1,000-round sessions that end ahead. Roulette is an even-money bet, blackjack the bot's own strategy. The current account's upgrades are marked."
+    "message": "Simulated for every game and every combination of its shop upgrades: the return to player, the share of rounds that pay more than the bet, and the share of 1,000-round sessions that end ahead. Roulette is an even-money bet, blackjack the bot's own strategy. The current account's upgrades are marked. The last column is the return on a Konec kvartálu weekend, when every round that ends ahead gets 50 % more profit until the weekend limit."
   },
   "oddsGame": {
     "message": "$GAME$, $COUNT$ combinations",
@@ -1126,5 +1126,79 @@
   },
   "colAhead1000": {
     "message": "Ahead after 1,000"
+  },
+  "type_typing": {
+    "message": "Retype code"
+  },
+  "game_lottery": {
+    "message": "Lottery"
+  },
+  "free_payroll": {
+    "message": "Payroll fund"
+  },
+  "free_event": {
+    "message": "Weekend win bonus"
+  },
+  "statusTyping": {
+    "message": "Typing $P1$ ($P2$ characters)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "statusLottery": {
+    "message": "Lottery: ticket $P1$ of $P2$ at $P3$ for the achievements",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "statusPayrollBet": {
+    "message": "Payroll fund at $P1$ of $P2$: betting on $P3$ at $P4$ a round",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      },
+      "p4": {
+        "content": "$4"
+      }
+    }
+  },
+  "statusWinsBet": {
+    "message": "Konec kvartálu bonus: $P1$ at $P2$ a round, $P3$ expected per credit",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "optionsEdgeBets": {
+    "message": "Bet when a round pays by itself (payroll fund near its cap, Konec kvartálu weekend)"
+  },
+  "colWinsRtp": {
+    "message": "Konec kvartálu"
   }
 }

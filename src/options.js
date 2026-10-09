@@ -10,6 +10,7 @@ const CHECKBOXES = [
   'loanTrick',
   'standup',
   'achievementHunt',
+  'edgeBets',
   'crashEnabled',
   'buyUpgrades',
   'saveForUpgrades',
@@ -45,6 +46,7 @@ const DEFAULTS = {
   loanTrick: true,
   standup: true,
   achievementHunt: true,
+  edgeBets: true,
   crashEnabled: true,
   crashBet: 100,
   crashMinEv: 1.05,
@@ -439,6 +441,7 @@ async function showAccounts() {
 // Odds of every game and upgrade combination (BotterOdds.table), built once.
 // Rows matching the upgrades of the account seen last are marked.
 const O = globalThis.BotterOdds;
+const A = globalThis.BotterAuto;
 const oddsRows = [];
 
 function buildOdds() {
@@ -452,7 +455,7 @@ function buildOdds() {
         ? msg('oddsGameRule', [msg(`game_${game}`), msg(`scatter_${mode}`), num.format(rows.length)])
         : msg('oddsGame', [msg(`game_${game}`), num.format(rows.length)]);
       const head = document.createElement('tr');
-      for (const key of ['colUpgrades', 'colRtp', 'colRoundWon', 'colAhead1000']) {
+      for (const key of ['colUpgrades', 'colRtp', 'colRoundWon', 'colAhead1000', 'colWinsRtp']) {
         const th = document.createElement('th');
         th.scope = 'col';
         th.textContent = msg(key);
@@ -468,6 +471,8 @@ function buildOdds() {
           cell(row.rtp === null ? '-' : pct2.format(row.rtp)),
           cell(row.win === undefined ? '-' : pct2.format(row.win)),
           cell(row.ahead === undefined ? '-' : pct2.format(row.ahead)),
+          // Return on a Konec kvartálu weekend: the bonus adds to every round that ends ahead.
+          cell(row.rtp === null || row.gain === null || row.gain === undefined ? '-' : pct2.format(row.rtp + A.WINS_BONUS * row.gain)),
         );
         tbody.append(tr);
         oddsRows.push({ game, upgrades: row.upgrades, tr });

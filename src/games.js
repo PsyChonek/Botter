@@ -3,6 +3,9 @@
 // extension, require() in Node).
 (function (root) {
   const BET_LEVELS = [20, 40, 100, 200, 400, 1000];
+  // Produkce padá takes stakes up to 10x the slot max bet (10,000 from level 15).
+  const CRASH_LEVELS = [...BET_LEVELS, 2000, 4000, 10_000];
+  const CRASH_MAX_BET = (maxBet) => maxBet * 10;
   const ENERGY_MS = 120_000;
 
   // Unlock levels and spin endpoints mirror the casino's own game list.
@@ -13,6 +16,7 @@
     blackjack: { unlock: 10 },
     roulette: { unlock: 15 },
   };
+  const LOTTERY_UNLOCK = 4;
   const GAME_KEYS = Object.keys(GAMES);
   const ROULETTE_BETS = ['red', 'black', 'even', 'odd', 'low', 'high'];
 
@@ -25,6 +29,7 @@
     '/api/roulette/spin': 'roulette',
     '/api/blackjack/deal': 'blackjack',
     '/api/blackjack/action': 'blackjack',
+    '/api/lottery/buy': 'lottery',
   };
 
   // Shop catalog copied from the client: [max level, base price, price growth].
@@ -99,9 +104,9 @@
   }
 
   // Highest allowed bet level that does not exceed what the user asked for.
-  function betFor(wanted, maxBet) {
-    const allowed = BET_LEVELS.filter((b) => b <= maxBet);
-    if (!allowed.length) return BET_LEVELS[0];
+  function betFor(wanted, maxBet, levels = BET_LEVELS) {
+    const allowed = levels.filter((b) => b <= maxBet);
+    if (!allowed.length) return levels[0];
     return [...allowed].reverse().find((b) => b <= wanted) ?? allowed[0];
   }
 
@@ -114,12 +119,21 @@
     return Math.min(maxEnergy, energy + Math.max(0, gained));
   }
 
-  // Credits a response pays on top of what was played: a level-up reward, and
-  // the rewards of standup quests and achievements it completed, which the
-  // server pays at once. { levelUp, standup, achievement }.
+  // Credits a response pays on top of what was played: a level-up reward, the
+  // rewards of standup quests and achievements it completed, which the server
+  // pays at once, the shared payroll fund when this bet dropped it (less what
+  // the debt collector took), and the Konec kvartálu weekend bonus on a win.
+  // { levelUp, standup, achievement, payroll, event }.
   function rewardsPaid(data) {
     const sum = (list) => (Array.isArray(list) ? list.reduce((total, item) => total + (Number(item?.reward) || 0), 0) : 0);
-    return { levelUp: Number(data?.levelUp?.reward) || 0, standup: sum(data?.quests), achievement: sum(data?.achievements) };
+    const fund = data?.payrollWin;
+    return {
+      levelUp: Number(data?.levelUp?.reward) || 0,
+      standup: sum(data?.quests),
+      achievement: sum(data?.achievements),
+      payroll: Math.max(0, (Number(fund?.amount) || 0) - (Number(fund?.garnished) || 0)),
+      event: Math.max(0, Number(data?.eventBonus) || 0),
+    };
   }
 
   const rewardTotal = (data) => Object.values(rewardsPaid(data)).reduce((a, b) => a + b, 0);
@@ -136,6 +150,8 @@
       wagered = Object.values(request?.bets ?? {}).reduce((sum, amount) => sum + amount, 0);
     } else if (path === '/api/blackjack/deal') {
       wagered = data.hand?.stake ?? request?.bet ?? 0;
+    } else if (path === '/api/lottery/buy') {
+      wagered = request?.price ?? 0;
     } else if (path === '/api/blackjack/action') {
       // Only a double adds to the stake; hit and stand cost nothing.
       rounds = 0;
@@ -183,6 +199,10 @@
 
   const api = {
     BET_LEVELS,
+    ENERGY_MS,
+    CRASH_LEVELS,
+    CRASH_MAX_BET,
+    LOTTERY_UNLOCK,
     GAMES,
     GAME_KEYS,
     ROULETTE_BETS,

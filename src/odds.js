@@ -62,24 +62,32 @@
     return out;
   }
 
-  // Simulated { win, ahead }: the share of rounds that return more than the
-  // bet, and of 1,000-round sessions that end ahead, or null without a model.
+  // Simulated { win, ahead, gain, variance }: the share of rounds that return
+  // more than the bet and of 1,000-round sessions that end ahead, the mean net
+  // profit per credit staked of the rounds that end ahead, and the variance of
+  // one round's return per credit, or null without a model. gain and variance
+  // are null in a table generated before they were recorded.
   function chances(game, upgrades, blazeMode = 'reels') {
     if (!UPGRADES[game]) return null;
     const games = TABLE.chances?.[game];
-    const pair = (game === 'blaze' ? games?.[blazeMode] : games)?.[key(game, upgrades?.[game])];
-    return pair ? { win: pair[0], ahead: pair[1] } : null;
+    const row = (game === 'blaze' ? games?.[blazeMode] : games)?.[key(game, upgrades?.[game])];
+    return row ? { win: row[0], ahead: row[1], gain: row[2] ?? null, variance: row[3] ?? null } : null;
   }
 
-  // Share of rounds that end ahead per game, for the games that have a model.
-  function winRates(games, upgrades, blazeMode) {
-    const out = {};
-    for (const game of games) {
-      const c = chances(game, upgrades, blazeMode);
-      if (c) out[game] = c.win;
-    }
-    return out;
+  // One simulated figure (see chances) per game, for the games that have it.
+  function pick(field) {
+    return (games, upgrades, blazeMode) => {
+      const out = {};
+      for (const game of games) {
+        const value = chances(game, upgrades, blazeMode)?.[field];
+        if (value !== null && value !== undefined) out[game] = value;
+      }
+      return out;
+    };
   }
+  const winRates = pick('win');
+  const gains = pick('gain');
+  const variances = pick('variance');
 
   // Every upgrade combination of a game with its return and chances, from no
   // upgrades to all maxed: [{ upgrades: { name: level }, rtp, win, ahead }].
@@ -104,7 +112,7 @@
     return symbols.match > reels.match ? 'symbols' : 'reels';
   }
 
-  const api = { UPGRADES, rtp, edges, chances, winRates, table, blazeMode };
+  const api = { UPGRADES, rtp, edges, chances, winRates, gains, variances, table, blazeMode };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BotterOdds = api;
 })(globalThis);
