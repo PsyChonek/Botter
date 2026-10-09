@@ -127,7 +127,7 @@ progress shows at `chrome://on-device-internals`.
   grinder: their chances are not modelled yet.
 - **Wheel of fortune** (Kolo štěstí, `/api/wheel/spin`): free once an hour, paid in
   multiples of the player's work pay (100 for Stážista up to 500 for Architekt) or a
-  coffee that refills energy. It is spun as soon as `player.wheelNextAt` has passed, with the other free
+  coffee that refills energy. It is spun 5 seconds after `player.wheelNextAt` has passed (a refused spin is retried after a minute), with the other free
   claims (also outside auto mode), and booked as free income. Account rotation visits
   another account whose wheel is ready, right after accounts not seen today.
 - **Personal bankruptcy** (Insolvence, `/api/loan/bankrupt`, settings Auto tab, on by

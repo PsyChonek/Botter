@@ -155,9 +155,11 @@
   }
 
   // The wheel of fortune is free once an hour; null means never spun. A player
-  // snapshot from before the wheel existed has no field and is not ready.
+  // snapshot from before the wheel existed has no field and is not ready. It is
+  // spun WHEEL_GRACE_MS late: right at wheelNextAt the server can still refuse.
+  const WHEEL_GRACE_MS = 5_000;
   const wheelReady = (wheelNextAt, now = Date.now()) =>
-    wheelNextAt !== undefined && (wheelNextAt === null || wheelNextAt <= now);
+    wheelNextAt !== undefined && (wheelNextAt === null || wheelNextAt + WHEEL_GRACE_MS <= now);
 
   // XP per credit wagered on a game, measured from its tracked rounds, or null
   // before it has earned any. Shown on the panel and used to price XP, never to

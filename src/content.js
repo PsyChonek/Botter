@@ -94,6 +94,9 @@
     '/api/loan/bankrupt': 'insolvency',
   };
   const CLAIM_RETRY_MS = 10 * 60_000;
+  // A refused wheel spin is retried sooner: it is free once an hour, so ten
+  // minutes of waiting lose a sixth of it.
+  const WHEEL_RETRY_MS = 60_000;
   // The shop queue is re-judged this often, and at once when the account, its
   // level, upgrades or max bet change.
   const SHOP_REVIEW_MS = 10 * 60_000;
@@ -1043,13 +1046,13 @@
   // Free credits: the daily bonus, the hourly wheel of fortune, and the
   // once-a-day bailout when broke.
   const FREEBIES = {
-    daily: { path: '/api/bonus/daily', status: 'statusClaimDaily' },
-    wheel: { path: '/api/wheel/spin', status: 'statusWheel' },
-    bailout: { path: '/api/bonus/bailout', status: 'statusClaimBailout' },
+    daily: { path: '/api/bonus/daily', status: 'statusClaimDaily', retryMs: CLAIM_RETRY_MS },
+    wheel: { path: '/api/wheel/spin', status: 'statusWheel', retryMs: WHEEL_RETRY_MS },
+    bailout: { path: '/api/bonus/bailout', status: 'statusClaimBailout', retryMs: CLAIM_RETRY_MS },
   };
   async function claimFreebies() {
     if (!player || !settings.autoClaim) return false;
-    const due = (kind) => Date.now() - (claimTried[kind] ?? 0) > CLAIM_RETRY_MS;
+    const due = (kind) => Date.now() - (claimTried[kind] ?? 0) > FREEBIES[kind].retryMs;
     let kind = null;
     if (player.daily?.available && due('daily')) kind = 'daily';
     else if (A.wheelReady(player.wheelNextAt) && due('wheel')) kind = 'wheel';

@@ -300,10 +300,11 @@ test('bankruptWorth only in execution, when the debt costs more than the reset',
   assert.equal(A.bankruptWorth(player(2500, 300, 10), null), false);
 });
 
-test('wheelReady when never spun or past the cooldown, not for old snapshots', () => {
+test('wheelReady when never spun or a few seconds past the cooldown, not for old snapshots', () => {
   assert.equal(A.wheelReady(null, 1000), true);
-  assert.equal(A.wheelReady(1000, 1000), true);
-  assert.equal(A.wheelReady(1001, 1000), false);
+  assert.equal(A.wheelReady(1000, 6000), true);
+  assert.equal(A.wheelReady(1000, 5999), false);
+  assert.equal(A.wheelReady(1000, 1000), false);
   assert.equal(A.wheelReady(undefined, 1000), false);
 });
 
