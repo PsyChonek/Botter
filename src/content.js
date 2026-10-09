@@ -68,7 +68,7 @@
     work: { tickets: 0, net: 0, xp: 0 },
     free: { daily: 0, bailout: 0 },
     crashBooked: [],
-    grind: { day: '', net: 0 },
+    grind: { day: '', net: 0, pool: null }, // pool: Hackathon budget, see BotterAuto.grindBudget
     flags: { cleanDone: false, cleanTaken: false, boardsDay: '', lotteryDraw: '', winsCapped: 0 },
     dwell: {}, // task type -> least ms open before a submit the server accepts
   };
@@ -167,6 +167,7 @@
     maximumFractionDigits: 4,
   });
   const num = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
+  const eventStart = new Intl.DateTimeFormat(locale, { weekday: 'short', hour: '2-digit', minute: '2-digit' });
   const signed = new Intl.NumberFormat(locale, { maximumFractionDigits: 0, signDisplay: 'exceptZero' });
   const decimal = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
   const pct = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 });
@@ -346,7 +347,7 @@
       if (delta) {
         bjStake = data.hand && !data.hand.done ? delta.stake : 0;
         G.addDelta(stats.games, delta);
-        if (stats.grind.day === A.dayKey()) stats.grind.net += delta.net;
+        bookGrind(delta.net);
         checkWinsLimit(delta, data);
         saveStats();
         log.debug('game_round', delta);
@@ -376,7 +377,7 @@
     if (achievement) stats.free.achievement = (stats.free.achievement ?? 0) + achievement;
     if (fund) stats.free.payroll = (stats.free.payroll ?? 0) + fund;
     if (event) stats.free.event = (stats.free.event ?? 0) + event;
-    if (stats.grind.day === A.dayKey()) stats.grind.net += standup + achievement + fund + event;
+    bookGrind(standup + achievement + fund + event);
     saveStats();
     if (!standup && !achievement && !fund) return;
     log.info('rewards', {
@@ -655,12 +656,14 @@
 
   // Whether a saved account could still place the smallest XP grinding bet,
   // judged from its last snapshot and today's grind loss in its stats.
-  function canGrind(id, saved, today) {
+  function canGrind(id, saved) {
     const unlock = settings.grindGame === 'auto' ? Math.min(...Object.values(GRIND_UNLOCKS)) : GRIND_UNLOCKS[settings.grindGame];
     if (!settings.autoMode || !(saved.level >= unlock)) return false;
-    const grind = statsCache[id]?.grind;
-    const lost = Math.max(0, -(grind?.day === today ? grind.net : 0));
-    return A.grindBets(settings, saved.credits ?? 0, lost, [G.BET_LEVELS[0]]).length > 0;
+    const now = Date.now();
+    const event = A.weekendEvent(now);
+    if (A.grindHold(event, now)) return false;
+    const { budget, lost } = A.grindBudget(statsCache[id]?.grind ?? EMPTY_STATS.grind, settings.xpBudget, event, now);
+    return A.grindBets({ ...settings, xpBudget: budget }, saved.credits ?? 0, lost, [G.BET_LEVELS[0]]).length > 0;
   }
 
   // An account with nothing left to do hands over to another saved account
@@ -683,7 +686,7 @@
         energy: G.energyNow(saved.work, now),
         normDone: settings.stopAtNorm && saved.seenDay === today && saved.work?.paidToday >= saved.work?.norm,
         credits: saved.credits ?? 0,
-        canGrind: canGrind(id, saved, today),
+        canGrind: canGrind(id, saved),
         wheel: settings.autoClaim && A.wheelReady(saved.wheelNextAt, now) && now - (saved.seenAt ?? 0) > CLAIM_RETRY_MS,
       }));
     const home = settings.homeAccount && settings.homeAccount !== accountId ? settings.homeAccount : null;
@@ -848,10 +851,11 @@
     const maxEnergy = player.work.maxEnergy ?? 20;
     // The achievement hunt works one ticket on Friday evening, whatever the energy plan.
     const friday = huntOn() && energy >= 1 && A.fridayEvening(now) && A.achievementTier(player, 'friday_deploy') !== null;
-    // Placené přesčasy pays double: energy is saved up for its start and then
-    // worked down at once. Rounds that pay by themselves count as grinding.
+    // Placené přesčasy and Hackathon pay work more: energy is saved up for
+    // their start and then worked down at once. Rounds that pay by themselves
+    // count as grinding.
     const event = settings.autoMode ? A.weekendEvent(now) : null;
-    if (event && A.overtimeHold(energy, maxEnergy, event, now, G.ENERGY_MS)) return friday;
+    if (event && A.workHold(energy, maxEnergy, event, now, G.ENERGY_MS)) return friday;
     const overtime = event?.active && event.key === 'overtime';
     const grinding = !overtime && (grindReady() || now - edgeAt < EDGE_ACTIVE_MS);
     workRun = A.workDue(energy, maxEnergy, workRun, WORK_MIN_ENERGY, grinding);
@@ -877,6 +881,8 @@
     if (!settings.autoMode || !player) return null;
     const left = grindPausedUntil - Date.now();
     if (left > 0) return ['statusGrindPaused', [grindError ?? '-', String(Math.ceil(left / 60_000))]];
+    const event = A.weekendEvent();
+    if (A.grindHold(event, Date.now())) return ['statusGrindHackathon', [eventStart.format(event.startAt)]];
     const goal = grindHeldFor();
     if (!goal) return null;
     return ['statusSavingForUpgrade', [`${goal.game}:${goal.key} ${goal.next}`, credits(player.credits), credits(limits().reserve + goal.price)]];
@@ -1558,20 +1564,50 @@
   // The bet is the one picked in the settings: XP per round is proportional to
   // the bet, so every level costs the same per XP and the bet only sets the pace.
   // A setting from before the bet was picked by hand ('auto') starts at the smallest.
+  // Before a Hackathon weekend the grinder holds (BotterAuto.grindHold), and on
+  // it the daily limit is the pooled weekend budget (BotterAuto.grindBudget).
   function grindChoice(saving = true) {
-    const lost = Math.max(0, -(stats.grind.day === A.dayKey() ? stats.grind.net : 0));
+    const now = Date.now();
+    const event = A.weekendEvent(now);
     const { levels, candidates, edges } = grindModel();
+    const limit = grindLimits(saving);
+    const { budget, lost } = A.grindBudget(stats.grind, limit.xpBudget, event, now);
+    if (A.grindHold(event, now)) return { lost, levels, candidates, edges, plan: null };
     const wanted = Number(settings.grindBet) || G.BET_LEVELS[0];
-    const bet = A.grindBet(grindLimits(saving), player.credits, lost, levels, wanted);
+    const bet = A.grindBet({ ...limit, xpBudget: budget }, player.credits, lost, levels, wanted);
     const plan = A.grindPlan(candidates, bet, player.level, GRIND_UNLOCKS, edges);
     return { lost, levels, candidates, edges, plan };
+  }
+
+  // The Hackathon pool of this week's event, started over for a new one.
+  function hackathonPool(event) {
+    if (stats.grind.pool?.startAt !== event.startAt) stats.grind.pool = { startAt: event.startAt, held: {}, net: 0 };
+    return stats.grind.pool;
+  }
+
+  // A game round's or reward's net goes to the day's grinding loss and, on a
+  // Hackathon weekend, to the weekend's.
+  function bookGrind(net) {
+    if (stats.grind.day === A.dayKey()) stats.grind.net += net;
+    const event = A.weekendEvent();
+    if (event.active && event.key === 'xp') hackathonPool(event).net += net;
   }
 
   async function grindStep() {
     if (Date.now() < grindPausedUntil) return false;
     const today = A.dayKey();
-    if (stats.grind.day !== today) stats.grind = { day: today, net: 0 };
+    if (stats.grind.day !== today) stats.grind = { ...stats.grind, day: today, net: 0 };
     const { lost, plan } = grindChoice();
+    // A day held for the Hackathon keeps what is left of its budget for the weekend.
+    const event = A.weekendEvent();
+    if (A.grindHold(event, Date.now()) && settings.grindLimit === 'daily') {
+      const held = hackathonPool(event).held;
+      const left = Math.max(0, settings.xpBudget - lost);
+      if (held[today] !== left) {
+        held[today] = left;
+        saveStats();
+      }
+    }
     if (!plan) return false;
     const { game, bet } = plan;
     const limit = limits();
@@ -1579,7 +1615,8 @@
       const floor = limit.grindLimit === 'off' ? limit.reserve : limit.grindMinBalance;
       setStatus('statusGrindingFloor', [msg(`game_${game}`), credits(player.credits), credits(floor), credits(bet)]);
     } else {
-      setStatus('statusGrinding', [msg(`game_${game}`), credits(lost), credits(settings.xpBudget), credits(bet)]);
+      const { budget } = A.grindBudget(stats.grind, settings.xpBudget, event, Date.now());
+      setStatus('statusGrinding', [msg(`game_${game}`), credits(lost), credits(budget), credits(bet)]);
     }
     const res = await playRound(game, bet);
     if (!res.ok) {

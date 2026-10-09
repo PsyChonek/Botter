@@ -196,11 +196,15 @@ progress shows at `chrome://on-device-internals`.
     credit of the rounds that end ahead), half Kelly on its simulated variance, until a
     winning round comes back without the bonus, which means the limit is reached. The
     bonus is booked as free income so it does not inflate the game's measured return.
-  - Before Placené přesčasy, work waits while the energy refilling until Friday 17:00
-    still fits under the cap, so the event starts with a full bar, and during it work
-    drains energy at once instead of keeping it for the grinder.
-  - Hackathon and Teambuilding need nothing: XP per credit improves by the same factor
-    in every game, and the wheel is spun anyway.
+  - Before Placené přesčasy and Hackathon, work waits while the energy refilling until
+    Friday 17:00 still fits under the cap, so the event starts with a full bar. During
+    Placené přesčasy work drains energy at once instead of keeping it for the grinder.
+  - Hackathon makes grinding XP a third cheaper, so in its week the grinder holds until
+    Friday 17:00 (`grindHold`). Under the daily limit, what each held day left of its
+    budget is kept, and on the weekend those budgets plus one per weekend day are
+    pooled against the weekend's loss (`grindBudget`). Under the balance or no limit
+    the held credits simply wait for the weekend.
+  - Teambuilding needs nothing: the wheel is spun anyway.
 - **Settings for the rest** (settings, Auto tab): XP grinding game (cheapest
   per XP or a fixed game), bet (a fixed level, 20 by default); automatic shop purchases from
   a priority plan (`game:key` list, off by default) using the client's price and

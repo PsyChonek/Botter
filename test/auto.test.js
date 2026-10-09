@@ -658,11 +658,37 @@ test('weekendEvent follows the client rotation from Friday 17:00 to Monday 9:00 
   assert.equal(new Date(at('2026-10-31T12:00:00Z').startAt).toISOString(), '2026-10-30T16:00:00.000Z');
 });
 
-test('overtimeHold saves energy for the start of a double-pay weekend', () => {
+test('workHold saves energy for the start of a weekend that pays work more', () => {
   const event = { key: 'overtime', startAt: 100 * 120_000 };
   // 10 points refill by the start: holding 10 ends at the cap of 20.
-  assert.equal(A.overtimeHold(10, 20, event, 90 * 120_000, 120_000), true);
-  assert.equal(A.overtimeHold(11, 20, event, 90 * 120_000, 120_000), false);
-  assert.equal(A.overtimeHold(10, 20, event, 100 * 120_000, 120_000), false);
-  assert.equal(A.overtimeHold(10, 20, { ...event, key: 'xp' }, 90 * 120_000, 120_000), false);
+  assert.equal(A.workHold(10, 20, event, 90 * 120_000, 120_000), true);
+  assert.equal(A.workHold(11, 20, event, 90 * 120_000, 120_000), false);
+  assert.equal(A.workHold(10, 20, event, 100 * 120_000, 120_000), false);
+  assert.equal(A.workHold(10, 20, { ...event, key: 'xp' }, 90 * 120_000, 120_000), true);
+  assert.equal(A.workHold(10, 20, { ...event, key: 'wins' }, 90 * 120_000, 120_000), false);
+});
+
+test('grindHold waits for a Hackathon weekend only before it starts', () => {
+  const hackathon = A.weekendEvent(Date.parse('2026-10-08T10:00:00Z'));
+  assert.equal(A.grindHold(hackathon, Date.parse('2026-10-08T10:00:00Z')), true);
+  assert.equal(A.grindHold(hackathon, hackathon.startAt), false);
+  const wins = A.weekendEvent(Date.parse('2026-10-14T10:00:00Z'));
+  assert.equal(A.grindHold(wins, Date.parse('2026-10-14T10:00:00Z')), false);
+});
+
+test('grindBudget pools the held weekday budgets into the Hackathon weekend', () => {
+  const at = (iso) => Date.parse(iso);
+  const sunday = at('2026-10-11T12:00:00Z');
+  const event = A.weekendEvent(sunday);
+  const grind = { day: A.dayKey(sunday), net: -900, pool: { startAt: event.startAt, held: {}, net: -1500 } };
+  // Off the weekend: today's loss against one day's budget.
+  assert.deepEqual(A.grindBudget(grind, 1000, A.weekendEvent(at('2026-10-14T12:00:00Z')), at('2026-10-14T12:00:00Z')), { budget: 1000, lost: 0 });
+  // Friday was never held, so the weekend has Friday, Saturday and Sunday.
+  assert.deepEqual(A.grindBudget(grind, 1000, event, sunday), { budget: 3000, lost: 1500 });
+  // Held Thursday and Friday: Friday's budget is in held, not counted again.
+  const held = { ...grind, pool: { ...grind.pool, held: { [A.dayKey(at('2026-10-08T12:00:00Z'))]: 1000, [A.dayKey(event.startAt)]: 400 } } };
+  assert.deepEqual(A.grindBudget(held, 1000, event, sunday), { budget: 3400, lost: 1500 });
+  // A pool from an older Hackathon does not count.
+  const stale = { ...held, pool: { ...held.pool, startAt: 1 } };
+  assert.deepEqual(A.grindBudget(stale, 1000, event, sunday), { budget: 3000, lost: 0 });
 });

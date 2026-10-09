@@ -535,6 +535,14 @@
       }
     }
   },
+  "statusGrindHackathon": {
+    "message": "Holding XP grinding for the Hackathon weekend (+50 % XP from $P1$). The daily budgets left this week go into it.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
   "statusSavingForUpgrade": {
     "message": "Saving for upgrade $P1$: balance $P2$, grinding resumes above $P3$. Turn off \"Save for the next upgrade\" to grind now.",
     "placeholders": {

@@ -670,12 +670,35 @@
     return { key: WEEKEND_EVENTS[((weeks % n) + n) % n], startAt, endAt, active: now >= startAt && now < endAt };
   }
 
-  // Before a Placené přesčasy weekend, work waits while the energy it would
-  // spend refills to no more than the cap by the start, so the start finds a
-  // full bar to work at double pay. energyMs is one point's refill time.
-  function overtimeHold(energy, maxEnergy, event, now, energyMs) {
-    if (event?.key !== 'overtime' || now >= event.startAt) return false;
+  // Before a weekend that pays work more (Placené přesčasy, Hackathon), work
+  // waits while the energy it would spend refills to no more than the cap by
+  // the start, so the start finds a full bar to work at the bonus. energyMs is
+  // one point's refill time.
+  function workHold(energy, maxEnergy, event, now, energyMs) {
+    if ((event?.key !== 'overtime' && event?.key !== 'xp') || now >= event.startAt) return false;
     return energy + (event.startAt - now) / energyMs <= maxEnergy;
+  }
+
+  // A Hackathon weekend gives +50 % XP for everything, so XP bought with losing
+  // rounds costs a third less then. In the week before it XP grinding holds.
+  const grindHold = (event, now) => event.key === 'xp' && now < event.startAt;
+
+  const daysBetween = (from, to) => Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
+
+  // Daily-limit budget and the loss counted against it. On a Hackathon weekend
+  // the budgets held back during the week (grind.pool.held, credits per day)
+  // and one for every weekend day are pooled against the weekend's loss
+  // (grind.pool.net); the start day's own budget is already in held if it was
+  // held. grind: the account's stats.grind.
+  function grindBudget(grind, xpBudget, event, now) {
+    if (!(event.active && event.key === 'xp')) {
+      return { budget: xpBudget, lost: Math.max(0, -(grind.day === dayKey(now) ? grind.net : 0)) };
+    }
+    const pool = grind.pool?.startAt === event.startAt ? grind.pool : { held: {}, net: 0 };
+    const start = dayKey(event.startAt);
+    const days = daysBetween(start, dayKey(now)) + (start in pool.held ? 0 : 1);
+    const held = Object.values(pool.held).reduce((sum, credits) => sum + credits, 0);
+    return { budget: held + days * xpBudget, lost: Math.max(0, -pool.net) };
   }
 
   // Chance that a crash bet placed now reaches its own multiplier target,
@@ -747,7 +770,9 @@
     WINS_BONUS,
     edgePlan,
     weekendEvent,
-    overtimeHold,
+    workHold,
+    grindHold,
+    grindBudget,
     dayKey,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
