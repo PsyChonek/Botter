@@ -908,7 +908,9 @@
     }
 
     if (taskEl) {
-      if (taskEl.querySelector('button.right, button.wrong')) {
+      // Typing tickets have no answer buttons to mark, so the result panel is
+      // the only sign that a "Přepiš kód" ticket is done.
+      if (screen.querySelector('section.work-result') || taskEl.querySelector('button.right, button.wrong')) {
         await sleep(humanDelay() / 2);
         pressKey('Escape');
         return;

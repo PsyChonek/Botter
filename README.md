@@ -328,5 +328,5 @@ Práce), `.work-screen`, `.work-pick .job-card` (bug hunt, output, ticket, then 
 `section.task`, `.ticket`, `ol.code.lines > li button`, `.options button`,
 `.ticket-field .ticket-options button` and `.ticket-submit` (the triage rules are
 copied into `TICKET_FIELDS` in `src/core.js`),
-`button.right` / `button.wrong` after a submit, `.modal .sheet.levelup`,
+`button.right` / `button.wrong` and `section.work-result` after a submit, `.modal .sheet.levelup`,
 `.modal .sheet.daily`. If the casino UI changes, start there.
