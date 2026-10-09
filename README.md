@@ -172,16 +172,19 @@ progress shows at `chrome://on-device-internals`.
   expected loss, always at the cheapest price. That means five tickets a draw until 3
   numbers hit once, then one ticket a draw for the draws-played tiers, then none. Ticket
   purchases and the payouts of each draw are booked as the Lottery game.
-- **Payroll fund** (Mzdový fond, settings Auto tab, on by default; `edgePlan` in
-  `src/auto.js`): 1 % of every bet goes into a shared fund that must drop by its cap
-  (12,000), and the bet that drops it takes it all. The bot reads the fund from every
-  response that carries it and polls the feed once a minute otherwise. It models the
-  drop point as uniform between the fund and the cap, so a bet of `b` drops it with
-  chance `0.01 b / (cap - fund)`, worth that chance times the fund. Near the cap that
-  beats the house edge (from about 10,600 of 12,000 on roulette), and the bot bets on
-  the lowest-edge game. The bet is sized by half Kelly on the game's own variance only:
-  the fund can only add, so it is no risk. The client shows no sign that the player
-  pays the 1 %, so the house most likely funds it. A fund win is booked as free income.
+- **Payroll fund** (Mzdový fond, settings Auto tab, on by default; `payrollWorth` and
+  `edgePlan` in `src/auto.js`): 1 % of every bet goes into a shared fund, and the bet
+  that takes it to its cap (12,000) drops it and takes it all. A bet whose 1 % covers
+  the room left wins it outright, so near the cap the bot plays the smallest such bet.
+  Short of that it pushes: filling the room takes 100 times the room in bets whatever
+  their size, so each credit pushed is worth the fund over 100 times the room, counted
+  at half for the pushes another player finishes first. That beats roulette's edge from
+  about 10,100 of 12,000 (blackjack unupgraded from about 11,500), and the bot then bets
+  on the lowest-edge game at the biggest bet half Kelly on the game's variance allows,
+  since bigger bets finish the push in fewer rounds. The fund is read from every
+  response that carries it and from the feed, every 10 seconds once pushing pays and
+  every minute otherwise. The client shows no sign that the player pays the 1 %, so the
+  house most likely funds it. A fund win is booked as free income.
 - **Weekend events** (`weekendEvent` in `src/auto.js`, same rotation as the client):
   Friday 17:00 to Monday 9:00, Prague time, one per weekend from the week of
   2026-10-05: Hackathon (+50 % XP), Konec kvartálu (+50 % on the net profit of every

@@ -577,12 +577,23 @@ test('lotteryPlan buys one ticket per draw for the draws-played tiers only', () 
   assert.equal(A.lotteryPlan({ achievements: allDone }, { mine: 0, prices: [20] }), null);
 });
 
-test('payrollChance grows with the bet and is sure once 1 % covers the room left', () => {
+test('payrollWorth pays the whole fund to a bet that reaches the cap, a share of it to a push', () => {
   const fund = { amount: 11_500, cap: 12_000 };
-  assert.equal(A.payrollChance(fund, 1000), 0.02);
-  assert.equal(A.payrollChance({ amount: 11_995, cap: 12_000 }, 1000), 1);
-  assert.equal(A.payrollChance(null, 1000), 0);
-  assert.equal(A.payrollChance({ amount: 12_000, cap: 12_000 }, 20), 1);
+  // 500 left takes 50,000 in bets; half the pushes are expected to win 11,500.
+  assert.equal(A.payrollWorth(fund, 1000), (0.5 * 11_500) / 50_000);
+  assert.equal(A.payrollWorth(fund, 20), A.payrollWorth(fund, 1000));
+  // 1 % of 1,000 covers the last 10.
+  assert.equal(A.payrollWorth({ amount: 11_990, cap: 12_000 }, 1000), 11.99);
+  // A 400 bet only pushes the last 10: half the fund over 1,000 in bets.
+  assert.equal(A.payrollWorth({ amount: 11_990, cap: 12_000 }, 400), (0.5 * 11_990) / 1000);
+  assert.equal(A.payrollWorth(null, 1000), 0);
+});
+
+test('payrollPollMs reads the fund often once pushing it pays', () => {
+  assert.equal(A.payrollPollMs({ amount: 11_500, cap: 12_000 }, 0.027), 10_000);
+  assert.equal(A.payrollPollMs({ amount: 3000, cap: 12_000 }, 0.027), 60_000);
+  assert.equal(A.payrollPollMs(null, 0.027), 60_000);
+  assert.equal(A.payrollPollMs({ amount: 11_500, cap: 12_000 }, null), 60_000);
 });
 
 test('edgePlan bets on the payroll fund only near its cap', () => {
@@ -596,13 +607,16 @@ test('edgePlan bets on the payroll fund only near its cap', () => {
     kelly: 0.5,
     winsBonus: 0,
   };
-  // Far from the cap the fund adds 0.01 * 6000 / 6000 = 1 % per credit, less than the edge.
+  // Far from the cap a push adds 0.5 * 0.01 * 6000 / 6000 = 0.5 % per credit, less than the edge.
   assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 6000, cap: 12_000 } }), null);
-  // At 11,500 it adds 23 %: the biggest bet Kelly allows on roulette.
+  // At 11,500 it adds 11.5 %: the biggest bet half Kelly allows on roulette (0.088 * 0.5 * 20,000).
   const plan = A.edgePlan({ ...ctx, payroll: { amount: 11_500, cap: 12_000 } });
-  assert.deepEqual([plan.game, plan.bet, plan.payroll], ['roulette', 1000, true]);
+  assert.deepEqual([plan.game, plan.bet, plan.payroll], ['roulette', 400, true]);
   // A small bankroll keeps the bet small.
-  assert.equal(A.edgePlan({ ...ctx, bankroll: 1000, payroll: { amount: 11_500, cap: 12_000 } }).bet, 100);
+  assert.equal(A.edgePlan({ ...ctx, bankroll: 1000, payroll: { amount: 11_500, cap: 12_000 } }).bet, 40);
+  // With 30 left the smallest bet that reaches the cap takes the fund.
+  assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 11_970, cap: 12_000 } }).bet, 1000);
+  assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 11_997, cap: 12_000 } }).bet, 400);
   assert.equal(A.edgePlan({ ...ctx, payroll: null }), null);
 });
 

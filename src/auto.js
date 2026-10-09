@@ -572,15 +572,28 @@
     return best;
   }
 
-  // Mzdový fond: 1 % of every bet goes into a shared fund that must drop by its
-  // cap, and the bet that drops it takes it all. Modelled as a drop point
-  // uniform between the fund now and the cap, so a bet drops it with chance
-  // 1 % of the bet over the room left, and surely once that covers the room.
+  // Mzdový fond: 1 % of every bet goes into a shared fund, and the bet that
+  // takes it to its cap (12,000) drops it and takes it all. A bet whose 1 %
+  // covers the room left wins the fund outright. Short of that, the bot pushes:
+  // filling the room takes 100 times the room in bets, whatever their size,
+  // and the fund goes to whoever lands the last one, so each credit pushed is
+  // worth the fund over 100 times the room, times the share of pushes the bot
+  // expects to finish before another player does.
   const PAYROLL_SHARE = 0.01;
-  function payrollChance(payroll, bet) {
+  const PAYROLL_PUSH_WON = 0.5;
+  // Fund credits a bet earns per credit staked.
+  function payrollWorth(payroll, bet) {
     if (!(payroll?.amount > 0) || !(payroll.cap > 0)) return 0;
     const room = payroll.cap - payroll.amount;
-    return room > 0 ? Math.min(1, (PAYROLL_SHARE * bet) / room) : 1;
+    if (PAYROLL_SHARE * bet >= room) return payroll.amount / bet;
+    return (PAYROLL_PUSH_WON * PAYROLL_SHARE * payroll.amount) / room;
+  }
+
+  // How often to read the fund while no bet brings it: every 10 seconds once
+  // pushing it pays on the cheapest game, else every minute.
+  function payrollPollMs(payroll, edge) {
+    if (!payroll || !Number.isFinite(edge)) return 60_000;
+    return payrollWorth(payroll, 0) > edge / 2 ? 10_000 : 60_000;
   }
 
   // Konec kvartálu weekend: +50 % on the net profit of every round that ends
@@ -590,11 +603,11 @@
   // A round worth playing for its own expected profit, or null: the payroll
   // fund close to its cap, or the Konec kvartálu bonus on wins. Per credit a
   // round returns -edge, plus winsBonus times gain (the mean net profit per
-  // credit staked of the rounds that end ahead), plus the fund's chance times
-  // the fund over the bet. The bet is sized by fractional Kelly on that edge
-  // over the game's variance per round; the fund only ever adds, so its
-  // variance is no risk. The smallest level is always allowed, and the pick is
-  // the biggest expected profit per round. ctx: level, unlocks, edges, gains and variances per game,
+  // credit staked of the rounds that end ahead), plus what the bet earns of the
+  // fund (payrollWorth). The bet is sized by fractional Kelly on that edge over
+  // the game's variance per round, the smallest level always allowed. The pick
+  // is the biggest expected profit per round, which near the cap is the
+  // smallest bet that drops the fund. ctx: level, unlocks, edges, gains and variances per game,
   // levels (affordable bets, ascending), bankroll (credits above the reserve),
   // kelly, winsBonus (0 off the weekend or past its limit), payroll
   // ({ amount, cap } or null).
@@ -606,8 +619,7 @@
       if (edge === undefined || ctx.level < ctx.unlocks[game]) continue;
       const base = -edge + (ctx.winsBonus ?? 0) * (ctx.gains?.[game] ?? 0);
       for (const bet of levels) {
-        const chance = payrollChance(ctx.payroll, bet);
-        const fund = chance > 0 ? (chance * ctx.payroll.amount) / bet : 0;
+        const fund = payrollWorth(ctx.payroll, bet);
         const ev = base + fund;
         if (!(ev > 0)) continue;
         if (bet !== levels[0] && bet > (ev / (ctx.variances?.[game] ?? 1)) * ctx.kelly * ctx.bankroll) continue;
@@ -730,7 +742,8 @@
     LOTTERY_RTP,
     lotteryChance,
     lotteryPlan,
-    payrollChance,
+    payrollWorth,
+    payrollPollMs,
     WINS_BONUS,
     edgePlan,
     weekendEvent,

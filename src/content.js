@@ -114,9 +114,6 @@
   // Delay between keystrokes on a "Přepiš kód" ticket, a quick typist's pace.
   const TYPING_MIN_MS = 70;
   const TYPING_MAX_MS = 190;
-  // The payroll fund is read from every response that carries it; while no
-  // bet brings a fresh amount, the feed is polled this often.
-  const PAYROLL_POLL_MS = 60_000;
   // Fraction of the Kelly stake bet on rounds that pay by themselves.
   const EDGE_KELLY = 0.5;
   // workAvailable treats edge betting as grinding this long after a round was found worth it.
@@ -1435,11 +1432,17 @@
   // Rounds that pay by themselves (BotterAuto.edgePlan): the payroll fund near
   // its cap, or wins on a Konec kvartálu weekend until its limit. Sized by
   // fractional Kelly; like the standup they keep the reserve but not the
-  // grinding budget. A stale fund amount is read from the feed first.
+  // grinding budget. The fund is read from every response that carries it;
+  // a stale amount is read from the feed first, every 10 seconds once pushing
+  // the fund pays on the cheapest game (BotterAuto.payrollPollMs).
   async function edgeStep() {
     if (!settings.edgeBets) return false;
     const now = Date.now();
-    if ((!payroll || now - payroll.at > PAYROLL_POLL_MS) && now - (claimTried.payroll ?? 0) > PAYROLL_POLL_MS) {
+    const mode = blazeMode();
+    const edges = O.edges(G.GAME_KEYS, player.upgrades, mode);
+    const cheapest = A.cheapestGame(G.GAME_KEYS, player.level, GRIND_UNLOCKS, edges);
+    const pollMs = A.payrollPollMs(payroll, cheapest ? edges[cheapest] : null);
+    if ((!payroll || now - payroll.at > pollMs) && now - (claimTried.payroll ?? 0) > pollMs) {
       claimTried.payroll = now;
       await api('/api/feed');
       if (!payroll) log.info('payroll_unknown');
@@ -1449,18 +1452,17 @@
     const event = A.weekendEvent(now);
     const winsOn = event.active && event.key === 'wins' && stats.flags.winsCapped !== event.startAt;
     const reserve = limits().reserve;
-    const mode = blazeMode();
     const plan = A.edgePlan({
       level: player.level,
       unlocks: GRIND_UNLOCKS,
-      edges: O.edges(G.GAME_KEYS, player.upgrades, mode),
+      edges,
       gains: O.gains(G.GAME_KEYS, player.upgrades, mode),
       variances: O.variances(G.GAME_KEYS, player.upgrades, mode),
       levels: G.BET_LEVELS.filter((bet) => bet <= player.maxBet && player.credits - bet >= reserve),
       bankroll: Math.max(0, player.credits - reserve),
       kelly: EDGE_KELLY,
       winsBonus: winsOn ? A.WINS_BONUS : 0,
-      payroll: payroll && now - payroll.at <= PAYROLL_POLL_MS ? payroll : null,
+      payroll: payroll && now - payroll.at <= pollMs ? payroll : null,
     });
     const note = plan ? `${plan.game} ${plan.bet} ${plan.payroll}` : '';
     if (note !== edgeNote) {
