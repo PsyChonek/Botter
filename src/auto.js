@@ -572,6 +572,17 @@
     return best;
   }
 
+  // "Feeling lucky": the next lottery ticket bought whatever it is worth, or
+  // null once the draw has the wanted number of tickets. It goes at the
+  // biggest affordable price up to the wanted one. ctx: mine (tickets already
+  // on this draw), prices (affordable prices), price and tickets (wanted).
+  function luckyPlan(ctx) {
+    const tickets = Math.min(ctx.tickets, LOTTERY_MAX_TICKETS);
+    const price = Math.max(...(ctx.prices ?? []).filter((p) => p <= ctx.price));
+    if (!Number.isFinite(price) || (ctx.mine ?? 0) >= tickets) return null;
+    return { price, tickets: tickets - (ctx.mine ?? 0) };
+  }
+
   // Mzdový fond: 1 % of every bet goes into a shared fund, and the bet that
   // takes it to its cap (12,000) drops it and takes it all. A bet whose 1 %
   // covers the room left wins the fund outright. Short of that, the bot pushes:
@@ -765,6 +776,7 @@
     LOTTERY_RTP,
     lotteryChance,
     lotteryPlan,
+    luckyPlan,
     payrollWorth,
     payrollPollMs,
     WINS_BONUS,

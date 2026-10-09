@@ -489,6 +489,15 @@
   "optionsCrashKelly": {
     "message": "Velikost sázky na crash (0,5 = půl Kelly, 0 = vždy maximum)"
   },
+  "optionsLotteryLucky": {
+    "message": "Mám štěstí: vždy kupovat tikety do loterie, ať se vyplatí, nebo ne"
+  },
+  "optionsLotteryPrice": {
+    "message": "Cena tiketu"
+  },
+  "optionsLotteryTickets": {
+    "message": "Tiketů na tah (1 až 5)"
+  },
   "optionsXpBudget": {
     "message": "Denní rozpočet ztráty na farmění XP (0 = vypnuto)"
   },
@@ -1155,6 +1164,20 @@
       },
       "p2": {
         "content": "$2"
+      }
+    }
+  },
+  "statusLotteryLucky": {
+    "message": "Loterie, mám štěstí: tiket $P1$ z $P2$ za $P3$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
       }
     }
   },

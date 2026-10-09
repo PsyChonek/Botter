@@ -172,6 +172,10 @@ progress shows at `chrome://on-device-internals`.
   expected loss, always at the cheapest price. That means five tickets a draw until 3
   numbers hit once, then one ticket a draw for the draws-played tiers, then none. Ticket
   purchases and the payouts of each draw are booked as the Lottery game.
+  - "Feeling lucky" (settings, Auto tab, off by default; `luckyPlan`) buys a set number
+    of tickets (1 to 5) every draw at a chosen price, or the biggest affordable one
+    below it, whatever they are worth. It keeps the reserve and runs without the hunt;
+    with the hunt on, the hunt can still add cheap tickets up to five.
 - **Payroll fund** (Mzdový fond, settings Auto tab, on by default; `payrollWorth` and
   `edgePlan` in `src/auto.js`): 1 % of every bet goes into a shared fund, and the bet
   that takes it to its cap (12,000) drops it and takes it all. A bet whose 1 % covers

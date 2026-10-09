@@ -12,6 +12,7 @@ const CHECKBOXES = [
   'achievementHunt',
   'edgeBets',
   'crashEnabled',
+  'lotteryLucky',
   'buyUpgrades',
   'saveForUpgrades',
   'recordSpins',
@@ -21,7 +22,7 @@ const CHECKBOXES = [
   'playOnScreen',
 ];
 const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet', 'grindLimit', 'grindGame'];
-const INT_SELECTS = ['gameBet', 'crashBet', 'grindBet'];
+const INT_SELECTS = ['gameBet', 'crashBet', 'grindBet', 'lotteryPrice'];
 const TEXTS = ['openrouterModel'];
 const NUMBERS = [
   'minDelayMs',
@@ -34,6 +35,7 @@ const NUMBERS = [
   'crashKelly',
   'xpBudget',
   'grindMinBalance',
+  'lotteryTickets',
 ];
 const DEFAULTS = {
   aiSolver: 'local',
@@ -51,6 +53,9 @@ const DEFAULTS = {
   crashBet: 100,
   crashMinEv: 1.05,
   crashKelly: 0.5,
+  lotteryLucky: false,
+  lotteryPrice: 20,
+  lotteryTickets: 5,
   grindLimit: 'daily',
   xpBudget: 0,
   grindMinBalance: 0,
@@ -204,6 +209,7 @@ function readFields() {
   for (const name of NUMBERS) next[name] = Math.max(0, Number(field(name).value) || 0);
   next.crashMinEv = Math.max(1, next.crashMinEv);
   next.crashKelly = Math.max(0, Math.min(1, next.crashKelly));
+  next.lotteryTickets = Math.max(1, Math.min(5, Math.round(next.lotteryTickets)));
   if (next.maxDelayMs < next.minDelayMs) next.maxDelayMs = next.minDelayMs;
   return next;
 }

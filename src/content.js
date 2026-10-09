@@ -42,6 +42,9 @@
     crashBet: 100,
     crashMinEv: 1.05,
     crashKelly: 0.5,
+    lotteryLucky: false,
+    lotteryPrice: 20,
+    lotteryTickets: 5,
     grindLimit: 'daily',
     xpBudget: 0,
     grindMinBalance: 0,
@@ -1394,11 +1397,14 @@
     return true;
   }
 
-  // Lottery tickets for the next draw while their achievements pay for them
-  // (BotterAuto.lotteryPlan), one ticket a tick at the cheapest price on
-  // random numbers. The state is read again every ten minutes and after a draw.
+  // Lottery tickets for the next draw, one a tick on random numbers: with
+  // "Feeling lucky" the wanted number at the wanted price whatever they are
+  // worth (BotterAuto.luckyPlan), then for the achievement hunt while its
+  // achievements pay for them at the cheapest price (BotterAuto.lotteryPlan).
+  // The state is read again every ten minutes and after a draw.
   async function lotteryStep() {
-    if (!huntOn() || player.level < G.LOTTERY_UNLOCK) return false;
+    const lucky = settings.autoMode && settings.lotteryLucky;
+    if ((!huntOn() && !lucky) || player.level < G.LOTTERY_UNLOCK) return false;
     const now = Date.now();
     if (!lottery?.next || now - lottery.at > CLAIM_RETRY_MS || now >= lottery.next.drawAt) {
       if (now - (claimTried.lottery ?? 0) < CRASH_POLL_MS) return false;
@@ -1409,19 +1415,18 @@
     if (now - (claimTried.lotteryBuy ?? 0) < CLAIM_RETRY_MS) return false;
     const reserve = limits().reserve;
     const mine = lottery.next.mine?.length ?? 0;
-    const plan = A.lotteryPlan(player, {
-      mine,
-      prices: (lottery.prices ?? []).filter((price) => player.credits - price >= reserve),
-    });
+    const prices = (lottery.prices ?? []).filter((price) => player.credits - price >= reserve);
+    const luckyBuy = lucky ? A.luckyPlan({ mine, prices, price: settings.lotteryPrice, tickets: settings.lotteryTickets }) : null;
+    const plan = luckyBuy ?? (huntOn() ? A.lotteryPlan(player, { mine, prices }) : null);
     if (!plan) return false;
     const numbers = lotteryNumbers();
-    setStatus('statusLottery', [String(mine + 1), String(mine + plan.tickets), credits(plan.price)]);
+    setStatus(luckyBuy ? 'statusLotteryLucky' : 'statusLottery', [String(mine + 1), String(mine + plan.tickets), credits(plan.price)]);
     const res = await api('/api/lottery/buy', { numbers, price: plan.price });
     if (!res.ok) {
       claimTried.lotteryBuy = Date.now();
       log.warn('lottery_buy_failed', { price: plan.price, status: res.status, error: res.data?.error });
     } else {
-      log.info('lottery_ticket', { numbers, price: plan.price, tickets: mine + 1, value: plan.value });
+      log.info('lottery_ticket', { numbers, price: plan.price, tickets: mine + 1, lucky: Boolean(luckyBuy), value: plan.value });
     }
     return true;
   }

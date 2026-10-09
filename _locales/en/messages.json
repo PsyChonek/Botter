@@ -489,6 +489,15 @@
   "optionsCrashKelly": {
     "message": "Crash bet sizing (0.5 = half Kelly, 0 = always max)"
   },
+  "optionsLotteryLucky": {
+    "message": "Feeling lucky: always buy lottery tickets, whatever they are worth"
+  },
+  "optionsLotteryPrice": {
+    "message": "Ticket price"
+  },
+  "optionsLotteryTickets": {
+    "message": "Tickets per draw (1 to 5)"
+  },
   "optionsXpBudget": {
     "message": "Daily loss budget for XP grinding (0 = off)"
   },
@@ -1155,6 +1164,20 @@
       },
       "p2": {
         "content": "$2"
+      }
+    }
+  },
+  "statusLotteryLucky": {
+    "message": "Lottery, feeling lucky: ticket $P1$ of $P2$ at $P3$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
       }
     }
   },

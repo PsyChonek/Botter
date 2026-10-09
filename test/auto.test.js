@@ -558,6 +558,15 @@ test('lottery tickets pay about 71.7 % back', () => {
   assert.ok(Math.abs(all - 1) < 1e-12);
 });
 
+test('luckyPlan buys the wanted tickets at the biggest affordable price up to the wanted one', () => {
+  assert.deepEqual(A.luckyPlan({ mine: 0, prices: [20, 40, 100], price: 40, tickets: 5 }), { price: 40, tickets: 5 });
+  assert.deepEqual(A.luckyPlan({ mine: 0, prices: [20, 40], price: 200, tickets: 3 }), { price: 40, tickets: 3 });
+  assert.deepEqual(A.luckyPlan({ mine: 2, prices: [20], price: 20, tickets: 9 }), { price: 20, tickets: 3 });
+  assert.equal(A.luckyPlan({ mine: 3, prices: [20], price: 20, tickets: 3 }), null);
+  assert.equal(A.luckyPlan({ mine: 0, prices: [100], price: 40, tickets: 5 }), null);
+  assert.equal(A.luckyPlan({ mine: 0, prices: [], price: 20, tickets: 5 }), null);
+});
+
 test('lotteryPlan buys five cheap tickets while the hit achievements are open', () => {
   const plan = A.lotteryPlan({ achievements: {} }, { mine: 0, prices: [100, 20, 40] });
   assert.deepEqual([plan.price, plan.tickets], [20, 5]);
