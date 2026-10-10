@@ -389,6 +389,9 @@ test('questGame and questKind read the standup quest text', () => {
   assert.equal(A.questGame({ key: 'spins_roulette', text: 'Roztoč kolo' }), 'roulette');
   assert.equal(A.questKind({ key: 'q', text: 'Vyhraj 1 000 kreditů' }), null);
   assert.equal(A.questKind({ key: 'q', text: 'Dej si kafe' }), null);
+  // A big win is a slot event whose chance is not modelled, not a round ahead.
+  assert.equal(A.questKind({ key: 'big_win', text: 'Tref BIG WIN' }), null);
+  assert.equal(A.questKind({ key: 'q', text: 'Tref 2× velkou výhru' }), null);
 });
 
 test('standupPlan plays a quest on the game and bet where it costs least', () => {

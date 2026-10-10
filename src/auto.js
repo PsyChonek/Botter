@@ -356,9 +356,10 @@
 
   // 'rounds' (play N rounds of a game), 'wager' (wager N credits), 'wins'
   // (finish N rounds ahead), or null for a quest the bot cannot play, such as
-  // an amount won.
+  // an amount won or a big win (a slot event whose chance is not modelled).
   function questKind(quest) {
     const text = `${quest?.key ?? ''} ${quest?.text ?? ''}`.toLowerCase();
+    if (/big[ _-]?win|velk\S* v[yý]hr/.test(text)) return null;
     const credits = /kredit|credit|wager/.test(text);
     if (/plus|vyhr|win/.test(text)) return credits ? null : 'wins';
     if (credits) return 'wager';

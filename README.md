@@ -106,7 +106,8 @@ progress shows at `chrome://on-device-internals`.
   makes them cheapest. The bonus and the achievement are not counted, so the estimate is
   conservative. It keeps the reserve but not the grinding budget: quest and achievement
   rewards are booked as free income, kept out of game and work profit, and the standup
-  reward offsets the day's grinding loss. Quests it cannot read, crash quests and ones
+  reward offsets the day's grinding loss. Quests it cannot read, big-win quests (a slot
+  event whose chance is not modelled), crash quests and ones
   on a locked game are skipped and logged as `standup_skipped`.
 - **Achievement hunt** (settings Auto tab, on by default; `huntPlan` in `src/auto.js`):
   goes after the credit achievements the bot can steer, read from `player.achievements`,
