@@ -250,9 +250,12 @@
     const keys = Object.keys(ctx.maxLevels);
 
     // XP per credit is the same in every game, so costs compare by edge alone.
+    // Only the game the grinder plays is upgraded, or one that this level of
+    // the upgrade alone makes the cheapest: credits put into a game it does not
+    // play buy no XP.
     const before = Math.min(...ctx.games.map((g) => now(g) ?? Infinity));
+    if (now(game) > before && ctx.edge(game, ctx.rest([offer.key], offer.next).upgrades) > before) return 'notBest';
     const maxed = ctx.rest(keys.filter((key) => gainPerCredit([key]) >= UPGRADE_MIN_GAIN));
-    if (ctx.edge(game, maxed.upgrades) >= before) return 'neverBest';
     const pays = (rest) => {
       const after = Math.min(before, ctx.edge(game, rest.upgrades));
       if (after <= 0) return true; // the player is ahead: it pays for itself

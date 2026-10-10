@@ -1101,8 +1101,8 @@
   "shopState_tooSmall": {
     "message": "moc malé"
   },
-  "shopState_neverBest": {
-    "message": "nikdy nejlevnější"
+  "shopState_notBest": {
+    "message": "není nejlevnější hra"
   },
   "shopState_xpFarmingBetter": {
     "message": "grind vynese víc"

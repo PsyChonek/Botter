@@ -1101,8 +1101,8 @@
   "shopState_tooSmall": {
     "message": "too small"
   },
-  "shopState_neverBest": {
-    "message": "never cheapest"
+  "shopState_notBest": {
+    "message": "not the cheapest game"
   },
   "shopState_xpFarmingBetter": {
     "message": "grinding pays more"

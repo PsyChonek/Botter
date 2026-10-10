@@ -230,13 +230,17 @@ test('upgradeVerdict skips upgrades that barely change the odds', () => {
   assert.equal(A.upgradeVerdict(offer('skeleton', 'hint'), verdictCtx()), 'tooSmall');
 });
 
-test('upgradeVerdict skips a game the grinder would not pick even maxed', () => {
+test('upgradeVerdict upgrades only the game the grinder plays', () => {
   const ctx = verdictCtx({ games: ['skeleton', 'roulette'] });
-  // Skeleton maxed (team and wild) gets to 0.06 edge, roulette is at 0.077: worth it.
-  assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), ctx), null);
-  // With roulette at 0.02, Skeleton never catches up.
-  const edge = (game, upgrades) => (game === 'roulette' ? 0.02 : ctx.edge(game, upgrades));
-  assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), { ...ctx, edge }), 'neverBest');
+  // Skeleton maxed would get to 0.06 edge, below roulette's 0.077, but the grinder
+  // plays roulette until then, so Skeleton is not upgraded.
+  assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), ctx), 'notBest');
+  // Roulette at 0.28: one level of team (0.3 -> 0.27) makes Skeleton the cheapest.
+  const close = (game, upgrades) => (game === 'roulette' ? 0.28 : ctx.edge(game, upgrades));
+  assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), { ...ctx, edge: close }), null);
+  // Skeleton already the cheapest.
+  const far = (game, upgrades) => (game === 'roulette' ? 0.4 : ctx.edge(game, upgrades));
+  assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), { ...ctx, edge: far }), null);
   assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), { ...ctx, games: ['roulette'] }), 'notGrinded');
 });
 
