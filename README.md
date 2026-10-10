@@ -103,11 +103,13 @@ progress shows at `chrome://on-device-internals`.
   reward (`standupPlan` in `src/auto.js`): game rounds at the smallest bet, a wager on
   the lowest-edge game at the biggest bet that does not overshoot, rounds ahead on the
   game where the simulated share of rounds that end ahead (see Odds in the settings)
-  makes them cheapest. The bonus and the achievement are not counted, so the estimate is
+  makes them cheapest, and a big / mega / super win (a round paying 10x / 25x / 50x the
+  bet, as in the client's big_fish achievement) at the smallest bet on the slot where the
+  simulated chance of one makes it cheapest; roulette and blackjack never pay one. The
+  bonus and the achievement are not counted, so the estimate is
   conservative. It keeps the reserve but not the grinding budget: quest and achievement
   rewards are booked as free income, kept out of game and work profit, and the standup
-  reward offsets the day's grinding loss. Quests it cannot read, big-win quests (a slot
-  event whose chance is not modelled), crash quests and ones
+  reward offsets the day's grinding loss. Quests it cannot read, crash quests and ones
   on a locked game are skipped and logged as `standup_skipped`.
 - **Achievement hunt** (settings Auto tab, on by default; `huntPlan` in `src/auto.js`):
   goes after the credit achievements the bot can steer, read from `player.achievements`,
@@ -319,8 +321,9 @@ the default 300,000 spins per combination). Besides the slot returns it records,
 every game and upgrade combination (roulette and blackjack included), the share of
 rounds that return more than the bet, the share of 10,000 sessions of 1,000 rounds,
 drawn from those spins, that end ahead, the mean net profit per credit of the rounds
-that end ahead (what the Konec kvartálu bonus pays on) and the variance of one round's
-return (for Kelly sizing). Rerun it when the casino changes a slot's
+that end ahead (what the Konec kvartálu bonus pays on), the variance of one round's
+return (for Kelly sizing) and the share of rounds paying 10x / 25x / 50x the bet (big win
+standup quests). Rerun it when the casino changes a slot's
 weights, paytable or upgrade effects. Skeleton Slots and Slotingi are evaluated on the
 server, so their models follow the client's rules text where it leaves details open:
 Skeleton counts rockets after the last cascade and lets free spins retrigger, Slotingi

@@ -1517,6 +1517,7 @@
         unlocks: GRIND_UNLOCKS,
         edges: O.edges(G.GAME_KEYS, player.upgrades, blazeMode()),
         wins: O.winRates(G.GAME_KEYS, player.upgrades, blazeMode()),
+        bigs: O.bigRates(G.GAME_KEYS, player.upgrades, blazeMode()),
         levels: G.BET_LEVELS.filter((bet) => bet <= player.maxBet && player.credits - bet >= reserve),
       },
       skipped,

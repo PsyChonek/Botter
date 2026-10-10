@@ -37,21 +37,28 @@ function combos(maxLevels) {
 }
 
 const round3 = (x) => Math.round(x * 1000) / 1000;
+const round5 = (x) => Math.round(x * 100_000) / 100_000;
+
+// Payout multiples of the client's big, mega and super win (achievement big_fish).
+const BIG_WINS = [10, 25, 50];
 
 // Return to player, share of rounds that return more than the bet, share of
 // SESSION_ROUNDS-round sessions that end ahead, the mean net profit per unit
-// bet of the rounds that end ahead (what a bonus on wins pays on) and the
-// variance of one round's return, from the per-round returns (per unit bet) of
-// one combination. Sessions are drawn from those returns with replacement, so
+// bet of the rounds that end ahead (what a bonus on wins pays on), the
+// variance of one round's return and the share of rounds that pay a big, mega
+// and super win (BIG_WINS times the bet or more), from the per-round returns
+// (per unit bet) of one combination. Sessions are drawn from those returns with replacement, so
 // a payout rarer than one in SPINS rounds is left out.
 function summary(returns) {
   let paid = 0;
   let won = 0;
   let gain = 0;
   let squares = 0;
+  const big = BIG_WINS.map(() => 0);
   for (const r of returns) {
     paid += r;
     squares += r * r;
+    for (let i = 0; i < BIG_WINS.length; i++) if (r >= BIG_WINS[i] - 1e-9) big[i]++;
     if (r > 1 + 1e-9) {
       won++;
       gain += r - 1;
@@ -65,7 +72,7 @@ function summary(returns) {
     for (let n = 0; n < SESSION_ROUNDS; n++) total += returns[(rand() * returns.length) | 0];
     if (total > SESSION_ROUNDS + 1e-6) ahead++;
   }
-  return { rtp: round3(paid / n), chances: [round3(won / n), round3(ahead / SESSIONS), round3(gain / n), round3(variance)] };
+  return { rtp: round3(paid / n), chances: [round3(won / n), round3(ahead / SESSIONS), round3(gain / n), round3(variance), ...big.map((b) => round5(b / n))] };
 }
 
 // ---------- Blaze 20 Wild (model in src/blaze.js) ----------
@@ -369,7 +376,8 @@ writeFileSync(
 // order: blaze lucky/wild/star (per scatter rule), skeleton team/wild/deploy,
 // slotingi crown/gulas/mint. chances holds [share of rounds that end ahead,
 // share of ${SESSION_ROUNDS.toLocaleString('en')}-round sessions that end ahead, mean net profit per unit
-// bet of the rounds that end ahead, variance of one round's return] per game and
+// bet of the rounds that end ahead, variance of one round's return, share of
+// rounds paying ${BIG_WINS.join(' / ')} times the bet or more] per game and
 // combination, also for roulette zeros (an even-money bet) and blackjack
 // bjpay/ties/soft17/double.
 (function (root) {

@@ -389,9 +389,33 @@ test('questGame and questKind read the standup quest text', () => {
   assert.equal(A.questGame({ key: 'spins_roulette', text: 'Roztoč kolo' }), 'roulette');
   assert.equal(A.questKind({ key: 'q', text: 'Vyhraj 1 000 kreditů' }), null);
   assert.equal(A.questKind({ key: 'q', text: 'Dej si kafe' }), null);
-  // A big win is a slot event whose chance is not modelled, not a round ahead.
-  assert.equal(A.questKind({ key: 'big_win', text: 'Tref BIG WIN' }), null);
-  assert.equal(A.questKind({ key: 'q', text: 'Tref 2× velkou výhru' }), null);
+  // A big win is a payout of 10x the bet or more, not a round ahead.
+  assert.equal(A.questKind({ key: 'big_win', text: 'Tref BIG WIN' }), 'big');
+  assert.equal(A.questKind({ key: 'q', text: 'Tref 2× velkou výhru' }), 'big');
+  assert.equal(A.questKind({ key: 'q', text: 'Tref MEGA WIN' }), 'mega');
+});
+
+test('standupPlan plays a big win quest only on a game that can pay one', () => {
+  const ctx = {
+    level: 20,
+    unlocks: { blaze: 1, skeleton: 5, blackjack: 10 },
+    edges: { blaze: 0.05, skeleton: 0.04, blackjack: 0.01 },
+    bigs: { blaze: [0.02, 0.004, 0.001], skeleton: [0.01, 0.002, 0.0005], blackjack: [0, 0, 0] },
+    levels: [20],
+  };
+  const quest = { key: 'big_win', text: 'Tref BIG WIN', progress: 0, target: 1, reward: 800 };
+  // Blaze: 50 rounds * 20 * 0.05 = 50; Skeleton: 100 rounds * 20 * 0.04 = 80; blackjack never pays 10x.
+  const plan = A.standupPlan([quest], ctx);
+  assert.equal(plan.game, 'blaze');
+  assert.ok(Math.abs(plan.cost - 50) < 1e-9);
+  // A super win at 1 in 1,000 rounds costs 1,000 on Blaze, more than it pays.
+  const skipped = [];
+  assert.equal(A.standupPlan([{ ...quest, text: 'Tref SUPER WIN' }], ctx, skipped), null);
+  assert.equal(skipped[0].reason, 'tooCostly');
+  // Without simulated rates nothing can be priced.
+  const none = [];
+  assert.equal(A.standupPlan([quest], { ...ctx, bigs: undefined }, none), null);
+  assert.equal(none[0].reason, 'noGame');
 });
 
 test('standupPlan plays a quest on the game and bet where it costs least', () => {

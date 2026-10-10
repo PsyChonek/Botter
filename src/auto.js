@@ -354,12 +354,19 @@
     return game ?? null;
   }
 
+  // Win sizes a quest can ask for, as the index into the simulated big win
+  // rates (BotterOdds.bigRates: 10x, 25x and 50x the bet).
+  const BIG_KINDS = ['big', 'mega', 'super'];
+
   // 'rounds' (play N rounds of a game), 'wager' (wager N credits), 'wins'
-  // (finish N rounds ahead), or null for a quest the bot cannot play, such as
-  // an amount won or a big win (a slot event whose chance is not modelled).
+  // (finish N rounds ahead), 'big', 'mega' or 'super' (hit N wins of 10x, 25x
+  // or 50x the bet), or null for a quest the bot cannot play, such as an
+  // amount won.
   function questKind(quest) {
     const text = `${quest?.key ?? ''} ${quest?.text ?? ''}`.toLowerCase();
-    if (/big[ _-]?win|velk\S* v[yý]hr/.test(text)) return null;
+    if (/super[ _-]?win/.test(text)) return 'super';
+    if (/mega[ _-]?win/.test(text)) return 'mega';
+    if (/big[ _-]?win|velk\S* v[yý]hr/.test(text)) return 'big';
     const credits = /kredit|credit|wager/.test(text);
     if (/plus|vyhr|win/.test(text)) return credits ? null : 'wins';
     if (credits) return 'wager';
@@ -381,10 +388,14 @@
   // Expected loss of finishing a quest on one game, and the bet to play it at.
   // levels are the affordable bet levels, ascending. Rounds and wins go at the
   // smallest bet; a wager quest costs the same at any bet, so it goes at the
-  // biggest one that does not overshoot what is left.
-  function questCost(kind, game, left, edge, levels, wins) {
+  // biggest one that does not overshoot what is left. A big win quest goes at
+  // the smallest bet for the expected rounds to hit it (bigs: the game's
+  // simulated rates).
+  function questCost(kind, game, left, edge, levels, wins, bigs) {
     const house = Math.max(0, edge);
     const min = levels[0];
+    const big = BIG_KINDS.indexOf(kind);
+    if (big >= 0) return { bet: min, cost: (left / bigs[big]) * min * house };
     if (kind === 'wager') {
       const bet = [...levels].reverse().find((b) => b <= left) ?? min;
       return { bet, cost: left * house };
@@ -398,8 +409,10 @@
   // that loss is smallest. The bonus for all three and the standup achievement
   // are left out, so a quest that pays only with them is skipped. ctx: level,
   // unlocks ({ game: level }), edges ({ game: house edge }), wins ({ game:
-  // share of rounds that end ahead }, optional) and levels (bet levels
-  // affordable now). skipped collects the quests that are not worth it.
+  // share of rounds that end ahead }, optional), bigs ({ game: [share of
+  // rounds paying 10x, 25x, 50x] }; a big win quest is played only on a game
+  // listed there with a chance above zero) and levels (bet levels affordable
+  // now). skipped collects the quests that are not worth it.
   function standupPlan(quests, ctx, skipped = []) {
     const levels = [...(ctx.levels ?? [])].sort((a, b) => a - b);
     let best = null;
@@ -408,15 +421,20 @@
       if (quest.done || !(left > 0)) continue;
       const kind = questKind(quest);
       const only = questGame(quest);
+      const big = BIG_KINDS.indexOf(kind);
       const games = (only ? [only] : Object.keys(ctx.unlocks)).filter(
-        (g) => ctx.unlocks[g] !== undefined && ctx.level >= ctx.unlocks[g] && ctx.edges[g] !== undefined,
+        (g) =>
+          ctx.unlocks[g] !== undefined &&
+          ctx.level >= ctx.unlocks[g] &&
+          ctx.edges[g] !== undefined &&
+          (big < 0 || ctx.bigs?.[g]?.[big] > 0),
       );
       if (!kind || !games.length || !levels.length) {
         skipped.push({ key: quest.key, reason: !kind ? 'unknown' : !games.length ? 'noGame' : 'noCredits' });
         continue;
       }
       const plan = games
-        .map((game) => ({ game, ...questCost(kind, game, left, ctx.edges[game], levels, ctx.wins) }))
+        .map((game) => ({ game, ...questCost(kind, game, left, ctx.edges[game], levels, ctx.wins, ctx.bigs?.[game]) }))
         .reduce((a, b) => (b.cost < a.cost ? b : a));
       if (plan.cost >= quest.reward) {
         skipped.push({ key: quest.key, reason: 'tooCostly', cost: Math.round(plan.cost), reward: quest.reward });

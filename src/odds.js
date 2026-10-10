@@ -62,16 +62,19 @@
     return out;
   }
 
-  // Simulated { win, ahead, gain, variance }: the share of rounds that return
-  // more than the bet and of 1,000-round sessions that end ahead, the mean net
-  // profit per credit staked of the rounds that end ahead, and the variance of
-  // one round's return per credit, or null without a model. gain and variance
-  // are null in a table generated before they were recorded.
+  // Simulated { win, ahead, gain, variance, bigs }: the share of rounds that
+  // return more than the bet and of 1,000-round sessions that end ahead, the
+  // mean net profit per credit staked of the rounds that end ahead, the
+  // variance of one round's return per credit and the share of rounds paying a
+  // big, mega and super win ([10x, 25x, 50x] the bet), or null without a model.
+  // Fields are null in a table generated before they were recorded.
   function chances(game, upgrades, blazeMode = 'reels') {
     if (!UPGRADES[game]) return null;
     const games = TABLE.chances?.[game];
     const row = (game === 'blaze' ? games?.[blazeMode] : games)?.[key(game, upgrades?.[game])];
-    return row ? { win: row[0], ahead: row[1], gain: row[2] ?? null, variance: row[3] ?? null } : null;
+    if (!row) return null;
+    const bigs = row.length > 4 ? row.slice(4, 7) : null;
+    return { win: row[0], ahead: row[1], gain: row[2] ?? null, variance: row[3] ?? null, bigs };
   }
 
   // One simulated figure (see chances) per game, for the games that have it.
@@ -88,6 +91,7 @@
   const winRates = pick('win');
   const gains = pick('gain');
   const variances = pick('variance');
+  const bigRates = pick('bigs');
 
   // Every upgrade combination of a game with its return and chances, from no
   // upgrades to all maxed: [{ upgrades: { name: level }, rtp, win, ahead }].
@@ -112,7 +116,7 @@
     return symbols.match > reels.match ? 'symbols' : 'reels';
   }
 
-  const api = { UPGRADES, rtp, edges, chances, winRates, gains, variances, table, blazeMode };
+  const api = { UPGRADES, rtp, edges, chances, winRates, gains, variances, bigRates, table, blazeMode };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BotterOdds = api;
 })(globalThis);
