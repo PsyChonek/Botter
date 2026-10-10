@@ -119,7 +119,8 @@ progress shows at `chrome://on-device-internals`.
   1 in 39 unupgraded), blackjack hands for a natural (300, 4.8 %) and a five-card win
   (1,000, 0.5 %, both from a simulation of the bot's strategy), any round between 2:00
   and 5:00 (Ponocování, 300), and the next rounds-played tier (1,000 / 5,000 / 25,000
-  at 1,000 / 10,000 / 100,000 rounds) spread over the rounds it still needs. On crash it
+  at 1,000 / 10,000 / 100,000 rounds, up to the tier picked in the settings, 10,000 by
+  default) spread over the rounds it still needs. On crash it
   bets the smallest stake with auto cash-out at 10x (Uptime hrdina, 2,000) when the
   round history gives a chance that pays with the reward counted, even with crash
   betting off. It works one ticket on Friday after 17:00 (Deploy v pátek, 200) and

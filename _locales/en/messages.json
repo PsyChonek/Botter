@@ -477,6 +477,9 @@
   "optionsAchievementHunt": {
     "message": "Hunt credit achievements when their reward beats the expected loss: roulette zero, crash at 10x, blackjack natural and five cards, night play, rounds played, Friday evening work and a fast answer"
   },
+  "optionsHuntRoundsGoal": {
+    "message": "Hunt rounds played up to"
+  },
   "optionsCrashEnabled": {
     "message": "Bet on crash when the history says it pays"
   },

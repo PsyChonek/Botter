@@ -477,6 +477,9 @@
   "optionsAchievementHunt": {
     "message": "Lovit achievementy s kreditovou odměnou, když odměna převýší očekávanou ztrátu: nula v ruletě, crash na 10x, blackjack z prvních dvou karet a s pěti kartami, hra v noci, odehraná kola, práce v pátek večer a rychlá odpověď"
   },
+  "optionsHuntRoundsGoal": {
+    "message": "Lovit odehraná kola až do"
+  },
   "optionsCrashEnabled": {
     "message": "Sázet na crash, když se to podle historie vyplatí"
   },

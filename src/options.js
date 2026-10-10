@@ -22,7 +22,8 @@ const CHECKBOXES = [
   'playOnScreen',
 ];
 const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet', 'grindLimit', 'grindGame'];
-const INT_SELECTS = ['gameBet', 'crashBet', 'grindBet', 'lotteryPrice'];
+const BET_SELECTS = ['gameBet', 'crashBet', 'grindBet', 'lotteryPrice'];
+const INT_SELECTS = [...BET_SELECTS, 'huntRoundsGoal'];
 const TEXTS = ['openrouterModel'];
 const NUMBERS = [
   'minDelayMs',
@@ -48,6 +49,7 @@ const DEFAULTS = {
   loanTrick: true,
   standup: true,
   achievementHunt: true,
+  huntRoundsGoal: 10_000,
   edgeBets: true,
   crashEnabled: true,
   crashBet: 100,
@@ -107,9 +109,10 @@ for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = msg(
 for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', msg(el.dataset.i18nLabel));
 document.documentElement.lang = locale;
 
-for (const name of INT_SELECTS) {
+for (const name of BET_SELECTS) {
   for (const bet of G.BET_LEVELS) field(name).add(new Option(num.format(bet), String(bet)));
 }
+for (const rounds of globalThis.BotterAuto.HUNT_ROUNDS_TIERS) field('huntRoundsGoal').add(new Option(num.format(rounds), String(rounds)));
 for (const key of G.ROULETTE_BETS) field('rouletteBet').add(new Option(msg(`roulette_${key}`), key));
 field('grindGame').add(new Option(msg('grind_auto'), 'auto'));
 for (const game of G.GAME_KEYS) field('grindGame').add(new Option(msg(`game_${game}`), game));

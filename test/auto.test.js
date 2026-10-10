@@ -549,6 +549,15 @@ test('huntPlan moves to blackjack once the zero is done and stops when nothing p
   assert.equal(A.huntPlan(hunter({ achievements: done, achProgress: { regular: 100 } }), huntCtx()), null);
 });
 
+test('huntPlan leaves rounds-played tiers above the chosen goal', () => {
+  const done = { zero_hero: { tier: 1 }, natural: { tier: 1 }, five_cards: { tier: 1 } };
+  assert.equal(A.huntPlan(hunter({ achievements: done }), huntCtx({ roundsGoal: 1000 })).game, 'roulette');
+  const second = hunter({ achievements: { ...done, regular: { tier: 1 } }, totalSpins: 9000 });
+  // 5000 over the 1,000 rounds left is worth 5 a round, above the 20 * 3/39 roulette loss.
+  assert.equal(A.huntPlan(second, huntCtx({ roundsGoal: 10_000 })).game, 'roulette');
+  assert.equal(A.huntPlan(second, huntCtx({ roundsGoal: 1000 })), null);
+});
+
 test('huntPlan plays a round at night and skips locked games and missing data', () => {
   const done = { zero_hero: { tier: 1 }, natural: { tier: 1 }, five_cards: { tier: 1 }, regular: { tier: 3 } };
   assert.equal(A.huntPlan(hunter({ achievements: done }), huntCtx()), null);

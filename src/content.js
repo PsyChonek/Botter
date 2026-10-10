@@ -37,6 +37,7 @@
     loanTrick: true,
     standup: true,
     achievementHunt: true,
+    huntRoundsGoal: 10_000,
     edgeBets: true,
     crashEnabled: true,
     crashBet: 100,
@@ -1382,6 +1383,7 @@
       unlocks: GRIND_UNLOCKS,
       edges: O.edges(G.GAME_KEYS, player.upgrades, blazeMode()),
       levels: G.BET_LEVELS.filter((bet) => bet <= player.maxBet && player.credits - bet >= reserve),
+      roundsGoal: settings.huntRoundsGoal,
     });
     const note = plan ? `${plan.game} ${plan.targets}` : '';
     if (note !== huntTargets) {

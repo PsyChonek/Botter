@@ -450,13 +450,14 @@
   // catalog (reward per tier, and the tier thresholds of counted ones). The
   // rest either happen on their own, are claimed elsewhere (clean loan,
   // podium, standup, wheel, attendance, maxed) or hinge on rare slot events.
+  const HUNT_ROUNDS_TIERS = [1000, 10_000, 100_000];
   const HUNT_ACHIEVEMENTS = {
     zero_hero: { reward: 1000 }, // win a roulette bet on a zero
     uptime_hero: { reward: 2000 }, // cash out a crash bet at 10x or more
     natural: { reward: 300 }, // blackjack from the first two cards
     five_cards: { reward: 1000 }, // win a blackjack hand with five or more cards
     night_owl: { reward: 300 }, // play between 2:00 and 5:00
-    regular: { reward: [1000, 5000, 25000], tiers: [1000, 10_000, 100_000] }, // rounds played
+    regular: { reward: [1000, 5000, 25000], tiers: HUNT_ROUNDS_TIERS }, // rounds played
     friday_deploy: { reward: 200 }, // work on Friday after 17:00
     speedy: { reward: 200 }, // a right answer within 3 seconds
     lottery_3: { reward: 1000 }, // 3 or more numbers on one lottery ticket
@@ -503,7 +504,7 @@
   // reward over that count). A round is played when that beats its expected
   // loss, on the game where the margin is biggest, at the smallest bet.
   // ctx: level, unlocks, edges (house edge per game), levels (affordable bet
-  // levels), now.
+  // levels), roundsGoal (highest rounds-played tier to chase, all when unset), now.
   function huntPlan(player, ctx) {
     const bet = Math.min(...(ctx.levels ?? []));
     if (!Number.isFinite(bet)) return null;
@@ -515,7 +516,8 @@
     const tier = achievementTier(player, 'regular');
     // The client shows counter progress from achProgress; totalSpins is the same count.
     const played = player.achProgress?.regular ?? player.totalSpins ?? Infinity;
-    const left = tier === null ? 0 : HUNT_ACHIEVEMENTS.regular.tiers[tier] - played;
+    const goal = HUNT_ACHIEVEMENTS.regular.tiers[tier];
+    const left = tier === null || goal > (ctx.roundsGoal ?? Infinity) ? 0 : goal - played;
     if (left > 0) shared.push({ key: 'regular', value: achievementReward('regular', tier) / left });
 
     let best = null;
@@ -791,6 +793,7 @@
     CRASH_ACHIEVEMENT_TARGET,
     achievementTier,
     fridayEvening,
+    HUNT_ROUNDS_TIERS,
     huntPlan,
     crashHitChance,
     crashHuntWorth,
