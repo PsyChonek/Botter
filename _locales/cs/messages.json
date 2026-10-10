@@ -681,6 +681,9 @@
       }
     }
   },
+  "optionsModelUndecided": {
+    "message": "Zatím žádné zaznamenané točení pravidla nerozliší: jinak vyplácí jen asi 1 točení ze 110 (víc hvězd na jednom válci). Do té doby bot počítá hvězdy po válcích. Zahraj víc Blaze a zkontroluj znovu."
+  },
   "optionsModelMismatch": {
     "message": "Ani jedno pravidlo nesedí na všechna točení, modelu tedy chybí nějaké pravidlo. Než se na čísla spolehneš, exportuj točení a pošli je."
   },

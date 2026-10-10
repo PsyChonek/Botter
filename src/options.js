@@ -291,7 +291,8 @@ $('checkModel').addEventListener('click', async () => {
   await new Promise((resolve) => setTimeout(resolve, 20));
   const check = Z.checkSpins(spins);
   const rate = (mode) => (check[mode].total ? check[mode].match / check[mode].total : 0);
-  const best = Z.SCATTER_MODES.reduce((a, b) => (rate(b) > rate(a) ? b : a));
+  // Same pick as the bot (BotterOdds.blazeMode): per symbol only when it matches more spins.
+  const best = O.blazeMode(check, 0);
   const current = spins[spins.length - 1].upgrades ?? {};
   const lines = Z.SCATTER_MODES.map((mode) =>
     msg('optionsModelMatch', [msg(`scatter_${mode}`), pct2.format(rate(mode)), num.format(check[mode].total)]),
@@ -301,6 +302,7 @@ $('checkModel').addEventListener('click', async () => {
     msg('optionsModelRtpMax', [pct2.format(Z.simulateRtp(Z.config({ lucky: 5, wild: 5, star: 5 }), best))]),
   );
   if (rate(best) < 0.99) lines.push(msg('optionsModelMismatch'));
+  else if (rate('symbols') === rate('reels')) lines.push(msg('optionsModelUndecided'));
   $('modelResult').textContent = lines.join('\n');
 });
 

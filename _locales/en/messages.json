@@ -681,6 +681,9 @@
       }
     }
   },
+  "optionsModelUndecided": {
+    "message": "No recorded spin tells the two rules apart yet: only about 1 spin in 110 pays differently (several stars on one reel). Until one does, the bot keeps stars counted per reel. Play more Blaze and check again."
+  },
   "optionsModelMismatch": {
     "message": "Neither rule reproduces every spin, so the model is missing a rule. Export the spins and send them over before trusting these numbers."
   },
