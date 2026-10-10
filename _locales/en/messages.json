@@ -1098,6 +1098,9 @@
   "shopState_notGrinded": {
     "message": "game not ground"
   },
+  "shopState_notFinal": {
+    "message": "not the end game"
+  },
   "shopState_tooSmall": {
     "message": "too small"
   },

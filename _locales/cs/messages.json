@@ -1098,6 +1098,9 @@
   "shopState_notGrinded": {
     "message": "hra se negrinduje"
   },
+  "shopState_notFinal": {
+    "message": "není koncová hra"
+  },
   "shopState_tooSmall": {
     "message": "moc malé"
   },

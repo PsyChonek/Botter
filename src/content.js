@@ -1241,8 +1241,10 @@
   function upgradeSkip(offer) {
     const { candidates } = grindModel();
     const mode = blazeMode();
+    const maxedEdge = (game) => O.edges([game], G.upgradeRest(player.upgrades, game, Object.keys(G.SHOP[game])).upgrades, mode)[game] ?? null;
     return A.upgradeVerdict(offer, {
       games: candidates.filter((game) => player.level >= GRIND_UNLOCKS[game]),
+      finalGame: A.finalGame(candidates, maxedEdge),
       upgrades: player.upgrades,
       edge: (game, upgrades) => O.edges([game], upgrades, mode)[game] ?? null,
       rest: (keys, upTo) => G.upgradeRest(player.upgrades, offer.game, keys, upTo),

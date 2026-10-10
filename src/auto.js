@@ -225,8 +225,22 @@
     return Math.max(0, settings.xpBudget) * UPGRADE_HORIZON_DAYS;
   }
 
+  // Game the grinder ends on: the one with the lowest edge once every upgrade
+  // is bought and it is unlocked, or null when no game has a model. Upgrades
+  // of any other game stop paying as soon as a cheaper game unlocks, so only
+  // this one is upgraded. maxedEdge(game) is that edge, or null.
+  function finalGame(games, maxedEdge) {
+    let best = null;
+    for (const game of games) {
+      const edge = maxedEdge(game);
+      if (edge !== null && (best === null || edge < best.edge)) best = { game, edge };
+    }
+    return best?.game ?? null;
+  }
+
   // Why an upgrade from the shop plan is not worth its price, or null when it is.
-  // ctx: games (unlocked games the grinder may pick), upgrades,
+  // ctx: games (unlocked games the grinder may pick), finalGame (see finalGame),
+  // upgrades,
   // edge(game, upgrades) (modelled house edge or null), rest(keys, upTo)
   // ({ price, upgrades } after buying those upgrades of the offer's game up to
   // level upTo, default max), maxLevels ({ key: max } of the game) and volume (see
@@ -250,11 +264,14 @@
     const keys = Object.keys(ctx.maxLevels);
 
     // XP per credit is the same in every game, so costs compare by edge alone.
-    // Only the game the grinder plays is upgraded, or one that this level of
-    // the upgrade alone makes the cheapest: credits put into a game it does not
-    // play buy no XP.
+    // Only the final game is upgraded; until it unlocks the grinder plays the
+    // cheapest game as it is. Without a final game, only the game the grinder
+    // plays, or one this level alone makes the cheapest: credits put into a
+    // game it does not play buy no XP.
     const before = Math.min(...ctx.games.map((g) => now(g) ?? Infinity));
-    if (now(game) > before && ctx.edge(game, ctx.rest([offer.key], offer.next).upgrades) > before) return 'notBest';
+    if (ctx.finalGame && game !== ctx.finalGame) return 'notFinal';
+    const nextEdge = ctx.edge(game, ctx.rest([offer.key], offer.next).upgrades);
+    if (!ctx.finalGame && now(game) > before && nextEdge > before) return 'notBest';
     const maxed = ctx.rest(keys.filter((key) => gainPerCredit([key]) >= UPGRADE_MIN_GAIN));
     const pays = (rest) => {
       const after = Math.min(before, ctx.edge(game, rest.upgrades));
@@ -795,6 +812,7 @@
     grindAllowed,
     workDue,
     grindVolume,
+    finalGame,
     upgradeVerdict,
     urgentAccount,
     pickAccount,

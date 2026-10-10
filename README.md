@@ -219,8 +219,10 @@ progress shows at `chrome://on-device-internals`.
   level formulas. A plan entry is skipped when it is not worth its price
   (`upgradeVerdict` in `src/auto.js`): it adds less than 0.5 % return per 10,000
   credits (blackjack hint, double and soft 17, Slotingi mint), the game is not
-  the one the grinder plays (cheapest per XP) and this level alone does not make it
-  the cheapest, or spending the price on plain grinding gives
+  the final one (the lowest edge with every upgrade bought, Roulette unless Blaze's
+  star scatter counts symbols; until it unlocks the grinder plays the cheapest game
+  without buying anything, since an upgrade of a game left behind at the next unlock
+  stops paying), or spending the price on plain grinding gives
   more XP than grinding the rest at the cheaper cost (volume: 14 days of the daily
   budget, or the credits above the minimum balance; judged for the next levels alone
   and for the game's useful upgrades maxed together). `crash:sla` is never bought:

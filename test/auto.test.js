@@ -244,6 +244,17 @@ test('upgradeVerdict upgrades only the game the grinder plays', () => {
   assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), { ...ctx, games: ['roulette'] }), 'notGrinded');
 });
 
+test('finalGame is the lowest edge maxed and upgradeVerdict buys nothing for other games', () => {
+  const maxed = { blaze: 0.039, blackjack: 0.029, roulette: 0.027, crash: null };
+  assert.equal(A.finalGame(Object.keys(maxed), (g) => maxed[g]), 'roulette');
+  assert.equal(A.finalGame(['crash'], (g) => maxed[g]), null);
+  const ctx = verdictCtx({ finalGame: 'roulette' });
+  assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), ctx), 'notFinal');
+  // The final game is upgraded even while it is not the cheapest yet.
+  const behind = verdictCtx({ games: ['skeleton', 'roulette'], finalGame: 'skeleton' });
+  assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), behind), null);
+});
+
 test('upgradeVerdict prefers plain XP grinding when the volume is too small to pay back', () => {
   // Spending 8000 of 9000 credits on upgrades leaves too little to grind.
   assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), verdictCtx({ volume: 9000 })), 'xpFarmingBetter');
