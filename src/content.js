@@ -1453,6 +1453,12 @@
   // grinding budget. The fund is read from every response that carries it;
   // a stale amount is read from the feed first, every 10 seconds once pushing
   // the fund pays on the cheapest game (BotterAuto.payrollPollMs).
+  // Whether a round that ends ahead earns the Konec kvartálu bonus now.
+  function winsBonusOn(now = Date.now()) {
+    const event = A.weekendEvent(now);
+    return event.active && event.key === 'wins' && stats.flags.winsCapped !== event.startAt;
+  }
+
   async function edgeStep() {
     if (!settings.edgeBets) return false;
     const now = Date.now();
@@ -1467,8 +1473,7 @@
       return true;
     }
     if (now - (claimTried.edge ?? 0) < CLAIM_RETRY_MS) return false;
-    const event = A.weekendEvent(now);
-    const winsOn = event.active && event.key === 'wins' && stats.flags.winsCapped !== event.startAt;
+    const winsOn = winsBonusOn(now);
     const reserve = limits().reserve;
     const plan = A.edgePlan({
       level: player.level,
@@ -1586,7 +1591,10 @@
     if (A.grindHold(event, now)) return { lost, levels, candidates, edges, plan: null };
     const wanted = Number(settings.grindBet) || G.BET_LEVELS[0];
     const bet = A.grindBet({ ...limit, xpBudget: budget }, player.credits, lost, levels, wanted);
-    const plan = A.grindPlan(candidates, bet, player.level, GRIND_UNLOCKS, edges);
+    // On a Konec kvartálu weekend the bonus on wins lowers each game's loss by its own amount.
+    const bonus = winsBonusOn(now) ? A.WINS_BONUS : 0;
+    const pickEdges = A.bonusEdges(edges, O.gains(candidates, player.upgrades, blazeMode()), bonus);
+    const plan = A.grindPlan(candidates, bet, player.level, GRIND_UNLOCKS, pickEdges);
     return { lost, levels, candidates, edges, plan };
   }
 

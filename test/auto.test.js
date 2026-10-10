@@ -549,6 +549,15 @@ test('huntPlan moves to blackjack once the zero is done and stops when nothing p
   assert.equal(A.huntPlan(hunter({ achievements: done, achProgress: { regular: 100 } }), huntCtx()), null);
 });
 
+test('bonusEdges takes the wins bonus off each edge and can change the grind pick', () => {
+  const edges = { skeleton: 0.2, slotingi: 0.22 };
+  assert.equal(A.bonusEdges(edges, { skeleton: 0.1 }, 0), edges);
+  const bonus = A.bonusEdges(edges, { skeleton: 0.1, slotingi: 0.4 }, 0.5);
+  assert.ok(Math.abs(bonus.skeleton - 0.15) < 1e-12 && Math.abs(bonus.slotingi - 0.02) < 1e-12);
+  assert.equal(A.cheapestGame(['skeleton', 'slotingi'], 10, { skeleton: 5, slotingi: 7 }, edges), 'skeleton');
+  assert.equal(A.cheapestGame(['skeleton', 'slotingi'], 10, { skeleton: 5, slotingi: 7 }, bonus), 'slotingi');
+});
+
 test('huntPlan leaves rounds-played tiers above the chosen goal', () => {
   const done = { zero_hero: { tier: 1 }, natural: { tier: 1 }, five_cards: { tier: 1 } };
   assert.equal(A.huntPlan(hunter({ achievements: done }), huntCtx({ roundsGoal: 1000 })).game, 'roulette');

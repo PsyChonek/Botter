@@ -634,6 +634,14 @@
   // ahead, up to a weekend limit.
   const WINS_BONUS = 0.5;
 
+  // House edges with the Konec kvartálu bonus on wins taken off: per credit a
+  // round then loses edge minus winsBonus times gain (see edgePlan). A game
+  // without a simulated gain keeps its plain edge.
+  function bonusEdges(edges, gains, winsBonus) {
+    if (!(winsBonus > 0)) return edges;
+    return Object.fromEntries(Object.entries(edges).map(([game, edge]) => [game, edge - winsBonus * (gains?.[game] ?? 0)]));
+  }
+
   // A round worth playing for its own expected profit, or null: the payroll
   // fund close to its cap, or the Konec kvartálu bonus on wins. Per credit a
   // round returns -edge, plus winsBonus times gain (the mean net profit per
@@ -804,6 +812,7 @@
     payrollWorth,
     payrollPollMs,
     WINS_BONUS,
+    bonusEdges,
     edgePlan,
     weekendEvent,
     workHold,
