@@ -58,6 +58,7 @@
     grindBet: 20,
     buyUpgrades: false,
     saveForUpgrades: true,
+    spareUpgrades: true,
     recordSpins: true,
     learnBlaze: true,
     captureDebug: false,
@@ -1309,23 +1310,42 @@
     return shopReview;
   }
 
-  // The goal upgrade when it is affordable above the reserve, or null.
+  // The goal upgrade when it is affordable above the reserve, or else a spare
+  // one (spareOffer), or null.
   function shopOffer() {
     const goal = reviewShop()?.goal;
-    return goal && player.credits >= goalNeed(goal) ? goal : null;
+    if (goal && player.credits >= goalNeed(goal)) return goal;
+    return spareOffer();
+  }
+
+  // An upgrade the XP plan skips (roulette, games other than the final one),
+  // bought only from credits beyond the reserve, the goal's price and the
+  // cushion to the next level. Not before the XP rate is measured, since the
+  // cushion is unknown until then, and not past a planned bankruptcy.
+  function spareOffer() {
+    if (!settings.spareUpgrades || bankruptPlanned() || !(A.pooledXpRate(stats.games) > 0)) return null;
+    const review = reviewShop();
+    if (!review) return null;
+    return A.spareUpgrade(review.queue, player.credits, goalNeed(review.goal));
   }
 
   // Credits the goal upgrade needs before it is bought: the reserve, its price
   // and what the grinder needs to reach the next level after it
-  // (BotterAuto.levelUpCushion, at the cheapest game's edge and variance).
+  // (levelCushion). With no goal, the reserve and the cushion.
   function goalNeed(goal) {
+    return limits().reserve + (goal?.price ?? 0) + levelCushion();
+  }
+
+  // Credits to reach the next level by grinding alone (BotterAuto.levelUpCushion,
+  // at the cheapest game's modelled edge and variance): no weekend event bonus
+  // is counted on, so the level is reached without one.
+  function levelCushion() {
     const { candidates, edges } = grindModel();
     const game = A.cheapestGame(candidates, player.level, GRIND_UNLOCKS, edges);
     const variance = game ? O.variances([game], player.upgrades, blazeMode())[game] : undefined;
     const xpLeft = Math.max(0, (player.xpNeed ?? 0) - (player.xpInto ?? 0));
     const bet = Number(settings.grindBet) || G.BET_LEVELS[0];
-    const cushion = game ? A.levelUpCushion(xpLeft, A.pooledXpRate(stats.games), edges[game], bet, variance) : 0;
-    return limits().reserve + goal.price + cushion;
+    return game ? A.levelUpCushion(xpLeft, A.pooledXpRate(stats.games), edges[game], bet, variance) : 0;
   }
 
   // The goal upgrade the grinder leaves credits for, or null. Its verdict says

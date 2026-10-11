@@ -222,6 +222,18 @@ function verdictCtx(overrides = {}) {
 }
 const offer = (game, key) => ({ game, key, next: 1, price: 1000 });
 
+test('spareUpgrade buys the cheapest skipped upgrade that leaves the need covered', () => {
+  const queue = [
+    { game: 'blaze', key: 'star', price: 2000, reason: null },
+    { game: 'slotingi', key: 'crown', price: 6000, reason: 'notFinal' },
+    { game: 'roulette', key: 'zeros', price: 15000, reason: 'notFinal' },
+    { game: 'blackjack', key: 'ties', price: 3000, reason: 'level' },
+  ];
+  assert.equal(A.spareUpgrade(queue, 30_000, 20_000).key, 'crown');
+  assert.equal(A.spareUpgrade(queue, 25_000, 20_000), null);
+  assert.equal(A.spareUpgrade(queue.slice(2), 40_000, 20_000).key, 'zeros');
+});
+
 test('upgradeVerdict buys an upgrade that pays back in XP', () => {
   assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), verdictCtx()), null);
 });

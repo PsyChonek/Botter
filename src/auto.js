@@ -320,6 +320,19 @@
     return [...steps, maxed].some(pays) ? null : 'xpFarmingBetter';
   }
 
+  // Cheapest upgrade from the shop queue (G.shopQueue) that the XP plan skips
+  // but the player level allows, bought only from spare credits: what is left
+  // after its price must still cover need (reserve, the saved goal and the
+  // cushion to the next level). Null when none fits.
+  function spareUpgrade(queue, credits, need) {
+    let best = null;
+    for (const offer of queue) {
+      if (!offer.reason || offer.reason === 'level' || credits - offer.price < need) continue;
+      if (!best || offer.price < best.price) best = offer;
+    }
+    return best;
+  }
+
   // Bet levels XP grinding may use now: allowed by the limits, and under a daily
   // budget no bigger than what is left of it, so one lost round cannot overshoot.
   function grindBets(settings, credits, lostToday, levels) {
@@ -866,6 +879,7 @@
     levelUpCushion,
     UPGRADE_HORIZON_LEVELS,
     upgradeVerdict,
+    spareUpgrade,
     urgentAccount,
     pickAccount,
     questGame,
