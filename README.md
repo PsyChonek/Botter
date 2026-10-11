@@ -222,7 +222,8 @@ progress shows at `chrome://on-device-internals`.
   the final one (the lowest edge with every upgrade bought, Roulette unless Blaze's
   star scatter counts symbols; until it unlocks the grinder plays the cheapest game
   without buying anything, since an upgrade of a game left behind at the next unlock
-  stops paying), or spending the price on plain grinding gives
+  stops paying; while the recorded Blaze spins have not settled the star rule and
+  the two rules point at different final games, nothing is bought), or spending the price on plain grinding gives
   more XP than grinding the rest at the cheaper cost (volume: 14 days of the daily
   budget, or the credits above the minimum balance; judged for the next levels alone
   and for the game's useful upgrades maxed together). `crash:sla` is never bought:

@@ -116,7 +116,14 @@
     return symbols.match > reels.match ? 'symbols' : 'reels';
   }
 
-  const api = { UPGRADES, rtp, edges, chances, winRates, gains, variances, bigRates, table, blazeMode };
+  // Whether the recorded spins settle the scatter rule: enough of them, and one
+  // rule matches more than the other. Only about 1 spin in 110 pays differently.
+  function blazeDecided(check, minSpins = 50) {
+    const { symbols, reels } = check ?? {};
+    return !!symbols && !!reels && symbols.total >= minSpins && symbols.match !== reels.match;
+  }
+
+  const api = { UPGRADES, rtp, edges, chances, winRates, gains, variances, bigRates, table, blazeMode, blazeDecided };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BotterOdds = api;
 })(globalThis);

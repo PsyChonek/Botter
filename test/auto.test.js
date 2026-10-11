@@ -255,6 +255,12 @@ test('finalGame is the lowest edge maxed and upgradeVerdict buys nothing for oth
   assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), behind), null);
 });
 
+test('upgradeVerdict buys nothing while the final game hangs on the Blaze star rule', () => {
+  const ctx = verdictCtx({ finalGame: 'skeleton', finalUnknown: true });
+  assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), ctx), 'starRule');
+  assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), { ...ctx, finalUnknown: false }), null);
+});
+
 test('upgradeVerdict prefers plain XP grinding when the volume is too small to pay back', () => {
   // Spending 8000 of 9000 credits on upgrades leaves too little to grind.
   assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), verdictCtx({ volume: 9000 })), 'xpFarmingBetter');

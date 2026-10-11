@@ -1259,10 +1259,14 @@
   function upgradeSkip(offer) {
     const { candidates } = grindModel();
     const mode = blazeMode();
-    const maxedEdge = (game) => O.edges([game], G.upgradeRest(player.upgrades, game, Object.keys(G.SHOP[game])).upgrades, mode)[game] ?? null;
+    const maxedEdge = (rule) => (game) =>
+      O.edges([game], G.upgradeRest(player.upgrades, game, Object.keys(G.SHOP[game])).upgrades, rule)[game] ?? null;
+    // Until the spins settle the Blaze star rule, the final game is unknown when the two rules disagree on it.
+    const finals = new Set(Z.SCATTER_MODES.map((rule) => A.finalGame(candidates, maxedEdge(rule))));
     return A.upgradeVerdict(offer, {
       games: candidates.filter((game) => player.level >= GRIND_UNLOCKS[game]),
-      finalGame: A.finalGame(candidates, maxedEdge),
+      finalGame: A.finalGame(candidates, maxedEdge(mode)),
+      finalUnknown: !blazeRule().decided && finals.size > 1,
       upgrades: player.upgrades,
       edge: (game, upgrades) => O.edges([game], upgrades, mode)[game] ?? null,
       rest: (keys, upTo) => G.upgradeRest(player.upgrades, offer.game, keys, upTo),
@@ -1276,7 +1280,7 @@
   // worth buying at this level. Changes are logged, not every review.
   function reviewShop() {
     if (!settings.buyUpgrades || !player) return (shopReview = null);
-    const key = JSON.stringify([accountId, player.level, player.upgrades, bankruptPlanned()]);
+    const key = JSON.stringify([accountId, player.level, player.upgrades, bankruptPlanned(), blazeRule().mode, blazeRule().decided]);
     if (shopReview?.key === key && Date.now() - shopReview.at < SHOP_REVIEW_MS) return shopReview;
     const queue = G.shopQueue(G.UPGRADE_PLAN, player, upgradeSkip);
     const goal = queue.find((offer) => !offer.reason) ?? null;
@@ -1572,11 +1576,17 @@
 
   // Scatter rule of the Blaze model, from the recorded spins, rechecked when a
   // new spin is recorded.
-  let blazeCheck = { last: undefined, mode: 'reels' };
-  function blazeMode() {
+  let blazeCheck = { last: undefined, mode: 'reels', decided: false };
+  function blazeRule() {
     const last = spins.at(-1);
-    if (blazeCheck.last !== last) blazeCheck = { last, mode: O.blazeMode(Z.checkSpins(spins)) };
-    return blazeCheck.mode;
+    if (blazeCheck.last !== last) {
+      const check = Z.checkSpins(spins);
+      blazeCheck = { last, mode: O.blazeMode(check), decided: O.blazeDecided(check) };
+    }
+    return blazeCheck;
+  }
+  function blazeMode() {
+    return blazeRule().mode;
   }
 
   // Games and bet levels the grinder may pick from right now, the modelled house

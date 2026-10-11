@@ -1122,6 +1122,9 @@
   "shopState_notGrinded": {
     "message": "hra se negrinduje"
   },
+  "shopState_starRule": {
+    "message": "čeká na pravidlo hvězd v Blaze"
+  },
   "shopState_notFinal": {
     "message": "není koncová hra"
   },

@@ -240,6 +240,7 @@
 
   // Why an upgrade from the shop plan is not worth its price, or null when it is.
   // ctx: games (unlocked games the grinder may pick), finalGame (see finalGame),
+  // finalUnknown (the final game hangs on the undecided Blaze star rule),
   // upgrades,
   // edge(game, upgrades) (modelled house edge or null), rest(keys, upTo)
   // ({ price, upgrades } after buying those upgrades of the offer's game up to
@@ -254,6 +255,8 @@
     const { game } = offer;
     const now = (g) => ctx.edge(g, ctx.upgrades);
     if (now(game) === null) return null;
+    // Credits put into the wrong final game are lost, so nothing is bought until it is known.
+    if (ctx.finalUnknown) return 'starRule';
     if (!ctx.games.includes(game)) return 'notGrinded';
 
     const gainPerCredit = (keys) => {

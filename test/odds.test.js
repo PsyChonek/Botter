@@ -31,6 +31,14 @@ test('edges skips games without a model', () => {
   assert.ok(Math.abs(edges.roulette - 3 / 39) < 1e-12);
 });
 
+test('blazeDecided needs enough spins and one rule matching more', () => {
+  assert.equal(O.blazeDecided(null), false);
+  assert.equal(O.blazeDecided({ symbols: { match: 60, total: 60 }, reels: { match: 60, total: 60 } }), false);
+  assert.equal(O.blazeDecided({ symbols: { match: 40, total: 40 }, reels: { match: 39, total: 40 } }), false);
+  assert.equal(O.blazeDecided({ symbols: { match: 60, total: 60 }, reels: { match: 59, total: 60 } }), true);
+  assert.equal(O.blazeDecided({ symbols: { match: 59, total: 60 }, reels: { match: 60, total: 60 } }), true);
+});
+
 test('blazeMode needs enough spins before trusting the richer scatter rule', () => {
   assert.equal(O.blazeMode(null), 'reels');
   assert.equal(O.blazeMode({ symbols: { match: 10, total: 10 }, reels: { match: 5, total: 10 } }), 'reels');
