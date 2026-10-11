@@ -232,7 +232,7 @@ progress shows at `chrome://on-device-internals`.
   star scatter counts symbols; until it unlocks the grinder plays the cheapest game
   without buying anything, since an upgrade of a game left behind at the next unlock
   stops paying; while the recorded Blaze spins have not settled the star rule and
-  the two rules point at different final games, nothing is bought, and with **Learn
+  the two rules point at different final games and learning is on, nothing is bought, and with **Learn
   the Blaze star rule** (Auto tab, on by default) the grinder plays Blaze at the
   smallest bet, within its limits, until they do. A tie over 1,000 spins counts as
   settled on per reel: the model expects 1 deciding spin in 110, so none means stars

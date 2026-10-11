@@ -505,7 +505,7 @@
     "message": "Lovit odehraná kola až do"
   },
   "optionsLearnBlaze": {
-    "message": "Grindovat Blaze s nejnižší sázkou, dokud zaznamenaná točení neukážou, jak se počítají hvězdy (po válcích, nebo po symbolech); vylepšení na to čekají"
+    "message": "Grindovat Blaze s nejnižší sázkou, dokud zaznamenaná točení neukážou, jak se počítají hvězdy (po válcích, nebo po symbolech), a do té doby nekupovat vylepšení; vypnuté kupuje podle počítání po válcích"
   },
   "optionsCrashEnabled": {
     "message": "Sázet na crash, když se to podle historie vyplatí"

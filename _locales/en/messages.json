@@ -505,7 +505,7 @@
     "message": "Hunt rounds played up to"
   },
   "optionsLearnBlaze": {
-    "message": "Grind Blaze at the smallest bet until its recorded spins show how stars are counted (per reel or per symbol); upgrades wait for it"
+    "message": "Grind Blaze at the smallest bet until its recorded spins show how stars are counted (per reel or per symbol), and hold upgrades until then; off buys on the per-reel rule"
   },
   "optionsCrashEnabled": {
     "message": "Bet on crash when the history says it pays"

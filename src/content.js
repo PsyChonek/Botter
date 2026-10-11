@@ -1271,12 +1271,14 @@
     const mode = blazeMode();
     const maxedEdge = (rule) => (game) =>
       O.edges([game], G.upgradeRest(player.upgrades, game, Object.keys(G.SHOP[game])).upgrades, rule)[game] ?? null;
-    // Until the spins settle the Blaze star rule, the final game is unknown when the two rules disagree on it.
+    // Until the spins settle the Blaze star rule, the final game is unknown when the two rules
+    // disagree on it. With learning switched off nothing would settle it, so the bot goes on the
+    // rule it uses (per reel until the spins say otherwise).
     const finals = new Set(Z.SCATTER_MODES.map((rule) => A.finalGame(candidates, maxedEdge(rule))));
     return A.upgradeVerdict(offer, {
       games: candidates.filter((game) => player.level >= GRIND_UNLOCKS[game]),
       finalGame: A.finalGame(candidates, maxedEdge(mode)),
-      finalUnknown: !blazeRule().decided && finals.size > 1,
+      finalUnknown: settings.learnBlaze && !blazeRule().decided && finals.size > 1,
       upgrades: player.upgrades,
       edge: (game, upgrades) => O.edges([game], upgrades, mode)[game] ?? null,
       rest: (keys, upTo) => G.upgradeRest(player.upgrades, offer.game, keys, upTo),
@@ -1290,7 +1292,7 @@
   // worth buying at this level. Changes are logged, not every review.
   function reviewShop() {
     if (!settings.buyUpgrades || !player) return (shopReview = null);
-    const key = JSON.stringify([accountId, player.level, player.upgrades, bankruptPlanned(), blazeRule().mode, blazeRule().decided]);
+    const key = JSON.stringify([accountId, player.level, player.upgrades, bankruptPlanned(), blazeRule().mode, blazeRule().decided, settings.learnBlaze]);
     if (shopReview?.key === key && Date.now() - shopReview.at < SHOP_REVIEW_MS) return shopReview;
     const queue = G.shopQueue(G.UPGRADE_PLAN, player, upgradeSkip);
     const goal = queue.find((offer) => !offer.reason) ?? null;
