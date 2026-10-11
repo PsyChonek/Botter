@@ -240,7 +240,11 @@ progress shows at `chrome://on-device-internals`.
   exactly that, so Roulette is the final game), or spending the price on plain grinding gives
   more XP than grinding the rest at the cheaper cost (volume: 14 days of the daily
   budget, or the credits above the minimum balance; judged for the next levels alone
-  and for the game's useful upgrades maxed together). `crash:sla` is never bought:
+  and for the game's useful upgrades maxed together). Once XP per credit is measured
+  (pooled over every game with XP), the volume is the XP to the next 10 levels instead,
+  from the level curve (`G.xpForLevel`: round(280 × level^1.35), reward 1,000 × (level
+  − 1), fitted exactly to recorded levels 14 to 18): an upgrade is bought when the
+  credits wagered for that XP times its drop in edge beat its price. `crash:sla` is never bought:
   Produkce padá's daily payout is too small to earn it back. `global:bets` (higher max bet) is not in the plan: XP per round
   is proportional to the bet, so a bigger bet never buys XP cheaper. The whole plan is judged again every 10 minutes and as soon as the level, the
   upgrades or the max bet change (`G.shopQueue` with `reviewShop` in `src/content.js`);

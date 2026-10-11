@@ -261,6 +261,21 @@ test('upgradeVerdict buys nothing while the final game hangs on the Blaze star r
   assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), { ...ctx, finalUnknown: false }), null);
 });
 
+test('upgradeVerdict judges by the XP ahead once the XP rate is measured', () => {
+  // team at 0.03 a level, 1000 a level: the budget rule says no on 9,000 credits.
+  assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), verdictCtx({ volume: 9000 })), 'xpFarmingBetter');
+  // 20,000 XP at 0.05 XP a credit is 400,000 wagered; one level saves 0.03 of it, 12,000 > 1,000.
+  assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), verdictCtx({ volume: 9000, xpAhead: 20_000, xpRate: 0.05 })), null);
+  // 500 XP is 10,000 wagered: 0.03 of it is 300 per level against 1,000 a level.
+  assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), verdictCtx({ volume: 9000, xpAhead: 500, xpRate: 0.05 })), 'xpFarmingBetter');
+});
+
+test('pooledXpRate is the XP per credit over games with XP', () => {
+  assert.equal(A.pooledXpRate({}), null);
+  const rate = A.pooledXpRate({ roulette: { xp: 50, wagered: 1000 }, blaze: { xp: 150, wagered: 3000 }, crash: { xp: 0, wagered: 9000 } });
+  assert.equal(rate, 0.05);
+});
+
 test('upgradeVerdict prefers plain XP grinding when the volume is too small to pay back', () => {
   // Spending 8000 of 9000 credits on upgrades leaves too little to grind.
   assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), verdictCtx({ volume: 9000 })), 'xpFarmingBetter');

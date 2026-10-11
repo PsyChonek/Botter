@@ -169,6 +169,13 @@ test('recordLevel keeps XP per level and the level-up reward, same map when noth
   assert.deepEqual(G.recordLevel({}, { level: 5, xpNeed: '700' }, { reward: '900' }), { 5: { xpNeed: 700, reward: 900 } });
 });
 
+test('the level curve matches the recorded levels and counts the XP ahead', () => {
+  assert.deepEqual([14, 15, 16, 17, 18].map(G.xpForLevel), [9873, 10836, 11823, 12831, 13860]);
+  assert.deepEqual([15, 16, 17, 18].map(G.levelReward), [14_000, 15_000, 16_000, 17_000]);
+  assert.equal(G.xpAhead({ level: 15, xpNeed: 10_836, xpInto: 836 }, 3), 10_000 + 11_823 + 12_831);
+  assert.equal(G.xpAhead({}, 3), 0);
+});
+
 test('dailyBonus follows the client formula', () => {
   // Client: round((500 + 250 * (min(day, 7) - 1)) * (1 + (level - 1) * 0.1 + max(0, level - 4) * 0.05) / 10) * 10
   assert.equal(G.dailyBonus(1, 1), 500);

@@ -167,6 +167,20 @@
   // game, so the simulated edge alone decides.
   const xpRate = (row) => (row?.wagered > 0 && row.xp > 0 ? row.xp / row.wagered : null);
 
+  // XP per credit wagered over every game that has earned XP, or null before
+  // any: XP per round is proportional to the bet the same way in every game,
+  // so all rounds measure the same rate. Crash and the lottery book no XP.
+  function pooledXpRate(games) {
+    let xp = 0;
+    let wagered = 0;
+    for (const row of Object.values(games ?? {})) {
+      if (!(row?.xp > 0) || !(row.wagered > 0)) continue;
+      xp += row.xp;
+      wagered += row.wagered;
+    }
+    return wagered > 0 ? xp / wagered : null;
+  }
+
   // Credits lost per XP point on a game: house edge over XP per credit wagered.
   // It does not depend on the bet, so the bet only sets the pace.
   function xpCost(game, stats, edges) {
@@ -215,6 +229,8 @@
   const UPGRADE_MIN_GAIN = 0.005 / 10_000;
   // Grinding volume an upgrade must pay back over, under a daily loss budget.
   const UPGRADE_HORIZON_DAYS = 14;
+  // Levels of XP an upgrade must pay back over once the XP rate is measured.
+  const UPGRADE_HORIZON_LEVELS = 10;
 
   // Credits the grinder expects to lose while an upgrade has to pay off: the
   // daily budget over the horizon, what is above the minimum balance, or with
@@ -241,12 +257,18 @@
   // Why an upgrade from the shop plan is not worth its price, or null when it is.
   // ctx: games (unlocked games the grinder may pick), finalGame (see finalGame),
   // finalUnknown (the final game hangs on the undecided Blaze star rule),
+  // xpAhead (XP to the next UPGRADE_HORIZON_LEVELS levels) and xpRate (measured
+  // XP per credit wagered, or null),
   // upgrades,
   // edge(game, upgrades) (modelled house edge or null), rest(keys, upTo)
   // ({ price, upgrades } after buying those upgrades of the offer's game up to
   // level upTo, default max), maxLevels ({ key: max } of the game) and volume (see
   // grindVolume).
-  // Credits spent on upgrades are not there to grind with, so they are bought
+  // With the XP rate measured, an upgrade is bought when it saves more than its
+  // price on the XP to the next levels: credits wagered for that XP (xpAhead /
+  // xpRate) times the drop in edge. Levels pay rewards, so grinding is not a
+  // loss to be kept small but XP to be bought cheap. Before the rate is known:
+  // credits spent on upgrades are not there to grind with, so they are bought
   // only if the XP from the remaining volume at the cheaper cost beats the XP
   // from the whole volume at today's best cost. That is checked for the next
   // levels of this upgrade alone (a cheap first level can pay back on its own)
@@ -279,6 +301,7 @@
     const pays = (rest) => {
       const after = Math.min(before, ctx.edge(game, rest.upgrades));
       if (after <= 0) return true; // the player is ahead: it pays for itself
+      if (ctx.xpAhead > 0 && ctx.xpRate > 0) return (ctx.xpAhead / ctx.xpRate) * (before - after) > rest.price;
       return (ctx.volume - rest.price) / after > ctx.volume / before;
     };
     const steps = [];
@@ -828,6 +851,8 @@
     workDue,
     grindVolume,
     finalGame,
+    pooledXpRate,
+    UPGRADE_HORIZON_LEVELS,
     upgradeVerdict,
     urgentAccount,
     pickAccount,

@@ -1279,6 +1279,8 @@
       games: candidates.filter((game) => player.level >= GRIND_UNLOCKS[game]),
       finalGame: A.finalGame(candidates, maxedEdge(mode)),
       finalUnknown: settings.learnBlaze && !blazeRule().decided && finals.size > 1,
+      xpAhead: G.xpAhead(player, A.UPGRADE_HORIZON_LEVELS),
+      xpRate: A.pooledXpRate(stats.games),
       upgrades: player.upgrades,
       edge: (game, upgrades) => O.edges([game], upgrades, mode)[game] ?? null,
       rest: (keys, upTo) => G.upgradeRest(player.upgrades, offer.game, keys, upTo),
@@ -1292,7 +1294,7 @@
   // worth buying at this level. Changes are logged, not every review.
   function reviewShop() {
     if (!settings.buyUpgrades || !player) return (shopReview = null);
-    const key = JSON.stringify([accountId, player.level, player.upgrades, bankruptPlanned(), blazeRule().mode, blazeRule().decided, settings.learnBlaze]);
+    const key = JSON.stringify([accountId, player.level, player.upgrades, bankruptPlanned(), blazeRule().mode, blazeRule().decided, settings.learnBlaze, Number(A.pooledXpRate(stats.games)?.toFixed(3))]);
     if (shopReview?.key === key && Date.now() - shopReview.at < SHOP_REVIEW_MS) return shopReview;
     const queue = G.shopQueue(G.UPGRADE_PLAN, player, upgradeSkip);
     const goal = queue.find((offer) => !offer.reason) ?? null;

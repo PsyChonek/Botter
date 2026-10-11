@@ -185,6 +185,19 @@
     return next;
   }
 
+  // Level curve of the server, fitted exactly to the recorded levels 14 to 18:
+  // XP a level needs and the credits paid on reaching it.
+  const xpForLevel = (level) => Math.round(280 * level ** 1.35);
+  const levelReward = (level) => 1000 * (level - 1);
+
+  // XP from where the player stands to the start of level `level + levels`.
+  function xpAhead(player, levels) {
+    if (!(player?.level >= 1)) return 0;
+    let xp = Math.max(0, (player.xpNeed ?? xpForLevel(player.level)) - (player.xpInto ?? 0));
+    for (let level = player.level + 1; level < player.level + levels; level++) xp += xpForLevel(level);
+    return xp;
+  }
+
   // Daily bonus on a streak day at a player level, the client's formula: the
   // base grows 250 a day up to day 7, and every level adds 10 % of it, 15 %
   // from level 5.
@@ -242,6 +255,9 @@
     rewardTotal,
     gameDelta,
     recordLevel,
+    xpForLevel,
+    levelReward,
+    xpAhead,
     dailyBonus,
     addDelta,
     totalNet,
