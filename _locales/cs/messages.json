@@ -981,6 +981,27 @@
   "colAccount": {
     "message": "Účet"
   },
+  "optionsLevelsHeading": {
+    "message": "Levely"
+  },
+  "optionsLevelsHint": {
+    "message": "Kolik XP který level potřebuje a kolik kreditů dal level-up, zaznamenané ze všech účtů, které bot vidí, aby šel najít vzorec. Denní bonus je vzorec z klienta při 7denní sérii."
+  },
+  "optionsLevelsEmpty": {
+    "message": "Zatím žádný level. Otevři kasino se zapnutým rozšířením."
+  },
+  "colXpNeed": {
+    "message": "Potřeba XP"
+  },
+  "colXpGrowth": {
+    "message": "Nárůst"
+  },
+  "colLevelReward": {
+    "message": "Odměna za level"
+  },
+  "colDailyBonus": {
+    "message": "Denní bonus"
+  },
   "colLevel": {
     "message": "Level"
   },

@@ -315,6 +315,7 @@
       player = data.player;
       saveAccount();
     }
+    trackLevel(data);
     if (settings.captureDebug && CAPTURE_PATHS.test(path)) {
       capture = [...capture, { at: Date.now(), path, ok, request, data }].slice(-MAX_CAPTURE);
       chrome.storage.local.set({ capture });
@@ -361,6 +362,18 @@
       }
     }
     render();
+  }
+
+  // Level curve shared by all accounts (G.recordLevel), saved only on a change.
+  let levels = null;
+  async function trackLevel(data) {
+    if (!data?.player && !data?.levelUp) return;
+    levels ??= (await chrome.storage.local.get('levels')).levels ?? {};
+    const next = G.recordLevel(levels, data.player, data.levelUp);
+    if (next === levels) return;
+    levels = next;
+    chrome.storage.local.set({ levels });
+    if (data.levelUp) log.info('level_up', { to: data.levelUp.to, reward: data.levelUp.reward, xpNeed: data.player?.xpNeed });
   }
 
   // "Začít úplně od nuly" wipes the whole profile on the server (credits, level,

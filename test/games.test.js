@@ -156,3 +156,22 @@ test('crash stakes go up to 10x the slot max bet', () => {
   assert.equal(G.betFor(5000, G.CRASH_MAX_BET(100), G.CRASH_LEVELS), 1000);
   assert.equal(G.betFor(5000, 1000), 1000);
 });
+
+test('recordLevel keeps XP per level and the level-up reward, same map when nothing is new', () => {
+  const levels = G.recordLevel({}, { level: 3, xpNeed: 450 });
+  assert.deepEqual(levels, { 3: { xpNeed: 450 } });
+  assert.equal(G.recordLevel(levels, { level: 3, xpNeed: 450 }), levels);
+  const up = G.recordLevel(levels, { level: 4, xpNeed: 600 }, { to: 4, reward: 800 });
+  assert.deepEqual(up, { 3: { xpNeed: 450 }, 4: { xpNeed: 600, reward: 800 } });
+  assert.equal(G.recordLevel(up, { level: 4 }), up);
+  assert.equal(G.recordLevel(up, null, null), up);
+});
+
+test('dailyBonus follows the client formula', () => {
+  // Client: round((500 + 250 * (min(day, 7) - 1)) * (1 + (level - 1) * 0.1 + max(0, level - 4) * 0.05) / 10) * 10
+  assert.equal(G.dailyBonus(1, 1), 500);
+  assert.equal(G.dailyBonus(7, 1), 2000);
+  assert.equal(G.dailyBonus(9, 5), 2900);
+  assert.equal(G.dailyBonus(7, 15), 5900);
+  assert.equal(G.dailyBonus(3, 10), 1000 * 2.2);
+});

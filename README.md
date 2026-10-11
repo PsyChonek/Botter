@@ -248,6 +248,13 @@ progress shows at `chrome://on-device-internals`.
   server, so its stats start over too: profit, XP per game, free income and the
   achievement flags, so the clean-loan trick and the podium run again. Only the submit
   dwell times are kept.
+- **Levels** (settings, Profit tab): the XP each level needs (`player.xpNeed`) and
+  the credits paid on reaching it (`levelUp.reward`), recorded from every response of
+  every account into one shared `levels` table (`G.recordLevel`), with the growth over
+  the level below and the daily bonus at a 7-day streak (the client's formula,
+  `G.dailyBonus`: each level adds 10 % of the base, 15 % from level 5). The server
+  sends both numbers only for the current level, so the curve fills in as accounts
+  level up. Level-ups are logged as `level_up`.
 - **Odds per upgrade** (settings, Games tab): for every game and every combination of
   its shop upgrades the return to player, the share of rounds won (more back than the
   bet), the chance that 1,000 rounds end ahead and the return on a Konec kvartálu

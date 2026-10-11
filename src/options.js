@@ -513,6 +513,32 @@ function markOdds(accounts) {
 
 buildOdds();
 
+// Level curve seen by the bot (G.recordLevel): XP per level, its growth over the
+// level below, the level-up reward and the daily bonus at a 7-day streak.
+function showLevels(levels = {}) {
+  const rows = Object.keys(levels)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .map((level) => {
+      const { xpNeed, reward } = levels[level];
+      const below = levels[level - 1]?.xpNeed;
+      const growth = xpNeed > 0 && below > 0 ? xpNeed / below - 1 : null;
+      const tr = document.createElement('tr');
+      tr.append(
+        cell(num.format(level)),
+        cell(xpNeed === undefined ? '-' : num.format(xpNeed)),
+        cell(growth === null ? '-' : signed.format(growth * 100) + ' %'),
+        cell(reward === undefined ? '-' : num.format(reward)),
+        cell(num.format(G.dailyBonus(7, level))),
+      );
+      return tr;
+    });
+  $('levelsBody').replaceChildren(...rows);
+  $('levelsEmpty').hidden = rows.length > 0;
+}
+
+chrome.storage.local.get('levels').then(({ levels }) => showLevels(levels));
+
 $('profitAccount').addEventListener('change', (event) => {
   profitChoice = event.target.value;
   showChosenProfit();
@@ -523,6 +549,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   const keys = Object.keys(changes);
   if (keys.some((key) => key === 'stats' || key.startsWith(STATS_PREFIX) || key.startsWith(ACCOUNT_PREFIX))) showAccounts();
   if (changes.bank) showBankSize(changes.bank.newValue ?? {});
+  if (changes.levels) showLevels(changes.levels.newValue);
   if (changes.settings && !saveTimer) fill({ ...DEFAULTS, ...changes.settings.newValue });
 });
 

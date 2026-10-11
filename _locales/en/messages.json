@@ -981,6 +981,27 @@
   "colAccount": {
     "message": "Account"
   },
+  "optionsLevelsHeading": {
+    "message": "Levels"
+  },
+  "optionsLevelsHint": {
+    "message": "XP each level needs and the credits paid on reaching it, recorded from every account the bot sees, to work out the pattern. The daily bonus is the client formula at a 7-day streak."
+  },
+  "optionsLevelsEmpty": {
+    "message": "No level seen yet. Open the casino with the extension on."
+  },
+  "colXpNeed": {
+    "message": "XP needed"
+  },
+  "colXpGrowth": {
+    "message": "Growth"
+  },
+  "colLevelReward": {
+    "message": "Level-up reward"
+  },
+  "colDailyBonus": {
+    "message": "Daily bonus"
+  },
   "colLevel": {
     "message": "Level"
   },

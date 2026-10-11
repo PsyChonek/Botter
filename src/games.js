@@ -169,6 +169,29 @@
     };
   }
 
+  // Level curve seen so far, shared by every account: { [level]: { xpNeed, reward } }
+  // with the XP a level needs (player.xpNeed while at it) and the credits paid on
+  // reaching it (levelUp.reward). Returns a new map when something new was
+  // seen, else the same one, so the caller saves only on a change.
+  function recordLevel(levels, player, levelUp) {
+    let next = levels;
+    const set = (level, field, value) => {
+      if (!(level >= 1) || !(value >= 0) || next[level]?.[field] === value) return;
+      next = { ...next, [level]: { ...next[level], [field]: value } };
+    };
+    if (typeof player?.xpNeed === 'number') set(player.level, 'xpNeed', player.xpNeed);
+    if (levelUp && typeof levelUp.reward === 'number') set(levelUp.to, 'reward', levelUp.reward);
+    return next;
+  }
+
+  // Daily bonus on a streak day at a player level, the client's formula: the
+  // base grows 250 a day up to day 7, and every level adds 10 % of it, 15 %
+  // from level 5.
+  function dailyBonus(day, level) {
+    const base = 500 + 250 * (Math.max(1, Math.min(day, 7)) - 1);
+    return Math.round((base * (1 + (level - 1) * 0.1 + Math.max(0, level - 4) * 0.05)) / 10) * 10;
+  }
+
   function addDelta(games, delta) {
     const row = (games[delta.game] ??= { rounds: 0, wagered: 0, net: 0, xp: 0 });
     row.rounds += delta.rounds;
@@ -217,6 +240,8 @@
     rewardsPaid,
     rewardTotal,
     gameDelta,
+    recordLevel,
+    dailyBonus,
     addDelta,
     totalNet,
     profitRows,
