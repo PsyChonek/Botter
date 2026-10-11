@@ -676,8 +676,19 @@
   // levels (affordable bets, ascending), bankroll (credits above the reserve),
   // kelly, winsBonus (0 off the weekend or past its limit), payroll
   // ({ amount, cap } or null).
+  // Near the cap the bot races for the last bet: once the biggest affordable
+  // bet fills the room in PAYROLL_RACE_ROUNDS rounds or fewer, fewer and bigger
+  // pushes leave other players less time to land it first, so the bet is the
+  // biggest level up to 1 / PAYROLL_RACE_STAKES of the bankroll instead of the
+  // Kelly size.
+  const PAYROLL_RACE_ROUNDS = 100;
+  const PAYROLL_RACE_STAKES = 20;
+  const payrollRace = (payroll, levels) =>
+    payroll?.cap > 0 && levels.length > 0 && payroll.cap - payroll.amount <= PAYROLL_SHARE * levels.at(-1) * PAYROLL_RACE_ROUNDS;
+
   function edgePlan(ctx) {
     const levels = ctx.levels ?? [];
+    const racing = payrollRace(ctx.payroll, levels);
     let best = null;
     for (const game of Object.keys(ctx.unlocks)) {
       const edge = ctx.edges[game];
@@ -687,7 +698,8 @@
         const fund = payrollWorth(ctx.payroll, bet);
         const ev = base + fund;
         if (!(ev > 0)) continue;
-        if (bet !== levels[0] && bet > (ev / (ctx.variances?.[game] ?? 1)) * ctx.kelly * ctx.bankroll) continue;
+        const cap = racing && fund > 0 ? ctx.bankroll / PAYROLL_RACE_STAKES : (ev / (ctx.variances?.[game] ?? 1)) * ctx.kelly * ctx.bankroll;
+        if (bet !== levels[0] && bet > cap) continue;
         const value = ev * bet;
         if (!best || value > best.value) best = { game, bet, ev, value, payroll: fund > 0 };
       }

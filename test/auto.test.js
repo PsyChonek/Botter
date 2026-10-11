@@ -685,11 +685,15 @@ test('edgePlan bets on the payroll fund only near its cap', () => {
   };
   // Far from the cap a push adds 0.5 * 0.01 * 6000 / 6000 = 0.5 % per credit, less than the edge.
   assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 6000, cap: 12_000 } }), null);
-  // At 11,500 it adds 11.5 %: the biggest bet half Kelly allows on roulette (0.088 * 0.5 * 20,000).
+  // At 10,500 it adds 3.5 %: the biggest bet half Kelly allows on roulette (0.008 * 0.5 * 20,000 = 80).
+  assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 10_500, cap: 12_000 } }).bet, 40);
+  // At 11,500 the 500 left takes 50 bets of 1000, so it races at the biggest bet
+  // up to a 20th of the bankroll.
   const plan = A.edgePlan({ ...ctx, payroll: { amount: 11_500, cap: 12_000 } });
-  assert.deepEqual([plan.game, plan.bet, plan.payroll], ['roulette', 400, true]);
+  assert.deepEqual([plan.game, plan.bet, plan.payroll], ['roulette', 1000, true]);
   // A small bankroll keeps the bet small.
   assert.equal(A.edgePlan({ ...ctx, bankroll: 1000, payroll: { amount: 11_500, cap: 12_000 } }).bet, 40);
+  assert.equal(A.edgePlan({ ...ctx, bankroll: 10_000, payroll: { amount: 11_500, cap: 12_000 } }).bet, 400);
   // With 30 left the smallest bet that reaches the cap takes the fund.
   assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 11_970, cap: 12_000 } }).bet, 1000);
   assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 11_997, cap: 12_000 } }).bet, 400);
