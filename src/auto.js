@@ -193,11 +193,11 @@
     return Math.round(Math.max(0, edge) * wagered + sigmas * Math.sqrt(variance * bet * wagered));
   }
 
-  // Spare upgrades (spareUpgrade) keep a wider cushion than the goal: the XP to
-  // the end of this many levels, no level-up reward counted on the way, and this
-  // many standard deviations of the swing.
-  const SPARE_LEVELS = 2;
-  const SPARE_SIGMAS = 3;
+  // Every upgrade purchase leaves the credits to grind the XP to the end of this
+  // many levels, no level-up reward counted on the way, with this many standard
+  // deviations of the swing.
+  const MARGIN_LEVELS = 2;
+  const MARGIN_SIGMAS = 3;
 
   // Credits lost per XP point on a game: house edge over XP per credit wagered.
   // It does not depend on the bet, so the bet only sets the pace.
@@ -887,8 +887,8 @@
     UPGRADE_HORIZON_LEVELS,
     upgradeVerdict,
     spareUpgrade,
-    SPARE_LEVELS,
-    SPARE_SIGMAS,
+    MARGIN_LEVELS,
+    MARGIN_SIGMAS,
     urgentAccount,
     pickAccount,
     questGame,

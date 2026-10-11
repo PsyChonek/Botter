@@ -1310,38 +1310,48 @@
     return shopReview;
   }
 
-  // The goal upgrade when it is affordable above the reserve, or else a spare
-  // one (spareOffer), or null.
+  // The goal upgrade when it is affordable (goalNeed), or else a spare one
+  // (spareOffer), or null. Nothing is bought before the XP rate is measured:
+  // until then the credits the grinder needs to level up are unknown.
   function shopOffer() {
+    if (levelMargin() === null) return null;
     const goal = reviewShop()?.goal;
     if (goal && player.credits >= goalNeed(goal)) return goal;
     return spareOffer();
   }
 
   // An upgrade the XP plan skips (roulette, games other than the final one),
-  // bought only from credits beyond the reserve, the goal's price and the
-  // cushion to the next level. Not before the XP rate is measured, since the
-  // cushion is unknown until then, and not past a planned bankruptcy.
+  // bought only from credits beyond what the goal needs (goalNeed), and not
+  // past a planned bankruptcy.
   function spareOffer() {
-    if (!settings.spareUpgrades || bankruptPlanned() || !(A.pooledXpRate(stats.games) > 0)) return null;
+    if (!settings.spareUpgrades || bankruptPlanned()) return null;
     const review = reviewShop();
-    if (!review) return null;
-    const need = limits().reserve + (review.goal?.price ?? 0) + levelCushion(G.xpAhead(player, A.SPARE_LEVELS), A.SPARE_SIGMAS);
-    return A.spareUpgrade(review.queue, player.credits, need);
+    return review ? A.spareUpgrade(review.queue, player.credits, goalNeed(review.goal)) : null;
   }
 
-  // Credits the goal upgrade needs before it is bought: the reserve, its price
-  // and what the grinder needs to reach the next level after it
-  // (levelCushion). With no goal, the reserve and the cushion.
+  // Credits an upgrade purchase must leave: where the grinder stops betting
+  // (grindFloor), the goal's price (none for no goal) and what grinding needs to
+  // keep levelling from there (levelMargin).
   function goalNeed(goal) {
-    return limits().reserve + (goal?.price ?? 0) + levelCushion();
+    return grindFloor() + (goal?.price ?? 0) + (levelMargin() ?? 0);
   }
 
-  // Credits to grind xp (default: to the next level) alone
-  // (BotterAuto.levelUpCushion), on the game the grinder plays: Blaze while it
-  // learns the star rule, else the cheapest game by its modelled edge and
-  // variance. No weekend event bonus is counted on, so the XP is reached without one.
-  function levelCushion(xp = Math.max(0, (player.xpNeed ?? 0) - (player.xpInto ?? 0)), sigmas) {
+  // Balance the grinder stops at: the reserve, or the minimum balance when that
+  // is the grind limit and higher.
+  function grindFloor() {
+    const limit = limits();
+    return limit.grindLimit === 'balance' ? Math.max(limit.reserve, limit.grindMinBalance) : limit.reserve;
+  }
+
+  // Credits to grind through the rest of this level and the next
+  // (BotterAuto.MARGIN_LEVELS, no level-up reward counted on the way) with
+  // BotterAuto.MARGIN_SIGMAS deviations of bad luck (BotterAuto.levelUpCushion),
+  // on the game the grinder plays: Blaze while it learns the star rule, else
+  // the cheapest game by its modelled edge and variance. No weekend event bonus
+  // is counted on. Null before the XP rate is measured.
+  function levelMargin() {
+    const rate = A.pooledXpRate(stats.games);
+    if (!(rate > 0)) return null;
     const { candidates, edges } = grindModel();
     const learning = learningBlaze();
     const game = learning ? 'blaze' : A.cheapestGame(candidates, player.level, GRIND_UNLOCKS, edges);
@@ -1349,14 +1359,15 @@
     const edge = learning ? O.edges([game], player.upgrades, blazeMode())[game] : edges[game];
     const variance = O.variances([game], player.upgrades, blazeMode())[game];
     const bet = learning ? G.BET_LEVELS[0] : Number(settings.grindBet) || G.BET_LEVELS[0];
-    return A.levelUpCushion(xp, A.pooledXpRate(stats.games), edge, bet, variance, sigmas);
+    return A.levelUpCushion(G.xpAhead(player, A.MARGIN_LEVELS), rate, edge, bet, variance, A.MARGIN_SIGMAS);
   }
 
   // The goal upgrade the grinder leaves credits for, or null. Its verdict says
   // the credits buy more XP as the upgrade than as grinding, so they are not
-  // gambled meanwhile. Not past a planned bankruptcy, which wipes the savings.
+  // gambled meanwhile. Not past a planned bankruptcy, which wipes the savings,
+  // nor before the XP rate is measured, which only grinding measures.
   function savingFor() {
-    if (!settings.saveForUpgrades || !settings.autoMode || bankruptPlanned()) return null;
+    if (!settings.saveForUpgrades || !settings.autoMode || bankruptPlanned() || levelMargin() === null) return null;
     return reviewShop()?.goal ?? null;
   }
 
