@@ -249,7 +249,7 @@
     "message": "Cíl zisku za relaci (0 = vypnuto)"
   },
   "optionsReserve": {
-    "message": "Nechat aspoň tolik kreditů"
+    "message": "Rezerva: kredity, které se nikdy nevsadí ani neutratí"
   },
   "optionsGameDelay": {
     "message": "Prodleva mezi koly (ms)"
@@ -1162,6 +1162,9 @@
         "content": "$2"
       }
     }
+  },
+  "optionsShopReserveHint": {
+    "message": "Vylepšení se kupují jen nad rezervou, kterou nastavíš na záložce Hry."
   },
   "optionsSpareUpgrades": {
     "message": "Kupovat ostatní vylepšení z přebytku, s rezervou na další level"

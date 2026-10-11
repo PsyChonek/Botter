@@ -249,7 +249,7 @@
     "message": "Take-profit per session (0 = off)"
   },
   "optionsReserve": {
-    "message": "Keep at least this many credits"
+    "message": "Reserve: credits never bet or spent"
   },
   "optionsGameDelay": {
     "message": "Delay between rounds (ms)"
@@ -1162,6 +1162,9 @@
         "content": "$2"
       }
     }
+  },
+  "optionsShopReserveHint": {
+    "message": "Upgrades are bought only above the reserve, set on the Games tab."
   },
   "optionsSpareUpgrades": {
     "message": "Buy the other upgrades from spare credits, keeping enough to reach the next level"
