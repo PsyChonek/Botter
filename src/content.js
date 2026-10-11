@@ -1326,7 +1326,8 @@
     if (!settings.spareUpgrades || bankruptPlanned() || !(A.pooledXpRate(stats.games) > 0)) return null;
     const review = reviewShop();
     if (!review) return null;
-    return A.spareUpgrade(review.queue, player.credits, goalNeed(review.goal));
+    const need = limits().reserve + (review.goal?.price ?? 0) + levelCushion(G.xpAhead(player, A.SPARE_LEVELS), A.SPARE_SIGMAS);
+    return A.spareUpgrade(review.queue, player.credits, need);
   }
 
   // Credits the goal upgrade needs before it is bought: the reserve, its price
@@ -1336,16 +1337,19 @@
     return limits().reserve + (goal?.price ?? 0) + levelCushion();
   }
 
-  // Credits to reach the next level by grinding alone (BotterAuto.levelUpCushion,
-  // at the cheapest game's modelled edge and variance): no weekend event bonus
-  // is counted on, so the level is reached without one.
-  function levelCushion() {
+  // Credits to grind xp (default: to the next level) alone
+  // (BotterAuto.levelUpCushion), on the game the grinder plays: Blaze while it
+  // learns the star rule, else the cheapest game by its modelled edge and
+  // variance. No weekend event bonus is counted on, so the XP is reached without one.
+  function levelCushion(xp = Math.max(0, (player.xpNeed ?? 0) - (player.xpInto ?? 0)), sigmas) {
     const { candidates, edges } = grindModel();
-    const game = A.cheapestGame(candidates, player.level, GRIND_UNLOCKS, edges);
-    const variance = game ? O.variances([game], player.upgrades, blazeMode())[game] : undefined;
-    const xpLeft = Math.max(0, (player.xpNeed ?? 0) - (player.xpInto ?? 0));
-    const bet = Number(settings.grindBet) || G.BET_LEVELS[0];
-    return game ? A.levelUpCushion(xpLeft, A.pooledXpRate(stats.games), edges[game], bet, variance) : 0;
+    const learning = learningBlaze();
+    const game = learning ? 'blaze' : A.cheapestGame(candidates, player.level, GRIND_UNLOCKS, edges);
+    if (!game) return 0;
+    const edge = learning ? O.edges([game], player.upgrades, blazeMode())[game] : edges[game];
+    const variance = O.variances([game], player.upgrades, blazeMode())[game];
+    const bet = learning ? G.BET_LEVELS[0] : Number(settings.grindBet) || G.BET_LEVELS[0];
+    return A.levelUpCushion(xp, A.pooledXpRate(stats.games), edge, bet, variance, sigmas);
   }
 
   // The goal upgrade the grinder leaves credits for, or null. Its verdict says

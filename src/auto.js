@@ -185,12 +185,19 @@
   // can still reach the next level: the expected loss on the XP left in the
   // level, plus two standard deviations of the swing at the grind bet. xpLeft
   // is the XP to the next level, rate XP per credit wagered (null before it is
-  // measured, then 0 is asked), edge and variance per credit of the grind game.
-  function levelUpCushion(xpLeft, rate, edge, bet, variance = 1) {
+  // measured, then 0 is asked), edge and variance per credit of the grind game,
+  // sigmas the standard deviations of the swing covered.
+  function levelUpCushion(xpLeft, rate, edge, bet, variance = 1, sigmas = 2) {
     if (!(xpLeft > 0) || !(rate > 0) || !(bet > 0)) return 0;
     const wagered = xpLeft / rate;
-    return Math.round(Math.max(0, edge) * wagered + 2 * Math.sqrt(variance * bet * wagered));
+    return Math.round(Math.max(0, edge) * wagered + sigmas * Math.sqrt(variance * bet * wagered));
   }
+
+  // Spare upgrades (spareUpgrade) keep a wider cushion than the goal: the XP to
+  // the end of this many levels, no level-up reward counted on the way, and this
+  // many standard deviations of the swing.
+  const SPARE_LEVELS = 2;
+  const SPARE_SIGMAS = 3;
 
   // Credits lost per XP point on a game: house edge over XP per credit wagered.
   // It does not depend on the bet, so the bet only sets the pace.
@@ -880,6 +887,8 @@
     UPGRADE_HORIZON_LEVELS,
     upgradeVerdict,
     spareUpgrade,
+    SPARE_LEVELS,
+    SPARE_SIGMAS,
     urgentAccount,
     pickAccount,
     questGame,

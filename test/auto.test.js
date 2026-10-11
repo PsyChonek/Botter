@@ -285,6 +285,7 @@ test('upgradeVerdict judges by the XP ahead once the XP rate is measured', () =>
 test('levelUpCushion is the expected loss to the next level plus two deviations of the swing', () => {
   // 10,000 XP at 0.05 is 200,000 wagered: 2.7 % of it plus 2 * sqrt(1 * 20 * 200,000).
   assert.equal(A.levelUpCushion(10_000, 0.05, 0.027, 20, 1), Math.round(5400 + 2 * Math.sqrt(4_000_000)));
+  assert.equal(A.levelUpCushion(10_000, 0.05, 0.027, 20, 1, 3), Math.round(5400 + 3 * Math.sqrt(4_000_000)));
   assert.equal(A.levelUpCushion(10_000, null, 0.027, 20), 0);
   assert.equal(A.levelUpCushion(0, 0.05, 0.027, 20), 0);
 });
