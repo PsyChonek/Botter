@@ -179,8 +179,9 @@
       if (!(level >= 1) || !(value >= 0) || next[level]?.[field] === value) return;
       next = { ...next, [level]: { ...next[level], [field]: value } };
     };
-    if (typeof player?.xpNeed === 'number') set(player.level, 'xpNeed', player.xpNeed);
-    if (levelUp && typeof levelUp.reward === 'number') set(levelUp.to, 'reward', levelUp.reward);
+    // Numbers as strings count too, as in rewardsPaid.
+    if (player && player.xpNeed != null) set(Number(player.level), 'xpNeed', Number(player.xpNeed));
+    if (levelUp && levelUp.reward != null) set(Number(levelUp.to ?? player?.level), 'reward', Number(levelUp.reward));
     return next;
   }
 

@@ -165,6 +165,8 @@ test('recordLevel keeps XP per level and the level-up reward, same map when noth
   assert.deepEqual(up, { 3: { xpNeed: 450 }, 4: { xpNeed: 600, reward: 800 } });
   assert.equal(G.recordLevel(up, { level: 4 }), up);
   assert.equal(G.recordLevel(up, null, null), up);
+  // A reward sent as a string, and a level-up without "to", read from the player.
+  assert.deepEqual(G.recordLevel({}, { level: 5, xpNeed: '700' }, { reward: '900' }), { 5: { xpNeed: 700, reward: 900 } });
 });
 
 test('dailyBonus follows the client formula', () => {

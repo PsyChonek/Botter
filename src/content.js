@@ -365,15 +365,20 @@
   }
 
   // Level curve shared by all accounts (G.recordLevel), saved only on a change.
-  let levels = null;
-  async function trackLevel(data) {
+  // Every update reads the stored table afresh and the updates run one at a
+  // time: a copy kept from earlier, or by another casino tab, would write back
+  // a table without the reward another tab has just recorded.
+  let levelWrites = Promise.resolve();
+  function trackLevel(data) {
     if (!data?.player && !data?.levelUp) return;
-    levels ??= (await chrome.storage.local.get('levels')).levels ?? {};
-    const next = G.recordLevel(levels, data.player, data.levelUp);
-    if (next === levels) return;
-    levels = next;
-    chrome.storage.local.set({ levels });
     if (data.levelUp) log.info('level_up', { to: data.levelUp.to, reward: data.levelUp.reward, xpNeed: data.player?.xpNeed });
+    levelWrites = levelWrites
+      .then(async () => {
+        const { levels = {} } = await chrome.storage.local.get('levels');
+        const next = G.recordLevel(levels, data.player, data.levelUp);
+        if (next !== levels) await chrome.storage.local.set({ levels: next });
+      })
+      .catch((err) => log.warn('levels_save_failed', { error: String(err) }));
   }
 
   // "Začít úplně od nuly" wipes the whole profile on the server (credits, level,
