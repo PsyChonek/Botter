@@ -254,6 +254,30 @@
   "optionsGameDelay": {
     "message": "Delay between rounds (ms)"
   },
+  "panelAutoParts": {
+    "message": "In auto mode"
+  },
+  "panelAutoGames": {
+    "message": "Games"
+  },
+  "panelAutoWork": {
+    "message": "Work"
+  },
+  "panelAutoWheel": {
+    "message": "Wheel"
+  },
+  "panelAutoHunt": {
+    "message": "Achievements"
+  },
+  "panelAutoPayroll": {
+    "message": "Payroll fund"
+  },
+  "panelAutoSprint": {
+    "message": "Sprint"
+  },
+  "statusAutoIdle": {
+    "message": "Auto: nothing to do right now."
+  },
   "panelOnScreen": {
     "message": "Play on the game screen"
   },

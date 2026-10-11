@@ -38,6 +38,11 @@
     standup: true,
     achievementHunt: true,
     huntRoundsGoal: 10_000,
+    autoGames: true,
+    autoWork: true,
+    autoWheel: true,
+    payrollFund: true,
+    sprintProtect: true,
     edgeBets: true,
     crashEnabled: true,
     crashBet: 100,
@@ -1076,7 +1081,7 @@
     const due = (kind) => Date.now() - (claimTried[kind] ?? 0) > FREEBIES[kind].retryMs;
     let kind = null;
     if (player.daily?.available && due('daily')) kind = 'daily';
-    else if (A.wheelReady(player.wheelNextAt) && due('wheel')) kind = 'wheel';
+    else if ((!settings.autoMode || settings.autoWheel) && A.wheelReady(player.wheelNextAt) && due('wheel')) kind = 'wheel';
     else if (player.bailout?.available && player.credits < G.BET_LEVELS[0] && due('bailout')) kind = 'bailout';
     if (!kind) return false;
     claimTried[kind] = Date.now();
@@ -1136,15 +1141,16 @@
     if (shopOffer() || grindReady()) return false;
     const price = xpPrice();
     if (A.waitForLevel(player, price, workPerXp())) return false;
-    const standing = await sprintStanding();
-    if (!standing || A.sprintHold(standing)) return false;
+    // With the sprint protection off the podium is not read or waited for.
+    const standing = settings.sprintProtect ? await sprintStanding() : null;
+    if (settings.sprintProtect && (!standing || A.sprintHold(standing))) return false;
     claimTried.bankrupt = Date.now();
     const terms = {
       debt: player.loan.debt,
       credits: player.credits,
       xpLost: player.xpInto ?? 0,
       xpPrice: price,
-      sprintScore: standing.score,
+      sprintScore: standing?.score ?? null,
     };
     setStatus('statusBankrupt', [credits(terms.debt)]);
     const res = await api('/api/loan/bankrupt', {});
@@ -1189,8 +1195,10 @@
       log.info('loan_cycle_skip', { amount, credits: player.credits, xpNeed: player.xpNeed, value: plan?.value ?? null });
       return false;
     }
-    const standing = await sprintStanding();
-    if (!standing || !A.loanSprintSafe(standing)) return false;
+    if (settings.sprintProtect) {
+      const standing = await sprintStanding();
+      if (!standing || !A.loanSprintSafe(standing)) return false;
+    }
     setStatus('statusLoanCycle', [credits(amount)]);
     const res = await api('/api/loan/take', { amount });
     if (!res.ok) {
@@ -1492,7 +1500,7 @@
     const edges = O.edges(G.GAME_KEYS, player.upgrades, mode);
     const cheapest = A.cheapestGame(G.GAME_KEYS, player.level, GRIND_UNLOCKS, edges);
     const pollMs = A.payrollPollMs(payroll, cheapest ? edges[cheapest] : null);
-    if ((!payroll || now - payroll.at > pollMs) && now - (claimTried.payroll ?? 0) > pollMs) {
+    if (settings.payrollFund && (!payroll || now - payroll.at > pollMs) && now - (claimTried.payroll ?? 0) > pollMs) {
       claimTried.payroll = now;
       await api('/api/feed');
       if (!payroll) log.info('payroll_unknown');
@@ -1511,7 +1519,7 @@
       bankroll: Math.max(0, player.credits - reserve),
       kelly: EDGE_KELLY,
       winsBonus: winsOn ? A.WINS_BONUS : 0,
-      payroll: payroll && now - payroll.at <= pollMs ? payroll : null,
+      payroll: settings.payrollFund && payroll && now - payroll.at <= pollMs ? payroll : null,
     });
     const note = plan ? `${plan.game} ${plan.bet} ${plan.payroll}` : '';
     if (note !== edgeNote) {
@@ -1699,15 +1707,17 @@
     if (await loanCycleStep()) return;
     if (await buyStep()) return;
     if (await leaderboardStep()) return;
-    if (await crashStep()) return;
-    if (await lotteryStep()) return;
-    if (await standupStep()) return;
-    if (workAvailable()) return workStep();
-    if (await edgeStep()) return;
-    if (await huntStep()) return;
-    if (await grindStep()) return;
+    const games = settings.autoGames;
+    if (games && (await crashStep())) return;
+    if (games && (await lotteryStep())) return;
+    if (games && (await standupStep())) return;
+    if (settings.autoWork && workAvailable()) return workStep();
+    if (games && (await edgeStep())) return;
+    if (games && (await huntStep())) return;
+    if (games && (await grindStep())) return;
     if (await rotateStep()) return;
-    return workStep();
+    if (settings.autoWork) return workStep();
+    setStatus(...((games ? grindIdleStatus() : null) ?? ['statusAutoIdle']));
   }
 
   async function step() {
@@ -1780,6 +1790,8 @@
           border-radius: 6px; padding: 4px 8px; cursor: pointer; }
         button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid #d4ff6a; outline-offset: 1px; }
         button.on { background: #7aa02c; color: #101a08; }
+        .auto-switches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 6px; }
+        .auto-switches button { padding: 3px 4px; }
         .show { position: fixed; left: 12px; bottom: 12px; z-index: 2147483647; font-weight: 700;
           background: #101a08f2; box-shadow: 0 4px 16px #0008; }
         .status { min-height: 1.4em; margin-bottom: 4px; }
@@ -1827,6 +1839,8 @@
           <span class="muted grow screen-label"></span>
           <button type="button" class="screen-toggle"></button>
         </div>
+        <div class="auto-label muted"></div>
+        <div class="auto-switches" role="group"></div>
         <div class="status" role="status" aria-live="polite"></div>
         <div class="stats muted"></div>
         <div class="cost muted"></div>
@@ -1873,6 +1887,8 @@
       gamesToggle: $('.games-toggle'),
       screenLabel: $('.screen-label'),
       screenToggle: $('.screen-toggle'),
+      autoLabel: $('.auto-label'),
+      autoSwitches: $('.auto-switches'),
       status: $('.status'),
       stats: $('.stats'),
       cost: $('.cost'),
@@ -1901,6 +1917,16 @@
     ui.typeLabel.textContent = msg('panelWork');
     ui.gameLabel.textContent = msg('panelGames');
     ui.screenLabel.textContent = msg('panelOnScreen');
+    ui.autoLabel.textContent = msg('panelAutoParts');
+    ui.autoSwitches.setAttribute('aria-label', msg('panelAutoParts'));
+    for (const [name, key] of AUTO_SWITCHES) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.setting = name;
+      button.textContent = msg(key);
+      button.addEventListener('click', () => saveSettings({ [name]: !settings[name] }));
+      ui.autoSwitches.append(button);
+    }
     ui.summary.textContent = msg('panelProfit');
     ['colGame', 'colRounds', 'colNet', 'colRtp'].forEach((key, i) => (ui.head[i].textContent = msg(key)));
     ui.xpSummary.textContent = msg('panelXp');
@@ -2065,6 +2091,16 @@
     ui.addAccount.disabled = switching;
   }
 
+  // Parts of auto mode that can be switched off from the panel: [setting, label].
+  const AUTO_SWITCHES = [
+    ['autoGames', 'panelAutoGames'],
+    ['autoWork', 'panelAutoWork'],
+    ['autoWheel', 'panelAutoWheel'],
+    ['achievementHunt', 'panelAutoHunt'],
+    ['payrollFund', 'panelAutoPayroll'],
+    ['sprintProtect', 'panelAutoSprint'],
+  ];
+
   function setToggle(button, on) {
     button.textContent = msg(on ? 'panelStop' : 'panelStart');
     button.classList.toggle('on', on);
@@ -2086,6 +2122,11 @@
     ui.screenToggle.classList.toggle('on', settings.playOnScreen);
     ui.screenToggle.setAttribute('aria-pressed', String(settings.playOnScreen));
     ui.screenToggle.setAttribute('aria-label', msg('panelOnScreen'));
+    for (const button of ui.autoSwitches.children) {
+      const on = !!settings[button.dataset.setting];
+      button.classList.toggle('on', on);
+      button.setAttribute('aria-pressed', String(on));
+    }
     renderAccounts();
     ui.type.value = settings.taskType;
     ui.game.value = settings.game;

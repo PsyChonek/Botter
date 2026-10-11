@@ -254,6 +254,30 @@
   "optionsGameDelay": {
     "message": "Prodleva mezi koly (ms)"
   },
+  "panelAutoParts": {
+    "message": "V automatickém režimu"
+  },
+  "panelAutoGames": {
+    "message": "Hry"
+  },
+  "panelAutoWork": {
+    "message": "Práce"
+  },
+  "panelAutoWheel": {
+    "message": "Kolo"
+  },
+  "panelAutoHunt": {
+    "message": "Achievementy"
+  },
+  "panelAutoPayroll": {
+    "message": "Mzdový fond"
+  },
+  "panelAutoSprint": {
+    "message": "Sprint"
+  },
+  "statusAutoIdle": {
+    "message": "Auto: teď není co dělat."
+  },
   "panelOnScreen": {
     "message": "Hrát na obrazovce hry"
   },

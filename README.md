@@ -180,6 +180,12 @@ progress shows at `chrome://on-device-internals`.
     of tickets (1 to 5) every draw at a chosen price, or the biggest affordable one
     below it, whatever they are worth. It keeps the reserve and runs without the hunt;
     with the hunt on, the hunt can still add cheap tickets up to five.
+- **Auto mode switches** (panel, all on by default): Games (crash, lottery, standup,
+  payroll and wins-bonus bets, achievement hunt and XP grinding), Work, Wheel (the free
+  hourly spin; the daily bonus and bailout stay), Achievements (the hunt), Payroll fund
+  (no fund reads or pushes when off) and Sprint (when off, bankruptcy and the loan cycle
+  no longer wait to protect a sprint podium). With Games and Work off the bot still
+  claims, repays, buys and rotates accounts.
 - **Payroll fund** (Mzdový fond, settings Auto tab, on by default; `payrollWorth` and
   `edgePlan` in `src/auto.js`): 1 % of every bet goes into a shared fund, and the bet
   that takes it to its cap (12,000) drops it and takes it all. A bet whose 1 % covers
