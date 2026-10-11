@@ -397,18 +397,19 @@
     log.info('profile_reset', { account: accountId });
   }
 
-  // Standup quest and achievement rewards are paid with whatever response
+  // Level-up, standup quest and achievement rewards are paid with whatever response
   // completed them, so they are booked as free income here and left out of that
   // response's game or work profit. They also offset the day's grinding loss,
   // since the rounds played for a quest or an achievement pay for themselves.
   function bookRewards(data) {
-    const { standup, achievement, payroll: fund, event } = G.rewardsPaid(data);
-    if (!standup && !achievement && !fund && !event) return;
+    const { levelUp, standup, achievement, payroll: fund, event } = G.rewardsPaid(data);
+    if (!levelUp && !standup && !achievement && !fund && !event) return;
+    if (levelUp) stats.free.levelUp = (stats.free.levelUp ?? 0) + levelUp;
     if (standup) stats.free.standup = (stats.free.standup ?? 0) + standup;
     if (achievement) stats.free.achievement = (stats.free.achievement ?? 0) + achievement;
     if (fund) stats.free.payroll = (stats.free.payroll ?? 0) + fund;
     if (event) stats.free.event = (stats.free.event ?? 0) + event;
-    bookGrind(standup + achievement + fund + event);
+    bookGrind(levelUp + standup + achievement + fund + event);
     saveStats();
     if (!standup && !achievement && !fund) return;
     log.info('rewards', {

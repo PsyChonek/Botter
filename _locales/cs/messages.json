@@ -317,6 +317,9 @@
   "free_loan": {
     "message": "Půjčky smazané bankrotem"
   },
+  "free_levelUp": {
+    "message": "Odměny za level"
+  },
   "free_standup": {
     "message": "Standup úkoly"
   },

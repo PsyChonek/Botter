@@ -317,6 +317,9 @@
   "free_loan": {
     "message": "Loans dropped by bankruptcy"
   },
+  "free_levelUp": {
+    "message": "Level-up rewards"
+  },
   "free_standup": {
     "message": "Standup quests"
   },
