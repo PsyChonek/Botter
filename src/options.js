@@ -621,6 +621,47 @@ $('import').addEventListener('change', async (event) => {
   }
 });
 
+// One id per install, so a backup imported back into the install it came from
+// does not add its stats a second time.
+async function installId() {
+  const { installId: id } = await chrome.storage.local.get('installId');
+  if (id) return id;
+  const created = crypto.randomUUID();
+  await chrome.storage.local.set({ installId: created });
+  return created;
+}
+
+$('exportAll').addEventListener('click', async () => {
+  const secrets = $('backupSecrets').checked;
+  if (secrets && !confirm(msg('optionsBackupSecretsConfirm'))) return;
+  const source = await installId();
+  const stored = await chrome.storage.local.get(null);
+  const backup = BotterBackup.buildBackup(stored, { secrets, id: crypto.randomUUID(), source });
+  download(`botter-backup-${backup.exportedAt.slice(0, 10)}.json`, backup);
+});
+
+$('importAllButton').addEventListener('click', () => $('importAll').click());
+
+$('importAll').addEventListener('change', async (event) => {
+  const file = event.target.files?.[0];
+  event.target.value = '';
+  if (!file) return;
+  try {
+    const backup = JSON.parse(await file.text());
+    if (!BotterBackup.isBackup(backup)) throw new Error('not a backup');
+    if (!confirm(msg('optionsImportAllConfirm', [backup.exportedAt ?? '-']))) return;
+    const install = await installId();
+    const stored = await chrome.storage.local.get(null);
+    const { set, counts, statsSkipped } = BotterBackup.importBackup(stored, backup, { install, isBankEntry: BotterCore.isBankEntry });
+    await chrome.storage.local.set(set);
+    await load();
+    const summary = msg('optionsImportedAll', [String(counts.stats), String(counts.answers), String(counts.levels), String(counts.spins), String(counts.accounts)]);
+    flash(statsSkipped ? `${summary} ${msg('optionsImportStatsSkipped')}` : summary);
+  } catch {
+    flash(msg('optionsImportAllFailed'));
+  }
+});
+
 $('clear').addEventListener('click', async () => {
   if (!confirm(msg('optionsClearConfirm'))) return;
   const stored = await chrome.storage.local.get(null);

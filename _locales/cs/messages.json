@@ -889,6 +889,58 @@
       }
     }
   },
+  "optionsBackupHeading": {
+    "message": "Záloha"
+  },
+  "optionsBackupHint": {
+    "message": "Export uloží do jednoho souboru nastavení, statistiky zisku všech účtů, banku odpovědí, křivku levelů, zaznamenané spiny Blaze a uložené účty. Import použije nastavení ze souboru a zbytek sloučí: statistiky se přičtou k těm zdejším, ostatní data doplní, co chybí. Soubor se nikdy nepřičte dvakrát: opakovaný import stejného exportu nebo import zpět do prohlížeče, ze kterého pochází, statistiky nechá být."
+  },
+  "optionsBackupSecrets": {
+    "message": "Přidat API klíče a uložená přihlášení"
+  },
+  "optionsBackupSecretsConfirm": {
+    "message": "Soubor bude obsahovat API klíče a přihlašovací relace jako čitelný text. Kdokoli ho má, může je použít. Přesto exportovat?"
+  },
+  "optionsExportAll": {
+    "message": "Exportovat vše"
+  },
+  "optionsImportAll": {
+    "message": "Importovat zálohu"
+  },
+  "optionsImportAllConfirm": {
+    "message": "Importovat zálohu z $P1$? Její nastavení nahradí tvoje a její statistiky se přičtou k tvým.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsImportedAll": {
+    "message": "Importováno: statistiky účtů $P1$, odpovědi $P2$, levely $P3$, spiny $P4$, účty $P5$.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      },
+      "p4": {
+        "content": "$4"
+      },
+      "p5": {
+        "content": "$5"
+      }
+    }
+  },
+  "optionsImportStatsSkipped": {
+    "message": "Statistiky přeskočeny: tahle záloha už sem byla importována nebo pochází z tohoto prohlížeče."
+  },
+  "optionsImportAllFailed": {
+    "message": "Soubor není platná záloha Botteru."
+  },
   "optionsBankHeading": {
     "message": "Banka odpovědí"
   },

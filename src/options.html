@@ -311,6 +311,17 @@
       </div>
 
       <div role="tabpanel" id="panel-data" aria-labelledby="tab-data" tabindex="0" hidden>
+        <section class="card" aria-labelledby="backup-heading">
+          <h2 id="backup-heading" data-i18n="optionsBackupHeading"></h2>
+          <p class="hint" data-i18n="optionsBackupHint"></p>
+          <label class="check"><span data-i18n="optionsBackupSecrets"></span><input id="backupSecrets" type="checkbox" role="switch" /></label>
+          <div class="actions">
+            <button id="exportAll" type="button" data-i18n="optionsExportAll"></button>
+            <button id="importAllButton" type="button" data-i18n="optionsImportAll"></button>
+            <input id="importAll" type="file" accept="application/json" hidden />
+          </div>
+        </section>
+
         <section class="card" aria-labelledby="bank-heading">
           <h2 id="bank-heading" data-i18n="optionsBankHeading"></h2>
           <p id="bankSize"></p>
@@ -353,6 +364,7 @@
     <script src="odds.js"></script>
     <script src="auto.js"></script>
     <script src="local-model.js"></script>
+    <script src="backup.js"></script>
     <script src="options.js"></script>
   </body>
 </html>

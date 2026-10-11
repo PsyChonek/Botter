@@ -889,6 +889,58 @@
       }
     }
   },
+  "optionsBackupHeading": {
+    "message": "Backup"
+  },
+  "optionsBackupHint": {
+    "message": "Export saves settings, profit stats of every account, the answer bank, the level curve, recorded Blaze spins and saved accounts to one file. Import applies the file's settings and merges the rest: stats are added to the ones here, other data fills in what is missing. A file is never added twice: importing the same export again, or back into the browser it came from, leaves the stats alone."
+  },
+  "optionsBackupSecrets": {
+    "message": "Include API keys and saved logins"
+  },
+  "optionsBackupSecretsConfirm": {
+    "message": "The file will hold your API keys and login sessions in plain text. Anyone with it can use them. Export anyway?"
+  },
+  "optionsExportAll": {
+    "message": "Export everything"
+  },
+  "optionsImportAll": {
+    "message": "Import backup"
+  },
+  "optionsImportAllConfirm": {
+    "message": "Import the backup from $P1$? Its settings replace yours and its stats are added to yours.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsImportedAll": {
+    "message": "Imported: stats of $P1$ accounts, $P2$ answers, $P3$ levels, $P4$ spins, $P5$ accounts.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      },
+      "p4": {
+        "content": "$4"
+      },
+      "p5": {
+        "content": "$5"
+      }
+    }
+  },
+  "optionsImportStatsSkipped": {
+    "message": "Stats skipped: this backup was imported here before or came from this browser."
+  },
+  "optionsImportAllFailed": {
+    "message": "That file is not a valid Botter backup."
+  },
   "optionsBankHeading": {
     "message": "Answer bank"
   },

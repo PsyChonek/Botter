@@ -344,6 +344,14 @@ progress shows at `chrome://on-device-internals`.
 The bank can be exported and imported as JSON from the settings (Data tab), so a
 bank learned on one machine can be reused on another.
 
+**Backup** (Data tab) exports everything to one file: settings, profit stats of
+every account, the bank, the level curve, recorded Blaze spins and saved accounts.
+API keys and login sessions are left out unless the switch to include them is on.
+Importing applies the file's settings and merges the rest: stats are added up per
+account, the other data only fills in what is missing. Each export has an id and
+names the install it came from, so importing it twice, or back into the same
+browser, never adds the stats again.
+
 ## Development
 
 ```
