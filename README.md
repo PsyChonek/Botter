@@ -244,7 +244,11 @@ progress shows at `chrome://on-device-internals`.
   (pooled over every game with XP), the volume is the XP to the next 10 levels instead,
   from the level curve (`G.xpForLevel`: round(280 × level^1.35), reward 1,000 × (level
   − 1), fitted exactly to recorded levels 14 to 18): an upgrade is bought when the
-  credits wagered for that XP times its drop in edge beat its price. `crash:sla` is never bought:
+  credits wagered for that XP times its drop in edge beat its price. A goal is bought
+  only when the credits left after it still reach the next level: the reserve, the
+  price and the expected loss on the XP left in the level plus two standard deviations
+  of the swing at the grind bet (`levelUpCushion`; 0 before the XP rate is measured).
+  Saving for the goal holds the same amount back from the grinder. `crash:sla` is never bought:
   Produkce padá's daily payout is too small to earn it back. `global:bets` (higher max bet) is not in the plan: XP per round
   is proportional to the bet, so a bigger bet never buys XP cheaper. The whole plan is judged again every 10 minutes and as soon as the level, the
   upgrades or the max bet change (`G.shopQueue` with `reviewShop` in `src/content.js`);

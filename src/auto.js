@@ -181,6 +181,17 @@
     return wagered > 0 ? xp / wagered : null;
   }
 
+  // Credits an upgrade purchase must leave on top of the reserve so the grinder
+  // can still reach the next level: the expected loss on the XP left in the
+  // level, plus two standard deviations of the swing at the grind bet. xpLeft
+  // is the XP to the next level, rate XP per credit wagered (null before it is
+  // measured, then 0 is asked), edge and variance per credit of the grind game.
+  function levelUpCushion(xpLeft, rate, edge, bet, variance = 1) {
+    if (!(xpLeft > 0) || !(rate > 0) || !(bet > 0)) return 0;
+    const wagered = xpLeft / rate;
+    return Math.round(Math.max(0, edge) * wagered + 2 * Math.sqrt(variance * bet * wagered));
+  }
+
   // Credits lost per XP point on a game: house edge over XP per credit wagered.
   // It does not depend on the bet, so the bet only sets the pace.
   function xpCost(game, stats, edges) {
@@ -852,6 +863,7 @@
     grindVolume,
     finalGame,
     pooledXpRate,
+    levelUpCushion,
     UPGRADE_HORIZON_LEVELS,
     upgradeVerdict,
     urgentAccount,

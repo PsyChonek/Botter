@@ -917,7 +917,7 @@
     if (A.grindHold(event, Date.now())) return ['statusGrindHackathon', [eventStart.format(event.startAt)]];
     const goal = grindHeldFor();
     if (!goal) return null;
-    return ['statusSavingForUpgrade', [`${goal.game}:${goal.key} ${goal.next}`, credits(player.credits), credits(limits().reserve + goal.price)]];
+    return ['statusSavingForUpgrade', [`${goal.game}:${goal.key} ${goal.next}`, credits(player.credits), credits(goalNeed(goal))]];
   }
 
   async function workStep() {
@@ -1311,7 +1311,20 @@
   // The goal upgrade when it is affordable above the reserve, or null.
   function shopOffer() {
     const goal = reviewShop()?.goal;
-    return goal && player.credits - goal.price >= limits().reserve ? goal : null;
+    return goal && player.credits >= goalNeed(goal) ? goal : null;
+  }
+
+  // Credits the goal upgrade needs before it is bought: the reserve, its price
+  // and what the grinder needs to reach the next level after it
+  // (BotterAuto.levelUpCushion, at the cheapest game's edge and variance).
+  function goalNeed(goal) {
+    const { candidates, edges } = grindModel();
+    const game = A.cheapestGame(candidates, player.level, GRIND_UNLOCKS, edges);
+    const variance = game ? O.variances([game], player.upgrades, blazeMode())[game] : undefined;
+    const xpLeft = Math.max(0, (player.xpNeed ?? 0) - (player.xpInto ?? 0));
+    const bet = Number(settings.grindBet) || G.BET_LEVELS[0];
+    const cushion = game ? A.levelUpCushion(xpLeft, A.pooledXpRate(stats.games), edges[game], bet, variance) : 0;
+    return limits().reserve + goal.price + cushion;
   }
 
   // The goal upgrade the grinder leaves credits for, or null. Its verdict says
@@ -1626,7 +1639,7 @@
   function grindLimits(saving = true) {
     const limit = limits();
     const goal = saving ? savingFor() : null;
-    return goal ? { ...limit, reserve: limit.reserve + goal.price } : limit;
+    return goal ? { ...limit, reserve: goalNeed(goal) } : limit;
   }
 
   // The bet is the one picked in the settings: XP per round is proportional to
