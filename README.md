@@ -228,7 +228,10 @@ progress shows at `chrome://on-device-internals`.
   stops paying; while the recorded Blaze spins have not settled the star rule and
   the two rules point at different final games, nothing is bought, and with **Learn
   the Blaze star rule** (Auto tab, on by default) the grinder plays Blaze at the
-  smallest bet, within its limits, until they do, about 300 spins), or spending the price on plain grinding gives
+  smallest bet, within its limits, until they do. A tie over 1,000 spins counts as
+  settled on per reel: the model expects 1 deciding spin in 110, so none means stars
+  do not stack on a reel and both rules pay the same; 2,000 recorded spins showed
+  exactly that, so Roulette is the final game), or spending the price on plain grinding gives
   more XP than grinding the rest at the cheaper cost (volume: 14 days of the daily
   budget, or the credits above the minimum balance; judged for the next levels alone
   and for the game's useful upgrades maxed together). `crash:sla` is never bought:

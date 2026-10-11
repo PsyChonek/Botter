@@ -34,6 +34,9 @@ test('edges skips games without a model', () => {
 test('blazeDecided needs enough spins and one rule matching more', () => {
   assert.equal(O.blazeDecided(null), false);
   assert.equal(O.blazeDecided({ symbols: { match: 60, total: 60 }, reels: { match: 60, total: 60 } }), false);
+  // A tie over 1,000 spins: stars do not stack, the rules pay the same.
+  assert.equal(O.blazeDecided({ symbols: { match: 1996, total: 2000 }, reels: { match: 1996, total: 2000 } }), true);
+  assert.equal(O.blazeMode({ symbols: { match: 1996, total: 2000 }, reels: { match: 1996, total: 2000 } }), 'reels');
   assert.equal(O.blazeDecided({ symbols: { match: 40, total: 40 }, reels: { match: 39, total: 40 } }), false);
   assert.equal(O.blazeDecided({ symbols: { match: 60, total: 60 }, reels: { match: 59, total: 60 } }), true);
   assert.equal(O.blazeDecided({ symbols: { match: 59, total: 60 }, reels: { match: 60, total: 60 } }), true);

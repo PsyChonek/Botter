@@ -684,6 +684,14 @@
       }
     }
   },
+  "optionsModelSame": {
+    "message": "Ani jedno z $P1$ a více točení pravidla nerozlišilo, ačkoli by mělo asi 1 ze 110: hvězdy se na válci nesčítají, obě pravidla platí stejně a bot je počítá po válcích.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
   "optionsModelUndecided": {
     "message": "Zatím žádné zaznamenané točení pravidla nerozliší: jinak vyplácí jen asi 1 točení ze 110 (víc hvězd na jednom válci). Do té doby bot počítá hvězdy po válcích. Zahraj víc Blaze a zkontroluj znovu."
   },

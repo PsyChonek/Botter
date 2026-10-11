@@ -304,7 +304,9 @@ $('checkModel').addEventListener('click', async () => {
     msg('optionsModelRtpMax', [pct2.format(Z.simulateRtp(Z.config({ lucky: 5, wild: 5, star: 5 }), best))]),
   );
   if (rate(best) < 0.99) lines.push(msg('optionsModelMismatch'));
-  else if (rate('symbols') === rate('reels')) lines.push(msg('optionsModelUndecided'));
+  else if (rate('symbols') === rate('reels')) {
+    lines.push(msg(O.blazeDecided(check) ? 'optionsModelSame' : 'optionsModelUndecided', [num.format(O.BLAZE_TIE_SPINS)]));
+  }
   $('modelResult').textContent = lines.join('\n');
 });
 

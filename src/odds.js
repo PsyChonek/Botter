@@ -117,13 +117,17 @@
   }
 
   // Whether the recorded spins settle the scatter rule: enough of them, and one
-  // rule matches more than the other. Only about 1 spin in 110 pays differently.
-  function blazeDecided(check, minSpins = 50) {
+  // rule matches more than the other. The model expects about 1 spin in 110 to
+  // pay differently, so a tie over tieSpins spins (about 9 expected, none seen)
+  // means stars do not stack on a reel and the rules pay the same: per reel.
+  const BLAZE_TIE_SPINS = 1000;
+  function blazeDecided(check, minSpins = 50, tieSpins = BLAZE_TIE_SPINS) {
     const { symbols, reels } = check ?? {};
-    return !!symbols && !!reels && symbols.total >= minSpins && symbols.match !== reels.match;
+    if (!symbols || !reels || symbols.total < minSpins) return false;
+    return symbols.match !== reels.match || symbols.total >= tieSpins;
   }
 
-  const api = { UPGRADES, rtp, edges, chances, winRates, gains, variances, bigRates, table, blazeMode, blazeDecided };
+  const api = { UPGRADES, rtp, edges, chances, winRates, gains, variances, bigRates, table, blazeMode, blazeDecided, BLAZE_TIE_SPINS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BotterOdds = api;
 })(globalThis);

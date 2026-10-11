@@ -684,6 +684,14 @@
       }
     }
   },
+  "optionsModelSame": {
+    "message": "No spin told the two rules apart over $P1$ or more spins, though about 1 in 110 should: stars do not stack on a reel, so both rules pay the same and the bot counts them per reel.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
   "optionsModelUndecided": {
     "message": "No recorded spin tells the two rules apart yet: only about 1 spin in 110 pays differently (several stars on one reel). Until one does, the bot keeps stars counted per reel. Play more Blaze and check again."
   },
