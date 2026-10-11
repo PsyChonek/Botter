@@ -54,6 +54,7 @@
     buyUpgrades: false,
     saveForUpgrades: true,
     recordSpins: true,
+    learnBlaze: true,
     captureDebug: false,
     logLevel: 'info',
     panelHidden: false,
@@ -416,7 +417,8 @@
 
   // Keeps the Blaze board and the server's win so the slot model can be checked.
   function recordSpin(request, data) {
-    if (!settings.recordSpins) return;
+    // Learning the star rule needs the spins whatever the recording setting says.
+    if (!settings.recordSpins && !learningBlaze()) return;
     const { result } = data;
     spins.push({
       grid: result.grid,
@@ -1581,10 +1583,18 @@
     const last = spins.at(-1);
     if (blazeCheck.last !== last) {
       const check = Z.checkSpins(spins);
-      blazeCheck = { last, mode: O.blazeMode(check), decided: O.blazeDecided(check) };
+      const decided = O.blazeDecided(check);
+      if (decided && blazeCheck.last !== undefined && !blazeCheck.decided) {
+        log.info('blaze_rule_decided', { mode: O.blazeMode(check), spins: check.symbols.total, symbols: check.symbols.match, reels: check.reels.match });
+      }
+      blazeCheck = { last, mode: O.blazeMode(check), decided };
     }
     return blazeCheck;
   }
+
+  // While the star rule is not settled, the grinder plays Blaze at the smallest
+  // bet so the recorded spins can settle it (see BotterOdds.blazeDecided).
+  const learningBlaze = () => settings.learnBlaze && !blazeRule().decided;
   function blazeMode() {
     return blazeRule().mode;
   }
@@ -1619,8 +1629,10 @@
     const limit = grindLimits(saving);
     const { budget, lost } = A.grindBudget(stats.grind, limit.xpBudget, event, now);
     if (A.grindHold(event, now)) return { lost, levels, candidates, edges, plan: null };
-    const wanted = Number(settings.grindBet) || G.BET_LEVELS[0];
+    const learning = learningBlaze();
+    const wanted = learning ? G.BET_LEVELS[0] : Number(settings.grindBet) || G.BET_LEVELS[0];
     const bet = A.grindBet({ ...limit, xpBudget: budget }, player.credits, lost, levels, wanted);
+    if (learning) return { lost, levels, candidates, edges, plan: bet ? { game: 'blaze', bet } : null };
     // On a Konec kvartálu weekend the bonus on wins lowers each game's loss by its own amount.
     const bonus = winsBonusOn(now) ? A.WINS_BONUS : 0;
     const pickEdges = A.bonusEdges(edges, O.gains(candidates, player.upgrades, blazeMode()), bonus);
