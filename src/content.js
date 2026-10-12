@@ -78,6 +78,7 @@
     spend: { usd: 0, calls: 0 },
     games: {},
     combos: {}, // game -> upgrade combination (BotterOdds.combo) -> the same rows as games
+    plainXp: {}, // rows like games, only rounds played off Hackathon weekends (BotterAuto.planXpRate)
     work: { tickets: 0, net: 0, xp: 0 },
     free: { daily: 0, bailout: 0 },
     crashBooked: [],
@@ -365,6 +366,7 @@
         bjStake = data.hand && !data.hand.done ? delta.stake : 0;
         G.addDelta(stats.games, delta);
         bookCombo(delta, data.player.upgrades ?? player?.upgrades);
+        if (!hackathonOn()) G.addDelta(stats.plainXp, delta);
         bookGrind(delta.net);
         checkWinsLimit(delta, data);
         saveStats();
@@ -1292,7 +1294,7 @@
       finalGame: A.finalGame(candidates, maxedEdge(mode)),
       finalUnknown: settings.learnBlaze && !blazeRule().decided && finals.size > 1,
       xpAhead: G.xpAhead(player, A.UPGRADE_HORIZON_LEVELS),
-      xpRate: A.pooledXpRate(stats.games),
+      xpRate: planXpRate(),
       upgrades: player.upgrades,
       edge: (game, upgrades) => O.edges([game], upgrades, mode)[game] ?? null,
       rest: (keys, upTo) => G.upgradeRest(player.upgrades, offer.game, keys, upTo),
@@ -1306,7 +1308,7 @@
   // worth buying at this level. Changes are logged, not every review.
   function reviewShop() {
     if (!settings.buyUpgrades || !player) return (shopReview = null);
-    const key = JSON.stringify([accountId, player.level, player.upgrades, bankruptPlanned(), blazeRule().mode, blazeRule().decided, settings.learnBlaze, settings.blazeFirst, Number(A.pooledXpRate(stats.games)?.toFixed(3))]);
+    const key = JSON.stringify([accountId, player.level, player.upgrades, bankruptPlanned(), blazeRule().mode, blazeRule().decided, settings.learnBlaze, settings.blazeFirst, Number(planXpRate()?.toFixed(3))]);
     if (shopReview?.key === key && Date.now() - shopReview.at < SHOP_REVIEW_MS) return shopReview;
     const queue = G.shopQueue(G.UPGRADE_PLAN, player, upgradeSkip);
     const goal = A.shopGoal(queue, shopPriority());
@@ -1357,6 +1359,17 @@
     return limit.grindLimit === 'balance' ? Math.max(limit.reserve, limit.grindMinBalance) : limit.reserve;
   }
 
+  // Whether a Hackathon weekend (+50 % XP) is on now.
+  function hackathonOn(now = Date.now()) {
+    const event = A.weekendEvent(now);
+    return event.active && event.key === 'xp';
+  }
+
+  // XP per credit to plan upgrades and the leveling cushion with (BotterAuto.planXpRate).
+  function planXpRate() {
+    return A.planXpRate(stats.games, stats.plainXp);
+  }
+
   // Credits to grind through the rest of this level and the next
   // (BotterAuto.MARGIN_LEVELS, no level-up reward counted on the way) with
   // BotterAuto.MARGIN_SIGMAS deviations of bad luck (BotterAuto.levelUpCushion),
@@ -1364,7 +1377,7 @@
   // the cheapest game by its modelled edge and variance. No weekend event bonus
   // is counted on. Null before the XP rate is measured.
   function levelMargin() {
-    const rate = A.pooledXpRate(stats.games);
+    const rate = planXpRate();
     if (!(rate > 0)) return null;
     const { candidates, edges } = grindModel();
     const learning = learningBlaze();

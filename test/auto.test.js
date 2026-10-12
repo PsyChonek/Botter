@@ -306,6 +306,14 @@ test('upgradeVerdict judges by the XP ahead once the XP rate is measured', () =>
   assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), verdictCtx({ volume: 9000, xpAhead: 500, xpRate: 0.05 })), 'xpFarmingBetter');
 });
 
+test('planXpRate leaves the Hackathon bonus out of the XP rate', () => {
+  const games = { roulette: { rounds: 100, wagered: 100_000, net: 0, xp: 15_000 } };
+  assert.ok(Math.abs(A.planXpRate(games, {}) - 0.1) < 1e-12);
+  assert.ok(Math.abs(A.planXpRate(games, { roulette: { rounds: 50, wagered: 50_000, net: 0, xp: 6000 } }) - 0.1) < 1e-12);
+  assert.equal(A.planXpRate(games, { roulette: { rounds: 100, wagered: 100_000, net: 0, xp: 12_000 } }), 0.12);
+  assert.equal(A.planXpRate({}, {}), null);
+});
+
 test('levelUpCushion is the expected loss to the next level plus two deviations of the swing', () => {
   // 10,000 XP at 0.05 is 200,000 wagered: 2.7 % of it plus 2 * sqrt(1 * 20 * 200,000).
   assert.equal(A.levelUpCushion(10_000, 0.05, 0.027, 20, 1), Math.round(5400 + 2 * Math.sqrt(4_000_000)));

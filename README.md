@@ -241,7 +241,9 @@ progress shows at `chrome://on-device-internals`.
   more XP than grinding the rest at the cheaper cost (volume: 14 days of the daily
   budget, or the credits above the minimum balance; judged for the next levels alone
   and for the game's useful upgrades maxed together). Once XP per credit is measured
-  (pooled over every game with XP), the volume is the XP to the next 10 levels instead,
+  (pooled over every game with XP; Hackathon weekend rounds, +50 % XP, are left out once
+  100,000 credits have been wagered off them, and until then the pooled rate is divided
+  by 1.5, so levels never look cheaper than they are), the volume is the XP to the next 10 levels instead,
   from the level curve (`G.xpForLevel`: round(280 × level^1.35), reward 1,000 × (level
   − 1), fitted exactly to recorded levels 14 to 18): an upgrade is bought when the
   credits wagered for that XP times its drop in edge beat its price. A goal is bought

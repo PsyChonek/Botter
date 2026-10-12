@@ -181,6 +181,23 @@
     return wagered > 0 ? xp / wagered : null;
   }
 
+  // Extra XP on a Hackathon weekend.
+  const HACKATHON_XP = 0.5;
+  // Credits wagered off Hackathon weekends before their rate alone is trusted.
+  const PLAIN_XP_MIN_WAGERED = 100_000;
+
+  // XP per credit wagered to plan with: from the rounds played off Hackathon
+  // weekends (plain, rows like games) once they cover PLAIN_XP_MIN_WAGERED, else
+  // the rate of all rounds without the Hackathon bonus, as if every one had it.
+  // The weekend's +50 % would otherwise make levels look cheaper than they are.
+  function planXpRate(games, plain) {
+    let wagered = 0;
+    for (const row of Object.values(plain ?? {})) if (row?.xp > 0) wagered += row.wagered;
+    if (wagered >= PLAIN_XP_MIN_WAGERED) return pooledXpRate(plain);
+    const rate = pooledXpRate(games);
+    return rate === null ? null : rate / (1 + HACKATHON_XP);
+  }
+
   // Credits an upgrade purchase must leave on top of the reserve so the grinder
   // can still reach the next level: the expected loss on the XP left in the
   // level, plus two standard deviations of the swing at the grind bet. xpLeft
@@ -907,6 +924,7 @@
     grindVolume,
     finalGame,
     pooledXpRate,
+    planXpRate,
     levelUpCushion,
     UPGRADE_HORIZON_LEVELS,
     upgradeVerdict,
