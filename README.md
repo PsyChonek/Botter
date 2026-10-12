@@ -272,6 +272,11 @@ progress shows at `chrome://on-device-internals`.
   from the win. The panel shows rounds, net and return rate per game; the settings
   Profit tab shows wagered, returned, net, return rate, net per round and XP, plus credits
   earned per work ticket. Crash bets are booked when they settle, from the round's bet list.
+  Every round of a game with an odds model is also booked under the upgrade levels it
+  was played with (`stats.combos`, keyed by `BotterOdds.combo`), and the Profit tab's
+  **Profit per upgrade level** table shows each combination's rounds, wagered, net,
+  measured return and the return the model gives it (Blaze on the per reel rule), so an
+  upgrade can be checked against what it promised.
   A profile reset (Začít úplně od nuly, `/api/profile/reset`) wipes the account on the
   server, so its stats start over too: profit, XP per game, free income and the
   achievement flags, so the clean-loan trick and the podium run again. Only the submit

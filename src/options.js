@@ -380,13 +380,43 @@ function showProfit(stats = {}) {
   foot.append(cell(msg('colTotal')), ...Array(3).fill().map(() => cell('')), cell(signed.format(total), tone(total)));
   $('profitFoot').replaceChildren(...(rows.length ? [foot] : []));
   $('profitEmpty').hidden = rows.length > 0;
+  showCombos(stats.combos ?? {});
+}
+
+// Profit per game and upgrade combination, next to the return the model gives
+// that combination (Blaze on the per reel star rule).
+function showCombos(combos) {
+  const rows = [];
+  for (const game of G.GAME_KEYS) {
+    for (const row of G.profitRows(combos[game] ?? {}).sort((a, b) => a.game.localeCompare(b.game))) {
+      const upgrades = O.comboUpgrades(game, row.game);
+      const model = O.rtp(game, { [game]: upgrades });
+      const tr = document.createElement('tr');
+      tr.append(
+        cell(msg(`game_${game}`)),
+        cell(Object.entries(upgrades).map(([name, level]) => `${name} ${level}`).join(', ')),
+        cell(num.format(row.rounds)),
+        cell(num.format(row.wagered)),
+        cell(signed.format(row.net), tone(row.net)),
+        cell(row.rtp === null ? '-' : pct2.format(row.rtp)),
+        cell(model === null ? '-' : pct2.format(model)),
+        cell(num.format(row.xp)),
+      );
+      rows.push(tr);
+    }
+  }
+  $('comboBody').replaceChildren(...rows);
+  $('comboEmpty').hidden = rows.length > 0;
 }
 
 // Totals of several accounts' stats, for the "all accounts" profit view.
 function sumStats(list) {
-  const total = { games: {}, work: { tickets: 0, net: 0, xp: 0 }, free: {} };
+  const total = { games: {}, combos: {}, work: { tickets: 0, net: 0, xp: 0 }, free: {} };
   for (const stats of list) {
     for (const [game, row] of Object.entries(stats.games ?? {})) G.addDelta(total.games, { game, ...row });
+    for (const [game, rows] of Object.entries(stats.combos ?? {})) {
+      for (const [combo, row] of Object.entries(rows)) G.addDelta((total.combos[game] ??= {}), { ...row, game: combo });
+    }
     for (const key of Object.keys(total.work)) total.work[key] += stats.work?.[key] ?? 0;
     for (const [kind, amount] of Object.entries(stats.free ?? {})) total.free[kind] = (total.free[kind] ?? 0) + amount;
   }

@@ -79,3 +79,12 @@ test('winRates skips games without a model', () => {
   const wins = O.winRates(['roulette', 'crash'], {});
   assert.deepEqual(Object.keys(wins), ['roulette']);
 });
+
+test('combo keys an upgrade combination and comboUpgrades reads it back', () => {
+  const upgrades = { blaze: { lucky: 2, star: 3 }, roulette: { zeros: 1 } };
+  assert.equal(O.combo('blaze', upgrades), '203');
+  assert.deepEqual(O.comboUpgrades('blaze', '203'), { lucky: 2, wild: 0, star: 3 });
+  assert.equal(O.combo('roulette', upgrades), '1');
+  assert.equal(O.combo('crash', upgrades), null);
+  assert.equal(O.rtp('blaze', { blaze: O.comboUpgrades('blaze', '203') }), O.rtp('blaze', upgrades));
+});

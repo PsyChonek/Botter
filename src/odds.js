@@ -20,6 +20,12 @@
   };
   const key = (game, own) => UPGRADES[game].map(([name, max]) => level(own, name, max)).join('');
 
+  // A game's upgrade combination as its table key ("213" for lucky 2, wild 1,
+  // star 3), or null for a game without a model.
+  const combo = (game, upgrades) => (UPGRADES[game] ? key(game, upgrades?.[game]) : null);
+  // The upgrade levels a combination key stands for: { name: level }.
+  const comboUpgrades = (game, id) => Object.fromEntries(UPGRADES[game].map(([name], i) => [name, Number(id[i])]));
+
   // Roulette pays 36 units per unit on a hit, outside bets included, on a
   // wheel of 37 numbers plus the zeros the upgrade has not removed yet.
   const ROULETTE_EXTRA_ZEROS = 2;
@@ -127,7 +133,7 @@
     return symbols.match !== reels.match || symbols.total >= tieSpins;
   }
 
-  const api = { UPGRADES, rtp, edges, chances, winRates, gains, variances, bigRates, table, blazeMode, blazeDecided, BLAZE_TIE_SPINS };
+  const api = { UPGRADES, combo, comboUpgrades, rtp, edges, chances, winRates, gains, variances, bigRates, table, blazeMode, blazeDecided, BLAZE_TIE_SPINS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BotterOdds = api;
 })(globalThis);

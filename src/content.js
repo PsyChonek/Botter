@@ -77,6 +77,7 @@
     manual: { correct: 0, wrong: 0 },
     spend: { usd: 0, calls: 0 },
     games: {},
+    combos: {}, // game -> upgrade combination (BotterOdds.combo) -> the same rows as games
     work: { tickets: 0, net: 0, xp: 0 },
     free: { daily: 0, bailout: 0 },
     crashBooked: [],
@@ -363,6 +364,7 @@
       if (delta) {
         bjStake = data.hand && !data.hand.done ? delta.stake : 0;
         G.addDelta(stats.games, delta);
+        bookCombo(delta, data.player.upgrades ?? player?.upgrades);
         bookGrind(delta.net);
         checkWinsLimit(delta, data);
         saveStats();
@@ -440,6 +442,13 @@
       unsavedSpins = 0;
       chrome.storage.local.set({ spins });
     }
+  }
+
+  // A game round booked again under the upgrade combination it was played
+  // with, so the profit tab can hold each combination against its model.
+  function bookCombo(delta, upgrades) {
+    const combo = O.combo(delta.game, upgrades);
+    if (combo !== null) G.addDelta((stats.combos[delta.game] ??= {}), { ...delta, game: combo });
   }
 
   // Crash pays auto cash-outs without a response, so settled bets are booked

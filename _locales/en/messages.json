@@ -290,6 +290,18 @@
   "optionsProfitHint": {
     "message": "Counted from your credit balance around every round, manual play included. Credits the debt collector takes from a win count as winnings, because they pay down the loan. Work counts credits earned per ticket."
   },
+  "optionsCombosHeading": {
+    "message": "Profit per upgrade level"
+  },
+  "optionsCombosHint": {
+    "message": "Every round is booked at the upgrade levels of its game when it was played, counted from this version on. Model is the long-run return those levels give (Blaze on the per reel star rule). A few hundred rounds are mostly luck; the measured return settles near the model over thousands."
+  },
+  "optionsCombosEmpty": {
+    "message": "Nothing played since per-upgrade tracking started."
+  },
+  "colModelRtp": {
+    "message": "Model"
+  },
   "optionsProfitEmpty": {
     "message": "Nothing played yet."
   },
