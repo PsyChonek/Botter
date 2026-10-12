@@ -194,9 +194,10 @@ progress shows at `chrome://on-device-internals`.
   their size, so each credit pushed is worth the fund over 100 times the room, counted
   at half for the pushes another player finishes first. That beats roulette's edge from
   about 10,100 of 12,000 (blackjack unupgraded from about 11,500), and the bot then bets
-  on the lowest-edge game at the biggest level up to the XP grinding bet that keeps the
-  reserve (the push is worth more than the edge costs, and the grinder takes that swing
-  on every round anyway),
+  on the lowest-edge game at the bet the XP grinder would play right now (the push is
+  worth more than the edge costs and the grinder takes that swing anyway); pushes keep
+  the grinder's floor, daily budget and upgrade savings, and stop when it may not bet
+  (a bet that drops the fund outright still goes, above the reserve alone),
   since bigger bets finish the push in fewer rounds. The fund is read from every
   response that carries it and from the feed, every 10 seconds once pushing pays and
   every minute otherwise. The client shows no sign that the player pays the 1 %, so the

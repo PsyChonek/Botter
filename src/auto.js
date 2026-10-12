@@ -748,9 +748,12 @@
   // bet fills the room in PAYROLL_RACE_ROUNDS rounds or fewer, fewer and bigger
   // pushes leave other players less time to land it first, so the bet is the
   // biggest level up to 1 / PAYROLL_RACE_STAKES of the bankroll instead of the
-  // Kelly size. With ctx.pushBet set (the XP grind bet) a fund push bets the
-  // biggest level up to it instead of either: the push is worth more than the
-  // edge costs, and the player already takes that swing on every grind round.
+  // Kelly size. With ctx.pushBet set (what the XP grinder would bet now, 0 when
+  // it may not bet) a fund push bets the biggest level up to it instead of
+  // either: the push is worth more than the edge costs, the grinder takes that
+  // swing anyway, and its floor and budget stay kept. At 0 nothing is pushed.
+  // A bet that drops the fund outright is not a push: it is played whatever
+  // pushBet says, above the reserve alone.
   const PAYROLL_RACE_ROUNDS = 100;
   const PAYROLL_RACE_STAKES = 20;
   const payrollRace = (payroll, levels) =>
@@ -768,10 +771,13 @@
         const fund = payrollWorth(ctx.payroll, bet);
         const ev = base + fund;
         if (!(ev > 0)) continue;
-        let cap = (ev / (ctx.variances?.[game] ?? 1)) * ctx.kelly * ctx.bankroll;
-        if (fund > 0 && ctx.pushBet > 0) cap = ctx.pushBet;
-        else if (fund > 0 && racing) cap = ctx.bankroll / PAYROLL_RACE_STAKES;
-        if (bet !== levels[0] && bet > cap) continue;
+        const drops = PAYROLL_SHARE * bet >= ctx.payroll?.cap - ctx.payroll?.amount;
+        if (fund > 0 && ctx.pushBet !== undefined) {
+          if (!drops && bet > ctx.pushBet) continue;
+        } else {
+          const cap = fund > 0 && racing ? ctx.bankroll / PAYROLL_RACE_STAKES : (ev / (ctx.variances?.[game] ?? 1)) * ctx.kelly * ctx.bankroll;
+          if (bet !== levels[0] && bet > cap) continue;
+        }
         const value = ev * bet;
         if (!best || value > best.value) best = { game, bet, ev, value, payroll: fund > 0 };
       }
