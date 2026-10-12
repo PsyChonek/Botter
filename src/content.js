@@ -2114,27 +2114,48 @@
     );
   }
 
-  // The shop queue from the last review: the goal with the savings toward it,
-  // then every upgrade left in the plan and why it waits.
+  // The upgrade bought next and the balance it is bought at, or null: the goal
+  // at goalNeed, or with no goal the first spare upgrade (BotterAuto.spareUpgrade)
+  // at the price on top of goalNeed. need is null before the XP rate is measured,
+  // when nothing is bought.
+  function nextBuy(review) {
+    const margin = levelMargin();
+    const at = (offer, need) => ({ offer, need: margin === null ? null : need, floor: grindFloor(), margin });
+    if (review.goal) return at(review.goal, goalNeed(review.goal));
+    if (!settings.spareUpgrades || bankruptPlanned()) return null;
+    const spare = A.spareUpgrade(review.queue, Infinity, 0, shopPriority());
+    return spare ? at(spare, goalNeed(null) + spare.price) : null;
+  }
+
+  // The shop queue from the last review: the next upgrade with the balance it is
+  // bought at, then every upgrade left in the plan and why it waits.
   function renderShop() {
     const review = settings.buyUpgrades && player ? shopReview : null;
     ui.shop.hidden = !review;
     if (!review) return;
     const { goal, queue } = review;
-    ui.shopGoal.textContent = goal
-      ? msg('shopGoal', [
-          `${goal.game}:${goal.key} ${goal.next}`,
-          credits(Math.min(player.credits, goal.price)),
-          credits(goal.price),
-          pct.format(Math.min(1, player.credits / goal.price)),
-        ])
-      : msg('shopNoGoal');
+    const next = nextBuy(review);
+    const name = (offer) => `${offer.game}:${offer.key} ${offer.next}`;
+    if (!next) ui.shopGoal.textContent = msg('shopNoGoal');
+    else if (next.need === null) ui.shopGoal.textContent = msg('shopNextUnmeasured', [name(next.offer), credits(next.offer.price)]);
+    else {
+      ui.shopGoal.textContent = msg('shopNext', [
+        name(next.offer),
+        credits(next.offer.price),
+        credits(next.need),
+        credits(next.floor),
+        credits(next.margin),
+        credits(player.credits),
+        credits(Math.max(0, next.need - player.credits)),
+      ]);
+    }
     ui.shopBody.replaceChildren(
       ...queue.map((offer) => {
         const tr = document.createElement('tr');
-        if (offer === goal) tr.className = 'pick';
+        if (offer === next?.offer) tr.className = 'pick';
         let state = msg('shopState_queued');
         if (offer === goal) state = msg('shopState_goal');
+        else if (offer === next?.offer) state = msg('shopState_spare');
         else if (offer.reason === 'level') state = msg('shopNeedsLevel', [String(offer.minLevel)]);
         else if (offer.reason) state = msg(`shopState_${offer.reason}`);
         tr.append(cell(`${offer.game}:${offer.key}`), cell(String(offer.next)), cell(credits(offer.price)), cell(state));

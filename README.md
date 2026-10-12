@@ -259,7 +259,9 @@ progress shows at `chrome://on-device-internals`.
   the goal's price on top of the reserve, so work pay saves up to it instead of being
   ground away (not past a planned bankruptcy, which wipes the savings). Once bought, the
   next goal is bought on the next tick if it fits too. The panel's **Upgrade queue**
-  shows the goal with the savings toward it and why every other upgrade waits. With
+  shows the next upgrade (the goal, or with none the first spare one), its price, the
+  balance it is bought at (the floor, the price and the leveling cushion) and how much is
+  still missing, then why every other upgrade waits. With
   **Buy Blaze 20 Wild upgrades first** (on by default) the goal is the cheapest Blaze
   upgrade the player level allows, whatever its verdict, and spare credits also go to
   Blaze before any other game; the plan above takes over once Blaze is maxed or waits

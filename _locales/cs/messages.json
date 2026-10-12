@@ -1196,22 +1196,45 @@
   "colPrice": {
     "message": "Cena"
   },
-  "shopGoal": {
-    "message": "Cíl: $UPGRADE$, $HAVE$ z $PRICE$ ($SHARE$)",
+  "shopNext": {
+    "message": "Další vylepšení: $UPGRADE$ za $PRICE$. Koupí se při zůstatku $NEED$: hranice $FLOOR$, cena a $MARGIN$ na další levelování. Zůstatek $HAVE$, chybí $LEFT$.",
     "placeholders": {
       "upgrade": {
         "content": "$1"
       },
-      "have": {
+      "price": {
         "content": "$2"
       },
-      "price": {
+      "need": {
         "content": "$3"
       },
-      "share": {
+      "floor": {
         "content": "$4"
+      },
+      "margin": {
+        "content": "$5"
+      },
+      "have": {
+        "content": "$6"
+      },
+      "left": {
+        "content": "$7"
       }
     }
+  },
+  "shopNextUnmeasured": {
+    "message": "Další vylepšení: $UPGRADE$ za $PRICE$. Dokud není změřené XP za kredit, nic se nekupuje.",
+    "placeholders": {
+      "upgrade": {
+        "content": "$1"
+      },
+      "price": {
+        "content": "$2"
+      }
+    }
+  },
+  "shopState_spare": {
+    "message": "další, z přebytku"
   },
   "shopNoGoal": {
     "message": "Teď se žádné vylepšení nevyplatí. Znovu se kontroluje každých 10 minut."
