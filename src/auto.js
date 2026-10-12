@@ -748,7 +748,9 @@
   // bet fills the room in PAYROLL_RACE_ROUNDS rounds or fewer, fewer and bigger
   // pushes leave other players less time to land it first, so the bet is the
   // biggest level up to 1 / PAYROLL_RACE_STAKES of the bankroll instead of the
-  // Kelly size.
+  // Kelly size. With ctx.pushBet set (the XP grind bet) a fund push bets the
+  // biggest level up to it instead of either: the push is worth more than the
+  // edge costs, and the player already takes that swing on every grind round.
   const PAYROLL_RACE_ROUNDS = 100;
   const PAYROLL_RACE_STAKES = 20;
   const payrollRace = (payroll, levels) =>
@@ -766,7 +768,9 @@
         const fund = payrollWorth(ctx.payroll, bet);
         const ev = base + fund;
         if (!(ev > 0)) continue;
-        const cap = racing && fund > 0 ? ctx.bankroll / PAYROLL_RACE_STAKES : (ev / (ctx.variances?.[game] ?? 1)) * ctx.kelly * ctx.bankroll;
+        let cap = (ev / (ctx.variances?.[game] ?? 1)) * ctx.kelly * ctx.bankroll;
+        if (fund > 0 && ctx.pushBet > 0) cap = ctx.pushBet;
+        else if (fund > 0 && racing) cap = ctx.bankroll / PAYROLL_RACE_STAKES;
         if (bet !== levels[0] && bet > cap) continue;
         const value = ev * bet;
         if (!best || value > best.value) best = { game, bet, ev, value, payroll: fund > 0 };

@@ -1590,6 +1590,7 @@
       kelly: EDGE_KELLY,
       winsBonus: winsOn ? A.WINS_BONUS : 0,
       payroll: settings.payrollFund && payroll && now - payroll.at <= pollMs ? payroll : null,
+      pushBet: Number(settings.grindBet) || 0,
     });
     const note = plan ? `${plan.game} ${plan.bet} ${plan.payroll}` : '';
     if (note !== edgeNote) {

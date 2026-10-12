@@ -759,6 +759,26 @@ test('edgePlan bets on the payroll fund only near its cap', () => {
   assert.equal(A.edgePlan({ ...ctx, payroll: null }), null);
 });
 
+test('edgePlan pushes the payroll fund at the biggest bet up to the grind bet', () => {
+  const ctx = {
+    level: 20,
+    unlocks: { blaze: 1, roulette: 15 },
+    edges: { blaze: 0.3, roulette: 0.027 },
+    variances: { roulette: 1 },
+    levels: [20, 40, 100, 200, 400, 1000],
+    bankroll: 20_000,
+    kelly: 0.5,
+    winsBonus: 0,
+    pushBet: 1000,
+  };
+  assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 10_500, cap: 12_000 } }).bet, 1000);
+  assert.equal(A.edgePlan({ ...ctx, pushBet: 200, payroll: { amount: 11_500, cap: 12_000 } }).bet, 200);
+  assert.equal(A.edgePlan({ ...ctx, levels: [20, 40, 100], payroll: { amount: 10_500, cap: 12_000 } }).bet, 100);
+  // Not pushing when the fund is worth less than the edge, and the smallest bet that drops it still wins near the cap.
+  assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 6000, cap: 12_000 } }), null);
+  assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 11_997, cap: 12_000 } }).bet, 400);
+});
+
 test('edgePlan plays the Konec kvartálu bonus on the game with the best edge', () => {
   const ctx = {
     level: 20,
