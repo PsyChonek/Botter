@@ -234,6 +234,30 @@ test('spareUpgrade buys the cheapest skipped upgrade that leaves the need covere
   assert.equal(A.spareUpgrade(queue.slice(2), 40_000, 20_000).key, 'zeros');
 });
 
+test('spareUpgrade buys the priority game first, even when another upgrade is cheaper', () => {
+  const queue = [
+    { game: 'skeleton', key: 'team', price: 4000, reason: 'notFinal' },
+    { game: 'blaze', key: 'wild', price: 7200, reason: 'notFinal' },
+    { game: 'blaze', key: 'lucky', price: 5400, reason: 'notFinal' },
+  ];
+  assert.equal(A.spareUpgrade(queue, 30_000, 20_000, 'blaze').key, 'lucky');
+  assert.equal(A.spareUpgrade(queue, 25_000, 20_000, 'blaze').key, 'team');
+  assert.equal(A.spareUpgrade(queue, 30_000, 20_000).key, 'team');
+});
+
+test('shopGoal picks the cheapest upgrade of the priority game the level allows, whatever its verdict', () => {
+  const queue = [
+    { game: 'skeleton', key: 'team', price: 4000, reason: null },
+    { game: 'blaze', key: 'star', price: 6500, reason: 'level' },
+    { game: 'blaze', key: 'wild', price: 7200, reason: 'notFinal' },
+    { game: 'blaze', key: 'lucky', price: 5400, reason: 'starRule' },
+  ];
+  assert.equal(A.shopGoal(queue, 'blaze').key, 'lucky');
+  assert.equal(A.shopGoal(queue).key, 'team');
+  assert.equal(A.shopGoal(queue.slice(0, 2), 'blaze').key, 'team');
+  assert.equal(A.shopGoal(queue.slice(1, 2), 'blaze'), null);
+});
+
 test('upgradeVerdict buys an upgrade that pays back in XP', () => {
   assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), verdictCtx()), null);
 });

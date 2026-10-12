@@ -59,6 +59,7 @@
     buyUpgrades: false,
     saveForUpgrades: true,
     spareUpgrades: true,
+    blazeFirst: true,
     recordSpins: true,
     learnBlaze: true,
     captureDebug: false,
@@ -1296,10 +1297,10 @@
   // worth buying at this level. Changes are logged, not every review.
   function reviewShop() {
     if (!settings.buyUpgrades || !player) return (shopReview = null);
-    const key = JSON.stringify([accountId, player.level, player.upgrades, bankruptPlanned(), blazeRule().mode, blazeRule().decided, settings.learnBlaze, Number(A.pooledXpRate(stats.games)?.toFixed(3))]);
+    const key = JSON.stringify([accountId, player.level, player.upgrades, bankruptPlanned(), blazeRule().mode, blazeRule().decided, settings.learnBlaze, settings.blazeFirst, Number(A.pooledXpRate(stats.games)?.toFixed(3))]);
     if (shopReview?.key === key && Date.now() - shopReview.at < SHOP_REVIEW_MS) return shopReview;
     const queue = G.shopQueue(G.UPGRADE_PLAN, player, upgradeSkip);
-    const goal = queue.find((offer) => !offer.reason) ?? null;
+    const goal = A.shopGoal(queue, shopPriority());
     const skipped = queue.filter((o) => o.reason && o.reason !== 'level').map((o) => `${o.game}:${o.key} ${o.reason}`);
     if (skipped.join() !== shopReview?.skipped.join() && skipped.length) log.info('upgrades_skipped', { skipped });
     const label = (o) => (o ? `${o.game}:${o.key} ${o.next}` : null);
@@ -1309,6 +1310,10 @@
     shopReview = { at: Date.now(), key, queue, goal, skipped };
     return shopReview;
   }
+
+  // Game whose upgrades are bought before any other, whatever their verdict
+  // (Blaze with the Blaze-first setting on), or null.
+  const shopPriority = () => (settings.blazeFirst ? 'blaze' : null);
 
   // The goal upgrade when it is affordable (goalNeed), or else a spare one
   // (spareOffer), or null. Nothing is bought before the XP rate is measured:
@@ -1326,7 +1331,7 @@
   function spareOffer() {
     if (!settings.spareUpgrades || bankruptPlanned()) return null;
     const review = reviewShop();
-    return review ? A.spareUpgrade(review.queue, player.credits, goalNeed(review.goal)) : null;
+    return review ? A.spareUpgrade(review.queue, player.credits, goalNeed(review.goal), shopPriority()) : null;
   }
 
   // Credits an upgrade purchase must leave: where the grinder stops betting

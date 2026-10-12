@@ -1169,6 +1169,9 @@
   "optionsSpareUpgrades": {
     "message": "Buy the other upgrades from spare credits, keeping enough to reach the next level"
   },
+  "optionsBlazeFirst": {
+    "message": "Buy Blaze 20 Wild upgrades first, before anything else and whatever the XP plan says"
+  },
   "optionsSaveForUpgrades": {
     "message": "Save for the next upgrade instead of grinding its price away"
   },

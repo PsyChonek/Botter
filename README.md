@@ -257,7 +257,11 @@ progress shows at `chrome://on-device-internals`.
   the goal's price on top of the reserve, so work pay saves up to it instead of being
   ground away (not past a planned bankruptcy, which wipes the savings). Once bought, the
   next goal is bought on the next tick if it fits too. The panel's **Upgrade queue**
-  shows the goal with the savings toward it and why every other upgrade waits. Skips
+  shows the goal with the savings toward it and why every other upgrade waits. With
+  **Buy Blaze 20 Wild upgrades first** (on by default) the goal is the cheapest Blaze
+  upgrade the player level allows, whatever its verdict, and spare credits also go to
+  Blaze before any other game; the plan above takes over once Blaze is maxed or waits
+  for a level. Skips
   are logged as `upgrades_skipped`; a Blaze model check (`src/blaze.js`) that records every Blaze spin
   with its board and the server win, reports which scatter rule reproduces the
   server and simulates the payout rate for current and maxed upgrades; and a debug

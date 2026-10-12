@@ -1169,6 +1169,9 @@
   "optionsSpareUpgrades": {
     "message": "Kupovat ostatní vylepšení z přebytku, s rezervou na další level"
   },
+  "optionsBlazeFirst": {
+    "message": "Kupovat vylepšení Blaze 20 Wild jako první, před vším ostatním a bez ohledu na plán XP"
+  },
   "optionsSaveForUpgrades": {
     "message": "Šetřit na další vylepšení místo protočení jeho ceny"
   },
