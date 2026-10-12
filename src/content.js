@@ -1370,10 +1370,13 @@
   // The goal upgrade the grinder leaves credits for, or null. Its verdict says
   // the credits buy more XP as the upgrade than as grinding, so they are not
   // gambled meanwhile. Not past a planned bankruptcy, which wipes the savings,
-  // nor before the XP rate is measured, which only grinding measures.
+  // nor before the XP rate is measured, which only grinding measures. A goal
+  // the verdict skips (a Blaze-first one) is bought when the credits are there,
+  // but the grinder does not wait for it.
   function savingFor() {
     if (!settings.saveForUpgrades || !settings.autoMode || bankruptPlanned() || levelMargin() === null) return null;
-    return reviewShop()?.goal ?? null;
+    const goal = reviewShop()?.goal;
+    return goal && !goal.reason ? goal : null;
   }
 
   // Buys the goal upgrade as soon as it fits above the reserve. A purchase

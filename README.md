@@ -261,7 +261,8 @@ progress shows at `chrome://on-device-internals`.
   **Buy Blaze 20 Wild upgrades first** (on by default) the goal is the cheapest Blaze
   upgrade the player level allows, whatever its verdict, and spare credits also go to
   Blaze before any other game; the plan above takes over once Blaze is maxed or waits
-  for a level. Skips
+  for a level. The grinder saves only for a goal the plan itself would buy, so a Blaze
+  goal the plan skips is bought when the credits are there and grinding never waits for it. Skips
   are logged as `upgrades_skipped`; a Blaze model check (`src/blaze.js`) that records every Blaze spin
   with its board and the server win, reports which scatter rule reproduces the
   server and simulates the payout rate for current and maxed upgrades; and a debug
