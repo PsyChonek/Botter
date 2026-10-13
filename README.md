@@ -319,7 +319,8 @@ progress shows at `chrome://on-device-internals`.
   unupgraded. Every spin and free-spin response, from the bot or played by hand, is
   recorded (`hotfixRounds`, up to 800, free-spin games kept first) and can be exported
   from the settings (Data tab) to settle those against the server.
-  `node scripts/hotfix-check.mjs <export> [spins]` does that: it recomputes every
+  `node scripts/hotfix-check.mjs <export>... [--spins N]` does that (several exports
+  count each round once): it recomputes every
   cascade step's wins from its grid, checks row heights and symbol weights on clean
   spins, measures how often the Hotfix wheel turns and what it picks, the modifier
   sizes and how the free-spin multiplier grows, then simulates the model at the
