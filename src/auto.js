@@ -242,17 +242,19 @@
   }
 
   // What the XP grinder knows per game, for the panel: the simulated edge, XP
-  // per credit wagered and credits lost per XP point.
-  function grindReport(games, level, stats, unlocks, edges = {}) {
+  // per credit wagered and credits lost per XP point, with the account's XP
+  // bonus (GameData.prestigeBonus) on the XP tracked without it.
+  function grindReport(games, level, stats, unlocks, edges = {}, bonus = 1) {
     return games.map((game) => {
-      const row = stats[game];
+      const rate = xpRate(stats[game]);
+      const cost = xpCost(game, stats, edges);
       return {
         game,
         locked: level < unlocks[game],
         unlock: unlocks[game],
         edge: edges?.[game] ?? null,
-        rate: xpRate(row),
-        cost: xpCost(game, stats, edges),
+        rate: rate === null ? null : rate * bonus,
+        cost: cost === null ? null : cost / bonus,
       };
     });
   }
@@ -275,13 +277,15 @@
   // XP per bet level of one game, for the panel: XP per round, XP per credit
   // wagered and credits lost per XP point at the game's edge (null without one),
   // and with xpLeft (XP to the next level) and msPerRound (the measured pace)
-  // the time and the expected loss to reach it grinding at that bet.
-  function betXpReport(cells, edge = null, { xpLeft = null, msPerRound = null } = {}) {
+  // the time and the expected loss to reach it grinding at that bet. bonus is
+  // the account's XP bonus (GameData.prestigeBonus) on the XP tracked without it.
+  function betXpReport(cells, edge = null, { xpLeft = null, msPerRound = null, bonus = 1 } = {}) {
     return Object.entries(cells ?? {})
       .map(([bet, cell]) => {
         const amount = Number(bet);
-        const rate = cell.rounds > 0 && cell.xp > 0 ? cell.xp / (cell.rounds * amount) : null;
-        const xpPerRound = cell.rounds > 0 ? cell.xp / cell.rounds : null;
+        const xp = cell.xp * bonus;
+        const rate = cell.rounds > 0 && xp > 0 ? xp / (cell.rounds * amount) : null;
+        const xpPerRound = cell.rounds > 0 ? xp / cell.rounds : null;
         const cost = edge !== null && rate ? edge / rate : null;
         return {
           bet: amount,

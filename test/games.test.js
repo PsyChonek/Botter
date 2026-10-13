@@ -46,6 +46,18 @@ test('gameDelta books a doubled blackjack hand as one round', () => {
   assert.deepEqual(games.blackjack, { rounds: 1, wagered: 200, net: 200, xp: 0 });
 });
 
+test('prestigeBonus gives +10 % XP per výpověď, at most five', () => {
+  assert.equal(G.prestigeBonus(undefined), 1);
+  assert.equal(G.prestigeBonus(0), 1);
+  assert.equal(G.prestigeBonus(2), 1.2);
+  assert.equal(G.prestigeBonus(7), 1.5);
+});
+
+test('gameDelta books XP without the výpověď bonus', () => {
+  const spin = G.gameDelta('/api/slot/spin', { bet: 40 }, { player: { credits: 1000, prestige: 3 }, xpGain: 13 }, 1000);
+  assert.equal(spin.xp, 10);
+});
+
 test('profitRows computes return rate and net per round', () => {
   const [row] = G.profitRows({ blaze: { rounds: 10, wagered: 200, net: -40, xp: 5 }, roulette: { rounds: 0, wagered: 0, net: 0, xp: 0 } });
   assert.equal(row.game, 'blaze');

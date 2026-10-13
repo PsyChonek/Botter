@@ -173,10 +173,17 @@
       rounds,
       wagered,
       net: data.player.credits - creditsBefore + (data.garnished ?? 0) - rewardTotal(data),
-      xp: data.xpGain ?? 0,
+      xp: (data.xpGain ?? 0) / prestigeBonus(data.player.prestige),
       stake: data.hand?.stake ?? prevStake,
     };
   }
+
+  // XP multiplier of an account's výpověď count (player.prestige), the client's
+  // formula: +10 % per výpověď, at most five. XP is tracked without it, so rates
+  // measured before a výpověď still hold after it.
+  const PRESTIGE_XP = 0.1;
+  const PRESTIGE_MAX = 5;
+  const prestigeBonus = (prestige) => 1 + PRESTIGE_XP * Math.min(Math.max(0, Number(prestige) || 0), PRESTIGE_MAX);
 
   // Level curve seen so far, shared by every account: { [level]: { xpNeed, reward } }
   // with the XP a level needs (player.xpNeed while at it) and the credits paid on
@@ -349,6 +356,7 @@
     gameDelta,
     recordLevel,
     xpForLevel,
+    prestigeBonus,
     levelReward,
     xpAhead,
     dailyBonus,

@@ -893,6 +893,16 @@ test('betXpReport gives XP per round, per credit and the loss per XP by bet', ()
   assert.equal(A.betXpReport({ 20: { rounds: 1, xp: 3 } })[0].cost, null);
 });
 
+test('betXpReport and grindReport put the výpověď bonus on the tracked XP', () => {
+  const [row] = A.betXpReport({ 20: { rounds: 10, xp: 30 } }, 0.03, { xpLeft: 60, msPerRound: 1000, bonus: 1.5 });
+  assert.equal(row.xpPerRound, 4.5);
+  assert.ok(Math.abs(row.cost - 0.03 / 0.225) < 1e-12);
+  assert.equal(row.levelMs, (60 / 4.5) * 1000);
+  const [game] = A.grindReport(['blaze'], 10, { blaze: { wagered: 100, xp: 10 } }, { blaze: 1 }, { blaze: 0.02 }, 1.2);
+  assert.ok(Math.abs(game.rate - 0.12) < 1e-12);
+  assert.ok(Math.abs(game.cost - 0.2 / 1.2) < 1e-12);
+});
+
 test('a game without a model is bought only as the first-game pick', () => {
   const offer = { game: 'hotfix', key: 'review', next: 1, price: 7000 };
   assert.equal(A.upgradeVerdict(offer, { edge: () => null, upgrades: {} }), 'noModel');

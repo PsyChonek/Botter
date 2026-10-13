@@ -582,7 +582,7 @@
     if (typeof creditsBefore === 'number' && data.player) {
       stats.work.tickets += 1;
       stats.work.net += data.player.credits - creditsBefore + (result.garnished ?? 0) - G.rewardTotal(data);
-      stats.work.xp += result.xpGain ?? 0;
+      stats.work.xp += (result.xpGain ?? 0) / G.prestigeBonus(data.player.prestige);
     }
     if (task && task.id === taskId && Number.isInteger(result.answer)) {
       bank[C.taskKey(task)] = C.bankEntry(task, result.answer);
@@ -1224,16 +1224,21 @@
 
   // ---------- auto mode ----------
 
+  // The account's XP bonus from výpověď (GameData.prestigeBonus). XP is tracked
+  // without it, so every rate read for planning gets it here.
+  const xpBonus = () => G.prestigeBonus(player?.prestige);
+
   // Credits the grinder pays per XP point on the game it plays, or null before
   // that game has earned any XP.
   function xpPrice() {
     const { candidates, edges } = grindModel();
     const game = A.cheapestGame(candidates, player.level, GRIND_UNLOCKS, edges);
-    return game ? A.xpCost(game, stats.games, edges) : null;
+    const cost = game ? A.xpCost(game, stats.games, edges) : null;
+    return cost === null ? null : cost / xpBonus();
   }
 
   // Credits a work ticket pays per XP point, or null before any ticket.
-  const workPerXp = () => (stats.work.xp > 0 ? Math.max(0, stats.work.net) / stats.work.xp : null);
+  const workPerXp = () => (stats.work.xp > 0 ? Math.max(0, stats.work.net) / stats.work.xp / xpBonus() : null);
 
   // Whether the open loan is going to be dropped by bankruptcy: a loan taken for
   // the bankruptcy cycle, or execution where bankruptcy is cheaper than paying.
@@ -1484,7 +1489,8 @@
 
   // XP per credit to plan upgrades and the leveling cushion with (BotterAuto.planXpRate).
   function planXpRate() {
-    return A.planXpRate(stats.games, stats.plainXp);
+    const rate = A.planXpRate(stats.games, stats.plainXp);
+    return rate === null ? null : rate * xpBonus();
   }
 
   // Credits to grind through the rest of this level and the next
@@ -2378,7 +2384,7 @@
       return;
     }
     const { candidates, edges, plan } = grindChoice();
-    const report = A.grindReport(candidates, player.level, stats.games, GRIND_UNLOCKS, edges);
+    const report = A.grindReport(candidates, player.level, stats.games, GRIND_UNLOCKS, edges, xpBonus());
     ui.xpBody.replaceChildren(
       ...report.map((game) => {
         let state = '';
@@ -2430,7 +2436,7 @@
     const pace = stats.pace[game];
     const msPerRound = pace?.rounds ? pace.ms / pace.rounds : null;
     const xpLeft = G.xpAhead(player, 1);
-    const report = A.betXpReport(stats.betXp[game], edge, { xpLeft, msPerRound });
+    const report = A.betXpReport(stats.betXp[game], edge, { xpLeft, msPerRound, bonus: xpBonus() });
     const name = msg(`game_${game}`);
     const rounds = num.format(A.BET_TEST_ROUNDS);
     let note;

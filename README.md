@@ -246,7 +246,10 @@ progress shows at `chrome://on-device-internals`.
   and for the game's useful upgrades maxed together). Once XP per credit is measured
   (pooled over every game with XP; Hackathon weekend rounds, +50 % XP, are left out once
   100,000 credits have been wagered off them, and until then the pooled rate is divided
-  by 1.5, so levels never look cheaper than they are), the volume is the XP to the next 10 levels instead,
+  by 1.5, so levels never look cheaper than they are; XP is tracked without the
+  výpověď bonus, +10 % per výpověď up to +50 % (`G.prestigeBonus`, `player.prestige`),
+  and the account's current bonus is put back on every rate it plans or shows with,
+  so rates measured before a výpověď hold after it; the bot never hands one in itself), the volume is the XP to the next 10 levels instead,
   from the level curve (`G.xpForLevel`: round(280 × level^1.35), reward 1,000 × (level
   − 1), fitted exactly to recorded levels 14 to 18): an upgrade is bought when the
   credits wagered for that XP times its drop in edge beat its price. A goal is bought
