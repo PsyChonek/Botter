@@ -215,6 +215,16 @@
     return games;
   }
 
+  // XP per game and bet level: { [game]: { [bet]: { rounds, xp } } }, to test
+  // whether XP per round really grows with the bet. A blackjack action adds its
+  // XP to the hand's opening bet with no round.
+  function addBetXp(table, game, bet, rounds, xp) {
+    const cell = ((table[game] ??= {})[bet] ??= { rounds: 0, xp: 0 });
+    cell.rounds += rounds;
+    cell.xp += xp;
+    return table;
+  }
+
   function totalNet(games) {
     return Object.values(games).reduce((sum, row) => sum + row.net, 0);
   }
@@ -260,6 +270,7 @@
     xpAhead,
     dailyBonus,
     addDelta,
+    addBetXp,
     totalNet,
     profitRows,
   };

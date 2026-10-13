@@ -257,6 +257,39 @@
     });
   }
 
+  // Rounds the XP-per-bet test plays at every bet level.
+  const BET_TEST_ROUNDS = 50;
+
+  // Next bet the XP-per-bet test plays, null when every level has its rounds,
+  // or 0 when the credits allow none of the levels still due. cells are one game's { [bet]: { rounds, xp } }, levels the bet
+  // levels to test and open the ones the credits allow now. The level with the
+  // fewest rounds goes first, the smaller on a tie, so the levels are played
+  // in turn and drift over time (a level-up, an upgrade) hits them all alike.
+  function betTestNext(cells, levels, open = levels, target = BET_TEST_ROUNDS) {
+    const rounds = (bet) => cells?.[bet]?.rounds ?? 0;
+    if (levels.every((bet) => rounds(bet) >= target)) return null;
+    const due = open.filter((bet) => rounds(bet) < target).sort((a, b) => rounds(a) - rounds(b) || a - b);
+    return due.length ? due[0] : 0;
+  }
+
+  // XP per bet level of one game, for the panel: XP per round, XP per credit
+  // wagered and credits lost per XP point at the game's edge (null without one).
+  function betXpReport(cells, edge = null) {
+    return Object.entries(cells ?? {})
+      .map(([bet, cell]) => {
+        const amount = Number(bet);
+        const rate = cell.rounds > 0 && cell.xp > 0 ? cell.xp / (cell.rounds * amount) : null;
+        return {
+          bet: amount,
+          rounds: cell.rounds,
+          xpPerRound: cell.rounds > 0 ? cell.xp / cell.rounds : null,
+          rate,
+          cost: edge !== null && rate ? edge / rate : null,
+        };
+      })
+      .sort((a, b) => a.bet - b.bet);
+  }
+
   // An upgrade has to raise its game's return by at least this much per credit
   // of its remaining levels: 0.5 percentage points per 10,000 credits. Below
   // that sit blackjack's hint (the bot already plays perfectly), its
@@ -915,6 +948,9 @@
     wheelReady,
     grindPlan,
     grindReport,
+    BET_TEST_ROUNDS,
+    betTestNext,
+    betXpReport,
     cheapestGame,
     xpCost,
     grindBets,

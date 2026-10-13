@@ -184,3 +184,11 @@ test('dailyBonus follows the client formula', () => {
   assert.equal(G.dailyBonus(7, 15), 5900);
   assert.equal(G.dailyBonus(3, 10), 1000 * 2.2);
 });
+
+test('addBetXp books XP per game and bet level', () => {
+  const table = {};
+  G.addBetXp(table, 'roulette', 20, 1, 3);
+  G.addBetXp(table, 'roulette', 20, 1, 4);
+  G.addBetXp(table, 'blackjack', 100, 0, 2);
+  assert.deepEqual(table, { roulette: { 20: { rounds: 2, xp: 7 } }, blackjack: { 100: { rounds: 0, xp: 2 } } });
+});

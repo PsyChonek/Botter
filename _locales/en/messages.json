@@ -1153,6 +1153,68 @@
       }
     }
   },
+  "statusBetTest": {
+    "message": "Testing XP per bet on $P1$ at $P2$ a round, $P3$ of $P4$ rounds at this bet",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      },
+      "p4": {
+        "content": "$4"
+      }
+    }
+  },
+  "panelBetTest": {
+    "message": "XP per bet"
+  },
+  "betTestNote": {
+    "message": "Plays $P2$ rounds of $P1$ at every bet level in turn, to see whether a smaller bet earns more XP per credit. Runs in auto mode with games on, keeps the reserve, and pauses on Hackathon weekends. Starting it clears the earlier samples of this game.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "betTestRunning": {
+    "message": "Testing $P1$: $P2$ rounds at every bet level.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "betTestHackathon": {
+    "message": "Testing $P1$ waits until the Hackathon weekend ends: its XP bonus would skew the result.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "betTestStart": {
+    "message": "Test XP per bet"
+  },
+  "betTestStop": {
+    "message": "Stop the test"
+  },
+  "colBet": {
+    "message": "Bet"
+  },
+  "colXpPerRound": {
+    "message": "XP/round"
+  },
   "statusWaitEnergy": {
     "message": "Waiting for more than $P1$ energy before working ($P2$ now).",
     "placeholders": {

@@ -79,6 +79,8 @@
     games: {},
     combos: {}, // game -> upgrade combination (BotterOdds.combo) -> the same rows as games
     plainXp: {}, // rows like games, only rounds played off Hackathon weekends (BotterAuto.planXpRate)
+    betXp: {}, // game -> bet -> { rounds, xp }, off Hackathon weekends (G.addBetXp)
+    betTest: null, // { game, done } of the XP-per-bet test (betTestStep)
     work: { tickets: 0, net: 0, xp: 0 },
     free: { daily: 0, bailout: 0 },
     crashBooked: [],
@@ -159,6 +161,7 @@
   let lastType = null;
   let workRun = false; // energy went above WORK_MIN_ENERGY and is being worked down
   let bjStake = 0; // stake of the open blackjack hand, to book doubles
+  let bjBet = 0; // opening bet of that hand, to book its XP per bet level
   let sessionBase = 0; // total game net when the game bot was started
   const claimTried = {}; // kind -> last attempt, so a refused claim is not spammed
   let crashPolledAt = 0;
@@ -366,7 +369,12 @@
         bjStake = data.hand && !data.hand.done ? delta.stake : 0;
         G.addDelta(stats.games, delta);
         bookCombo(delta, data.player.upgrades ?? player?.upgrades);
-        if (!hackathonOn()) G.addDelta(stats.plainXp, delta);
+        if (path === '/api/blackjack/deal') bjBet = request?.bet ?? delta.wagered;
+        const bet = path === '/api/blackjack/action' ? bjBet : (request?.bet ?? delta.wagered);
+        if (!hackathonOn()) {
+          G.addDelta(stats.plainXp, delta);
+          if (bet > 0) G.addBetXp(stats.betXp, delta.game, bet, delta.rounds, delta.xp);
+        }
         bookGrind(delta.net);
         checkWinsLimit(delta, data);
         saveStats();
@@ -589,6 +597,7 @@
     lastType = null;
     workRun = false;
     bjStake = 0;
+    bjBet = 0;
     crashPolledAt = 0;
     grindPausedUntil = 0;
     for (const kind of Object.keys(claimTried)) delete claimTried[kind];
@@ -1781,6 +1790,62 @@
     return true;
   }
 
+  // ---------- XP per bet test ----------
+
+  // Bet levels the XP-per-bet test plays: every grinding level the max bet allows.
+  const betTestLevels = () => G.BET_LEVELS.filter((bet) => bet <= player.maxBet);
+
+  // Starts the XP-per-bet test on the game the grinder would play, forgetting
+  // that game's earlier samples so every level is measured at the same player
+  // level and upgrades. A running test is stopped instead.
+  function toggleBetTest() {
+    if (!player) return;
+    if (stats.betTest && !stats.betTest.done) {
+      stats.betTest = { ...stats.betTest, done: true };
+      log.info('bet_test_stopped', { game: stats.betTest.game });
+    } else {
+      const { candidates, edges } = grindModel();
+      const game = A.cheapestGame(candidates, player.level, GRIND_UNLOCKS, edges) ?? 'roulette';
+      delete stats.betXp[game];
+      stats.betTest = { game, done: false };
+      log.info('bet_test_started', { game, levels: betTestLevels(), rounds: A.BET_TEST_ROUNDS });
+    }
+    saveStats();
+    render();
+  }
+
+  // Plays the XP-per-bet test one round at a time, the bet levels in turn
+  // (BotterAuto.betTestNext). It keeps the reserve but not the grinding budget,
+  // like the standup, and waits out Hackathon weekends: their rounds are not
+  // booked per bet level.
+  async function betTestStep() {
+    const test = stats.betTest;
+    if (!test || test.done || Date.now() < grindPausedUntil) return false;
+    const { game } = test;
+    const levels = betTestLevels();
+    const reserve = limits().reserve;
+    const open = levels.filter((bet) => player.credits - bet >= reserve);
+    const bet = A.betTestNext(stats.betXp[game], levels, open);
+    if (bet === null) {
+      stats.betTest = { ...test, done: true };
+      saveStats();
+      log.info('bet_test_done', { game, report: A.betXpReport(stats.betXp[game]) });
+      render();
+      return false;
+    }
+    if (!bet || hackathonOn() || player.level < GRIND_UNLOCKS[game]) return false;
+    const rounds = stats.betXp[game]?.[bet]?.rounds ?? 0;
+    setStatus('statusBetTest', [msg(`game_${game}`), credits(bet), num.format(rounds), num.format(A.BET_TEST_ROUNDS)]);
+    const res = await playRound(game, bet);
+    if (!res.ok) {
+      log.warn('bet_test_failed', { game, bet, status: res.status, error: res.data?.error });
+      grindError = res.data?.error ?? String(res.status);
+      grindPausedUntil = Date.now() + CLAIM_RETRY_MS;
+    }
+    await sleep(settings.gameDelayMs);
+    return true;
+  }
+
   async function autoStep() {
     if (!player) return loadPlayer();
     if (await bankruptStep()) return;
@@ -1797,6 +1862,7 @@
     if (games && (await standupStep())) return;
     if (settings.autoWork && workAvailable()) return workStep();
     if (games && (await edgeStep())) return;
+    if (games && (await betTestStep())) return;
     if (games && (await huntStep())) return;
     if (games && (await grindStep())) return;
     if (await rotateStep()) return;
@@ -1889,6 +1955,7 @@
         .pos { color: #a6e05a; }
         .neg { color: #ff8f7a; }
         .xp-note { margin: 4px 0 0; }
+        .bettest-toggle { margin-top: 4px; }
         tr.group td { text-align: left; padding-top: 6px; font-weight: 600; color: #e8f5c8; }
         tr.pick td { color: #d4ff6a; font-weight: 700; }
       </style>
@@ -1943,6 +2010,15 @@
             <tbody></tbody>
           </table>
         </details>
+        <details class="bettest">
+          <summary></summary>
+          <p class="muted xp-note bettest-note"></p>
+          <button type="button" class="bettest-toggle"></button>
+          <table>
+            <thead><tr><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </details>
         <details class="shop">
           <summary></summary>
           <p class="muted xp-note shop-goal"></p>
@@ -1983,6 +2059,11 @@
       xpNote: $('.xp-note'),
       xpHead: [...shadow.querySelectorAll('.xp th')],
       xpBody: $('.xp tbody'),
+      betSummary: $('.bettest summary'),
+      betNote: $('.bettest-note'),
+      betToggle: $('.bettest-toggle'),
+      betHead: [...shadow.querySelectorAll('.bettest th')],
+      betBody: $('.bettest tbody'),
       shop: $('.shop'),
       shopSummary: $('.shop summary'),
       shopGoal: $('.shop-goal'),
@@ -2018,6 +2099,11 @@
     ['colGame', 'colEdge', 'colXpPerCredit', 'colCostPerXp', 'colState'].forEach(
       (key, i) => (ui.xpHead[i].textContent = msg(key)),
     );
+    ui.betSummary.textContent = msg('panelBetTest');
+    ['colBet', 'colRounds', 'colXpPerRound', 'colXpPerCredit', 'colCostPerXp'].forEach(
+      (key, i) => (ui.betHead[i].textContent = msg(key)),
+    );
+    ui.betToggle.addEventListener('click', toggleBetTest);
     ui.shopSummary.textContent = msg('panelShop');
     ['colUpgrade', 'colLevel', 'colPrice', 'colState'].forEach((key, i) => (ui.shopHead[i].textContent = msg(key)));
     for (const option of ui.type.options) option.textContent = msg(`type_${option.value}`);
@@ -2108,6 +2194,44 @@
           cell(game.rate === null ? '-' : decimal.format(game.rate * 100)),
           cell(game.cost === null ? '-' : decimal.format(game.cost)),
           cell(state, game.locked ? 'muted' : undefined),
+        );
+        return tr;
+      }),
+    );
+  }
+
+  // XP per bet level of the tested game (the grind game before any test), the
+  // bet with the most XP per credit highlighted.
+  function renderBetTest() {
+    const test = stats.betTest;
+    const running = Boolean(test && !test.done);
+    ui.betToggle.textContent = msg(running ? 'betTestStop' : 'betTestStart');
+    ui.betToggle.disabled = !player;
+    if (!player) {
+      ui.betNote.textContent = '';
+      ui.betBody.replaceChildren();
+      return;
+    }
+    const { candidates, edges } = grindModel();
+    const game = test?.game ?? A.cheapestGame(candidates, player.level, GRIND_UNLOCKS, edges) ?? 'roulette';
+    const edge = O.edges([game], player.upgrades, blazeMode())[game] ?? null;
+    const report = A.betXpReport(stats.betXp[game], edge);
+    const name = msg(`game_${game}`);
+    const rounds = num.format(A.BET_TEST_ROUNDS);
+    if (running && hackathonOn()) ui.betNote.textContent = msg('betTestHackathon', [name]);
+    else if (running) ui.betNote.textContent = msg('betTestRunning', [name, rounds]);
+    else ui.betNote.textContent = msg('betTestNote', [name, rounds]);
+    const best = report.reduce((a, b) => ((b.rate ?? 0) > (a?.rate ?? 0) ? b : a), null);
+    ui.betBody.replaceChildren(
+      ...report.map((row) => {
+        const tr = document.createElement('tr');
+        if (row === best) tr.className = 'pick';
+        tr.append(
+          cell(credits(row.bet)),
+          cell(num.format(row.rounds)),
+          cell(row.xpPerRound === null ? '-' : decimal.format(row.xpPerRound)),
+          cell(row.rate === null ? '-' : decimal.format(row.rate * 100)),
+          cell(row.cost === null ? '-' : decimal.format(row.cost)),
         );
         return tr;
       }),
@@ -2247,6 +2371,7 @@
     ui.cost.textContent = msg('panelCost', [usd.format(spent), usd.format(calls ? spent / calls : 0)]);
     renderProfit();
     renderXp();
+    renderBetTest();
     renderShop();
   }
 

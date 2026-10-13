@@ -1153,6 +1153,68 @@
       }
     }
   },
+  "statusBetTest": {
+    "message": "Testuji XP podle sázky na $P1$ se sázkou $P2$, $P3$ z $P4$ kol na této sázce",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      },
+      "p4": {
+        "content": "$4"
+      }
+    }
+  },
+  "panelBetTest": {
+    "message": "XP podle sázky"
+  },
+  "betTestNote": {
+    "message": "Odehraje $P2$ kol $P1$ na každé výši sázky střídavě, aby se ukázalo, jestli menší sázka dává víc XP na kredit. Běží v automatickém režimu se zapnutými hrami, drží rezervu a o víkendu Hackathonu čeká. Spuštění smaže dřívější vzorky této hry.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "betTestRunning": {
+    "message": "Testuji $P1$: $P2$ kol na každé výši sázky.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "betTestHackathon": {
+    "message": "Test $P1$ čeká na konec víkendu Hackathonu: jeho bonus XP by výsledek zkreslil.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "betTestStart": {
+    "message": "Otestovat XP podle sázky"
+  },
+  "betTestStop": {
+    "message": "Zastavit test"
+  },
+  "colBet": {
+    "message": "Sázka"
+  },
+  "colXpPerRound": {
+    "message": "XP/kolo"
+  },
   "statusWaitEnergy": {
     "message": "Čekám na víc než $P1$ energie, pak začnu pracovat (teď $P2$).",
     "placeholders": {

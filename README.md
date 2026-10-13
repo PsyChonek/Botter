@@ -300,6 +300,16 @@ progress shows at `chrome://on-device-internals`.
 - **XP per game** (panel): for each game the house edge the grinder plans with, XP per
   100 credits wagered, credits lost per XP point and its state (locked or playing at
   the chosen bet). The row the grinder plays next is highlighted.
+- **XP per bet** (panel): checks whether XP per round really grows in proportion to
+  the bet, the assumption the grinder plans with. Every round played off a Hackathon
+  weekend is booked by game and bet level (`stats.betXp`, `G.addBetXp`). **Test XP per
+  bet** clears the grind game's samples and, in auto mode with games on, plays 50
+  rounds at every bet level up to the max bet, the levels in turn so a level-up or
+  upgrade during the test hits them all alike (`betTestNext` in `src/auto.js`). It
+  keeps the reserve but not the grinding budget, and waits out Hackathon weekends.
+  The table shows XP per round, XP per 100 credits and the loss per XP at the game's
+  edge for each bet; the bet with the most XP per credit is highlighted. The result
+  is logged as `bet_test_done`.
 - A small panel in the bottom-left corner of the page has Start/Stop for work and
   for games, the ticket type, the game, accuracy per answer source, AI cost and
   the profit table. **Hide** collapses it to a small Botter button in the same corner
