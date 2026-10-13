@@ -232,3 +232,14 @@ test('addRouletteSpin keys rows only by a zeros level the wheel can have', () =>
   assert.deepEqual(Object.keys(check).sort(), ['0', '2']);
   assert.equal(Object.prototype.spins, undefined);
 });
+
+test('addPace keeps a mean that follows the recent rounds', () => {
+  const pace = {};
+  for (let i = 0; i < 200; i++) G.addPace(pace, 'roulette', 4000);
+  for (let i = 0; i < 300; i++) G.addPace(pace, 'roulette', 1000);
+  // Older rounds lose half their weight every 100 rounds: 300 rounds on, the
+  // old 4 s pace weighs about an eighth.
+  const mean = pace.roulette.ms / pace.roulette.rounds;
+  assert.ok(mean > 1000 && mean < 1500);
+  assert.equal(pace.roulette.rounds, 200);
+});

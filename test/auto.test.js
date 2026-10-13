@@ -904,3 +904,14 @@ test('a game without a model is bought only as the first-game pick', () => {
   assert.equal(A.shopGoal(queue, 'hotfix'), queue[2]);
   assert.equal(A.shopGoal(queue, null), queue[0]);
 });
+
+test('betXpReport gives the time and the loss to the next level at each bet', () => {
+  const cells = { 20: { rounds: 50, xp: 50 }, 1000: { rounds: 50, xp: 1300 } };
+  const [small, big] = A.betXpReport(cells, 0.027, { xpLeft: 2600, msPerRound: 2000 });
+  // 2,600 XP at 1 XP a round is 2,600 rounds of 2 s; at 26 XP a round, 100 rounds.
+  assert.equal(small.levelMs, 2600 * 2000);
+  assert.equal(big.levelMs, 100 * 2000);
+  assert.ok(Math.abs(small.levelCost - 2600 * 20 * 0.027) < 1e-6);
+  assert.ok(Math.abs(big.levelCost - 2600 * (1000 / 26) * 0.027) < 1e-6);
+  assert.equal(A.betXpReport(cells, 0.027)[0].levelMs, null);
+});

@@ -84,6 +84,7 @@
     roulette: {}, // zeros level -> roulette model check (G.addRouletteSpin)
     plainXp: {}, // rows like games, only rounds played off Hackathon weekends (BotterAuto.planXpRate)
     betXp: {}, // game -> bet -> { rounds, xp }, off Hackathon weekends (G.addBetXp)
+    pace: {}, // game -> { ms, rounds } between consecutive rounds (trackPace)
     betTest: null, // { game, done } of the XP-per-bet test (betTestStep)
     hotfixTest: null, // { spins, done } of the Forbes z Chánova test (hotfixTestStep)
     work: { tickets: 0, net: 0, xp: 0 },
@@ -208,6 +209,14 @@
   const signed = new Intl.NumberFormat(locale, { maximumFractionDigits: 0, signDisplay: 'exceptZero' });
   const decimal = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
   const pct = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 });
+  const durationFormat = new Intl.DurationFormat(locale, { style: 'narrow' });
+  // A wait in whole minutes ("3h 20m"), in days and hours from 48 hours on.
+  function duration(ms) {
+    const minutes = Math.max(1, Math.round(ms / 60_000));
+    const days = minutes >= 48 * 60 ? Math.floor(minutes / 1440) : 0;
+    const hours = Math.floor((minutes - days * 1440) / 60);
+    return durationFormat.format({ days, hours, minutes: days ? 0 : minutes % 60 });
+  }
   const signedPct = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1, signDisplay: 'exceptZero' });
 
   const workOn = () => settings.enabled || settings.autoMode;
@@ -392,6 +401,7 @@
         bjStake = data.hand && !data.hand.done ? delta.stake : 0;
         G.addDelta(stats.games, delta);
         bookCombo(delta, data.player.upgrades ?? player?.upgrades);
+        if (delta.rounds > 0) trackPace(delta.game);
         if (path === '/api/roulette/spin') {
           G.addRouletteSpin(stats.roulette, (data.player.upgrades ?? player?.upgrades)?.roulette?.zeros ?? 0, request, data, delta.net);
         }
@@ -410,6 +420,17 @@
       }
     }
     render();
+  }
+
+  // Time between consecutive game rounds (G.addPace), for the time to the next
+  // level per bet. A longer gap is a pause (work, a wait, a reload), not pace.
+  const PACE_MAX_GAP_MS = 20_000;
+  let lastRoundAt = 0;
+  function trackPace(game) {
+    const now = Date.now();
+    const gap = now - lastRoundAt;
+    lastRoundAt = now;
+    if (gap <= PACE_MAX_GAP_MS) G.addPace(stats.pace, game, gap);
   }
 
   // Level curve shared by all accounts (G.recordLevel), saved only on a change.
@@ -2149,7 +2170,7 @@
           <p class="muted xp-note bettest-note"></p>
           <button type="button" class="bettest-toggle"></button>
           <table>
-            <thead><tr><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th></tr></thead>
+            <thead><tr><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th></tr></thead>
             <tbody></tbody>
           </table>
         </details>
@@ -2249,7 +2270,7 @@
       (key, i) => (ui.xpHead[i].textContent = msg(key)),
     );
     ui.betSummary.textContent = msg('panelBetTest');
-    ['colBet', 'colRounds', 'colXpPerRound', 'colXpPerCredit', 'colCostPerXp'].forEach(
+    ['colBet', 'colRounds', 'colXpPerRound', 'colCostPerXp', 'colLevelIn', 'colLevelCost'].forEach(
       (key, i) => (ui.betHead[i].textContent = msg(key)),
     );
     ui.betToggle.addEventListener('click', toggleBetTest);
@@ -2382,12 +2403,20 @@
     const { candidates, edges } = grindModel();
     const game = test?.game ?? A.cheapestGame(candidates, player.level, GRIND_UNLOCKS, edges) ?? 'roulette';
     const edge = O.edges([game], player.upgrades, blazeMode())[game] ?? null;
-    const report = A.betXpReport(stats.betXp[game], edge);
+    const pace = stats.pace[game];
+    const msPerRound = pace?.rounds ? pace.ms / pace.rounds : null;
+    const xpLeft = G.xpAhead(player, 1);
+    const report = A.betXpReport(stats.betXp[game], edge, { xpLeft, msPerRound });
     const name = msg(`game_${game}`);
     const rounds = num.format(A.BET_TEST_ROUNDS);
-    if (running && hackathonOn()) ui.betNote.textContent = msg('betTestHackathon', [name]);
-    else if (running) ui.betNote.textContent = msg('betTestRunning', [name, rounds]);
-    else ui.betNote.textContent = msg('betTestNote', [name, rounds]);
+    let note;
+    if (running && hackathonOn()) note = msg('betTestHackathon', [name]);
+    else if (running) note = msg('betTestRunning', [name, rounds]);
+    else note = msg('betTestNote', [name, rounds]);
+    const paceNote = msPerRound
+      ? msg('betTestPace', [num.format(xpLeft), decimal.format(msPerRound / 1000)])
+      : msg('betTestNoPace', [num.format(xpLeft)]);
+    ui.betNote.textContent = `${note} ${paceNote}`;
     const best = report.reduce((a, b) => ((b.rate ?? 0) > (a?.rate ?? 0) ? b : a), null);
     ui.betBody.replaceChildren(
       ...report.map((row) => {
@@ -2397,8 +2426,9 @@
           cell(credits(row.bet)),
           cell(num.format(row.rounds)),
           cell(row.xpPerRound === null ? '-' : decimal.format(row.xpPerRound)),
-          cell(row.rate === null ? '-' : decimal.format(row.rate * 100)),
           cell(row.cost === null ? '-' : decimal.format(row.cost)),
+          cell(row.levelMs === null ? '-' : duration(row.levelMs)),
+          cell(row.levelCost === null ? '-' : credits(Math.round(row.levelCost))),
         );
         return tr;
       }),

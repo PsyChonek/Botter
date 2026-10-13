@@ -273,18 +273,24 @@
   }
 
   // XP per bet level of one game, for the panel: XP per round, XP per credit
-  // wagered and credits lost per XP point at the game's edge (null without one).
-  function betXpReport(cells, edge = null) {
+  // wagered and credits lost per XP point at the game's edge (null without one),
+  // and with xpLeft (XP to the next level) and msPerRound (the measured pace)
+  // the time and the expected loss to reach it grinding at that bet.
+  function betXpReport(cells, edge = null, { xpLeft = null, msPerRound = null } = {}) {
     return Object.entries(cells ?? {})
       .map(([bet, cell]) => {
         const amount = Number(bet);
         const rate = cell.rounds > 0 && cell.xp > 0 ? cell.xp / (cell.rounds * amount) : null;
+        const xpPerRound = cell.rounds > 0 ? cell.xp / cell.rounds : null;
+        const cost = edge !== null && rate ? edge / rate : null;
         return {
           bet: amount,
           rounds: cell.rounds,
-          xpPerRound: cell.rounds > 0 ? cell.xp / cell.rounds : null,
+          xpPerRound,
           rate,
-          cost: edge !== null && rate ? edge / rate : null,
+          cost,
+          levelMs: xpLeft !== null && msPerRound && xpPerRound ? (xpLeft / xpPerRound) * msPerRound : null,
+          levelCost: xpLeft !== null && cost !== null ? xpLeft * cost : null,
         };
       })
       .sort((a, b) => a.bet - b.bet);

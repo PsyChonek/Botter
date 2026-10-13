@@ -346,8 +346,13 @@ progress shows at `chrome://on-device-internals`.
   rounds at every bet level up to the max bet, the levels in turn so a level-up or
   upgrade during the test hits them all alike (`betTestNext` in `src/auto.js`). It
   keeps the reserve but not the grinding budget, and waits out Hackathon weekends.
-  The table shows XP per round, XP per 100 credits and the loss per XP at the game's
-  edge for each bet; the bet with the most XP per credit is highlighted. The result
+  The table shows XP per round, the loss per XP at the game's edge, and the time and
+  expected loss to finish the current level grinding at that bet, from the XP left in
+  the level and the measured pace (`stats.pace`, `G.addPace`: the mean time between
+  rounds played back to back, gaps over 20 seconds left out, older rounds halving in
+  weight every 100). The bet with the most XP per credit is highlighted. The server
+  pays at least 1 XP a round (since 2026-10-09), so the smallest bet is the cheapest
+  per XP but the slowest. The result
   is logged as `bet_test_done`.
 - A small panel in the bottom-left corner of the page has Start/Stop for work and
   for games, the ticket type, the game, accuracy per answer source, AI cost and

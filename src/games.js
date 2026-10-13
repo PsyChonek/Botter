@@ -293,6 +293,21 @@
     return check;
   }
 
+  // Mean time between consecutive rounds per game: { [game]: { ms, rounds } }.
+  // Past PACE_WINDOW rounds both halve before a round is added, so the mean
+  // follows the recent pace.
+  const PACE_WINDOW = 200;
+  function addPace(pace, game, ms) {
+    const row = (pace[game] ??= { ms: 0, rounds: 0 });
+    if (row.rounds >= PACE_WINDOW) {
+      row.ms /= 2;
+      row.rounds /= 2;
+    }
+    row.ms += ms;
+    row.rounds += 1;
+    return pace;
+  }
+
   function totalNet(games) {
     return Object.values(games).reduce((sum, row) => sum + row.net, 0);
   }
@@ -342,6 +357,7 @@
     roulettePayout,
     roulettePockets,
     addRouletteSpin,
+    addPace,
     totalNet,
     profitRows,
   };

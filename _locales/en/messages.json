@@ -1221,6 +1221,31 @@
   "colCostPerXp": {
     "message": "Loss/XP"
   },
+  "colLevelIn": {
+    "message": "To level"
+  },
+  "colLevelCost": {
+    "message": "Level loss"
+  },
+  "betTestPace": {
+    "message": "To level and Level loss: grinding the $P1$ XP left in this level at that bet, at the measured $P2$ s a round.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "betTestNoPace": {
+    "message": "$P1$ XP left in this level; the time to level shows once rounds are played back to back.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
   "colState": {
     "message": "State"
   },

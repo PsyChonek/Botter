@@ -1221,6 +1221,31 @@
   "colCostPerXp": {
     "message": "Ztráta/XP"
   },
+  "colLevelIn": {
+    "message": "Do levelu"
+  },
+  "colLevelCost": {
+    "message": "Ztráta"
+  },
+  "betTestPace": {
+    "message": "Do levelu a Ztráta: dohrání $P1$ XP, které v tomto levelu chybí, tou sázkou, při naměřených $P2$ s na kolo.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "betTestNoPace": {
+    "message": "V tomto levelu chybí $P1$ XP; čas do levelu se ukáže, až se odehrají kola za sebou.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
   "colState": {
     "message": "Stav"
   },
