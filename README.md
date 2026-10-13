@@ -296,7 +296,8 @@ progress shows at `chrome://on-device-internals`.
   its shop upgrades the return to player, the share of rounds won (more back than the
   bet), the chance that 1,000 rounds end ahead and the return on a Konec kvartálu
   weekend, all from the simulation in `scripts/odds.mjs`. Roulette is an even-money bet, blackjack the bot's own strategy,
-  Blaze is listed per scatter rule. The current account's upgrades are marked.
+  Blaze is listed per scatter rule; once the recorded spins settle the rule, the other
+  table is marked as ruled out. The current account's upgrades are marked.
 - **XP per game** (panel): for each game the house edge the grinder plans with, XP per
   100 credits wagered, credits lost per XP point and its state (locked or playing at
   the chosen bet). The row the grinder plays next is highlighted.

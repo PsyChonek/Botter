@@ -1364,6 +1364,14 @@
       }
     }
   },
+  "oddsRuledOut": {
+    "message": ", ruled out by $COUNT$ recorded spins",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "colUpgrades": {
     "message": "Upgrades"
   },

@@ -492,6 +492,7 @@ async function showAccounts() {
 const O = globalThis.BotterOdds;
 const A = globalThis.BotterAuto;
 const oddsRows = [];
+const blazeSummaries = {}; // scatter rule -> its odds table summary, see markBlazeRule
 
 function buildOdds() {
   const groups = [];
@@ -503,6 +504,7 @@ function buildOdds() {
       summary.textContent = mode
         ? msg('oddsGameRule', [msg(`game_${game}`), msg(`scatter_${mode}`), num.format(rows.length)])
         : msg('oddsGame', [msg(`game_${game}`), num.format(rows.length)]);
+      if (mode) blazeSummaries[mode] = summary;
       const head = document.createElement('tr');
       for (const key of ['colUpgrades', 'colRtp', 'colRoundWon', 'colAhead1000', 'colWinsRtp']) {
         const th = document.createElement('th');
@@ -538,6 +540,18 @@ function buildOdds() {
   $('oddsTables').replaceChildren(...groups);
 }
 
+// Once the recorded spins settle the Blaze star rule (BotterOdds.blazeDecided),
+// the other rule's odds table says it is ruled out: its returns never happen.
+async function markBlazeRule() {
+  const { spins = [] } = await chrome.storage.local.get('spins');
+  const check = Z.checkSpins(spins);
+  if (!O.blazeDecided(check)) return;
+  const kept = O.blazeMode(check);
+  for (const [mode, summary] of Object.entries(blazeSummaries)) {
+    if (mode !== kept) summary.textContent += msg('oddsRuledOut', [num.format(check[mode].total)]);
+  }
+}
+
 function markOdds(accounts) {
   const last = Object.values(accounts).reduce((a, b) => ((b.seenAt ?? 0) > (a?.seenAt ?? 0) ? b : a), null);
   for (const { game, upgrades, tr } of oddsRows) {
@@ -550,6 +564,7 @@ function markOdds(accounts) {
 }
 
 buildOdds();
+markBlazeRule();
 
 // Level curve seen by the bot (G.recordLevel): XP per level, its growth over the
 // level below, the level-up reward and the daily bonus at a 7-day streak.

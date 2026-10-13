@@ -1364,6 +1364,14 @@
       }
     }
   },
+  "oddsRuledOut": {
+    "message": ", vyloučeno $COUNT$ zaznamenanými zatočeními",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
   "colUpgrades": {
     "message": "Vylepšení"
   },
