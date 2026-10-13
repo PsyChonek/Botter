@@ -344,7 +344,8 @@
   function upgradeVerdict(offer, ctx) {
     const { game } = offer;
     const now = (g) => ctx.edge(g, ctx.upgrades);
-    if (now(game) === null) return null;
+    // A game without a validated model is bought only as the first-game pick.
+    if (now(game) === null) return 'noModel';
     // Credits put into the wrong final game are lost, so nothing is bought until it is known.
     if (ctx.finalUnknown) return 'starRule';
     if (!ctx.games.includes(game)) return 'notGrinded';

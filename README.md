@@ -262,10 +262,12 @@ progress shows at `chrome://on-device-internals`.
   shows the next upgrade (the goal, or with none the first spare one), its price, the
   balance it is bought at (the floor, the price and the leveling cushion) and how much is
   still missing, then why every other upgrade waits. With
-  **Buy Blaze 20 Wild upgrades first** (on by default) the goal is the cheapest Blaze
-  upgrade the player level allows, whatever its verdict, and spare credits also go to
-  Blaze before any other game; the plan above takes over once Blaze is maxed or waits
-  for a level. The grinder saves only for a goal the plan itself would buy, so a Blaze
+  **Buy this game's upgrades first** (`firstGame`, Forbes z Chánova by default, or Blaze
+  20 Wild, or none) the goal is the cheapest upgrade of that game the player level
+  allows, whatever its verdict, and spare credits also go to it before any other game;
+  the plan above takes over once it is maxed or waits for a level. Forbes upgrades are
+  in the plan but without a model their verdict is `noModel`, so only this setting buys
+  them. The grinder saves only for a goal the plan itself would buy, so a first-game
   goal the plan skips is bought when the credits are there and grinding never waits for it. Skips
   are logged as `upgrades_skipped`; a Blaze model check (`src/blaze.js`) that records every Blaze spin
   with its board and the server win, reports which scatter rule reproduces the
@@ -298,16 +300,23 @@ progress shows at `chrome://on-device-internals`.
   weekend, all from the simulation in `scripts/odds.mjs`. Roulette is an even-money bet, blackjack the bot's own strategy,
   Blaze is listed per scatter rule; once the recorded spins settle the rule, the other
   table is marked as ruled out. The current account's upgrades are marked.
-- **Forbes z Chánova** (from level 13, game bot only): a Megaways slot with cascades,
-  the Hotfix wheel of modifiers and free spins on 4+ incidents. When free spins start,
-  the bot plays them at once with Postupný rollout (`HOTFIX_CHOICE`). The grinder never
-  picks it and the shop plan never buys its upgrades: it has no validated model yet.
+- **Forbes z Chánova** (from level 13): a Megaways slot with cascades, the Hotfix
+  wheel of modifiers and free spins on 4+ incidents. When free spins start, the bot
+  plays them at once with Postupný rollout (`HOTFIX_CHOICE`). The grinder never picks
+  it: it has no validated model yet. It is played by the game bot when picked there, and
+  by the **Forbes z Chánova test** in the panel, started by hand: 500 spins at the
+  smallest bet in auto mode with games on, keeping the reserve (`hotfixTestStep`).
   `scripts/hotfix-sim.mjs` simulates it from the client's tables, but the client does
   not show how the free-spin multiplier grows (per winning spin or per cascade step)
   or how big the modifiers are, and that moves the return from about 80 % to 102 %
   unupgraded. Every spin and free-spin response, from the bot or played by hand, is
   recorded (`hotfixRounds`, up to 800, free-spin games kept first) and can be exported
   from the settings (Data tab) to settle those against the server.
+  **Forbes force** (panel, off by default) sends the server's test switch `force` on
+  every Forbes spin the bot plays (the client has the field but never sets it). The
+  value field is read as JSON (`4`, `true`, `"free"`), anything else is sent as text,
+  and an empty field sends `true`. Forced spins are booked and recorded like any
+  other, with the force in the recorded request, so drop them before checking the model.
 - **XP per game** (panel): for each game the house edge the grinder plans with, XP per
   100 credits wagered, credits lost per XP point and its state (locked or playing at
   the chosen bet). The row the grinder plays next is highlighted.

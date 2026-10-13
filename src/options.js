@@ -16,7 +16,6 @@ const CHECKBOXES = [
   'buyUpgrades',
   'saveForUpgrades',
   'spareUpgrades',
-  'blazeFirst',
   'recordSpins',
   'learnBlaze',
   'captureDebug',
@@ -24,7 +23,7 @@ const CHECKBOXES = [
   'rotateAccounts',
   'playOnScreen',
 ];
-const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet', 'grindLimit', 'grindGame'];
+const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet', 'grindLimit', 'grindGame', 'firstGame'];
 const BET_SELECTS = ['gameBet', 'crashBet', 'grindBet', 'lotteryPrice'];
 const INT_SELECTS = [...BET_SELECTS, 'huntRoundsGoal'];
 const TEXTS = ['openrouterModel'];
@@ -69,7 +68,7 @@ const DEFAULTS = {
   buyUpgrades: false,
   saveForUpgrades: true,
   spareUpgrades: true,
-  blazeFirst: true,
+  firstGame: 'hotfix',
   recordSpins: true,
   learnBlaze: true,
   captureDebug: false,
@@ -122,6 +121,8 @@ for (const rounds of globalThis.BotterAuto.HUNT_ROUNDS_TIERS) field('huntRoundsG
 for (const key of G.ROULETTE_BETS) field('rouletteBet').add(new Option(msg(`roulette_${key}`), key));
 field('grindGame').add(new Option(msg('grind_auto'), 'auto'));
 for (const game of G.GAME_KEYS) field('grindGame').add(new Option(msg(`game_${game}`), game));
+field('firstGame').add(new Option(msg('firstGame_none'), ''));
+for (const game of ['hotfix', 'blaze']) field('firstGame').add(new Option(msg(`game_${game}`), game));
 
 async function load() {
   const { settings = {}, apiKey = '', openrouterKey = '', bank = {} } = await chrome.storage.local.get([

@@ -284,6 +284,12 @@
   "panelOnScreen": {
     "message": "Hrát na obrazovce hry"
   },
+  "panelHotfixForce": {
+    "message": "Forbes force"
+  },
+  "panelHotfixForceHint": {
+    "message": "Posílá se jako force při každém točení Forbes z Chánova, které hraje bot. Čte se jako JSON (4, true, \"free\"); prázdné pole pošle true."
+  },
   "optionsPlayOnScreen": {
     "message": "Hrát na obrazovce hry: bot otevře hru a mačká její tlačítka, takže každé kolo je vidět. Pomalejší než hraní přes API."
   },
@@ -1238,6 +1244,59 @@
   "betTestStop": {
     "message": "Zastavit test"
   },
+  "panelHotfixTest": {
+    "message": "Test Forbes z Chánova"
+  },
+  "hotfixTestNote": {
+    "message": "Odehraje $P1$ zatočení se sázkou $P2$ a ověří model hry proti serveru. Běží v automatickém režimu se zapnutými hrami a drží rezervu. Farmení Forbes nehraje, dokud model není ověřený a nevychází lépe než ruleta.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "hotfixTestRunning": {
+    "message": "Testuji: $P1$ z $P2$ zatočení.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "hotfixRecorded": {
+    "message": "Zaznamenáno: $P1$ zatočení, $P2$ her s free spiny.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "hotfixTestStart": {
+    "message": "Spustit test Forbes"
+  },
+  "hotfixTestStop": {
+    "message": "Zastavit test Forbes"
+  },
+  "statusHotfixTest": {
+    "message": "Testuji Forbes z Chánova, zatočení $P1$ z $P2$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
   "colBet": {
     "message": "Sázka"
   },
@@ -1272,11 +1331,14 @@
   "optionsSpareUpgrades": {
     "message": "Kupovat ostatní vylepšení z přebytku, s rezervou na další level"
   },
-  "optionsBlazeFirst": {
-    "message": "Kupovat vylepšení Blaze 20 Wild jako první, před vším ostatním a bez ohledu na plán XP"
-  },
   "optionsSaveForUpgrades": {
     "message": "Šetřit na další vylepšení místo protočení jeho ceny"
+  },
+  "optionsFirstGame": {
+    "message": "Kupovat vylepšení této hry jako první, před vším ostatním a bez ohledu na plán XP"
+  },
+  "firstGame_none": {
+    "message": "Žádná, podle plánu XP"
   },
   "panelShop": {
     "message": "Fronta vylepšení"
@@ -1361,6 +1423,9 @@
   },
   "shopState_xpFarmingBetter": {
     "message": "grind vynese víc"
+  },
+  "shopState_noModel": {
+    "message": "zatím bez modelu"
   },
   "optionsOddsHeading": {
     "message": "Šance podle vylepšení"

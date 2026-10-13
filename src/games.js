@@ -73,6 +73,7 @@
   const UPGRADE_PLAN = [
     'blaze:star', 'skeleton:team', 'blaze:lucky', 'blaze:wild', 'skeleton:wild', 'slotingi:gulas', 'skeleton:deploy',
     'slotingi:crown', 'roulette:zeros', 'blackjack:ties', 'blackjack:bjpay',
+    'hotfix:review', 'hotfix:oncall', 'hotfix:fix',
   ].map((entry) => {
     const [game, key] = entry.split(':');
     return { game, key };

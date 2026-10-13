@@ -892,3 +892,15 @@ test('betXpReport gives XP per round, per credit and the loss per XP by bet', ()
   assert.equal(report[2].rate, 0.03);
   assert.equal(A.betXpReport({ 20: { rounds: 1, xp: 3 } })[0].cost, null);
 });
+
+test('a game without a model is bought only as the first-game pick', () => {
+  const offer = { game: 'hotfix', key: 'review', next: 1, price: 7000 };
+  assert.equal(A.upgradeVerdict(offer, { edge: () => null, upgrades: {} }), 'noModel');
+  const queue = [
+    { game: 'roulette', key: 'zeros', next: 1, price: 15000, reason: null },
+    { game: 'hotfix', key: 'oncall', next: 1, price: 9000, reason: 'noModel' },
+    { game: 'hotfix', key: 'review', next: 1, price: 7000, reason: 'noModel' },
+  ];
+  assert.equal(A.shopGoal(queue, 'hotfix'), queue[2]);
+  assert.equal(A.shopGoal(queue, null), queue[0]);
+});

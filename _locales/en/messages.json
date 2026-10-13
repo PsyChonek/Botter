@@ -284,6 +284,12 @@
   "panelOnScreen": {
     "message": "Play on the game screen"
   },
+  "panelHotfixForce": {
+    "message": "Forbes force"
+  },
+  "panelHotfixForceHint": {
+    "message": "Sent as force on every Forbes z Chánova spin the bot plays. Read as JSON (4, true, \"free\"); an empty field sends true."
+  },
   "optionsPlayOnScreen": {
     "message": "Play on the game screen: the bot opens the game and presses its buttons, so every round animates. Slower than playing through the API."
   },
@@ -1238,6 +1244,59 @@
   "betTestStop": {
     "message": "Stop the test"
   },
+  "panelHotfixTest": {
+    "message": "Forbes z Chánova test"
+  },
+  "hotfixTestNote": {
+    "message": "Plays $P1$ spins at $P2$ to check the game model against the server. Runs in auto mode with games on and keeps the reserve. The grinder never plays Forbes until its model is checked and beats roulette.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "hotfixTestRunning": {
+    "message": "Testing: $P1$ of $P2$ spins.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "hotfixRecorded": {
+    "message": "Recorded: $P1$ spins, $P2$ free-spin games.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "hotfixTestStart": {
+    "message": "Start the Forbes test"
+  },
+  "hotfixTestStop": {
+    "message": "Stop the Forbes test"
+  },
+  "statusHotfixTest": {
+    "message": "Testing Forbes z Chánova, spin $P1$ of $P2$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
   "colBet": {
     "message": "Bet"
   },
@@ -1272,11 +1331,14 @@
   "optionsSpareUpgrades": {
     "message": "Buy the other upgrades from spare credits, keeping enough to reach the next level"
   },
-  "optionsBlazeFirst": {
-    "message": "Buy Blaze 20 Wild upgrades first, before anything else and whatever the XP plan says"
-  },
   "optionsSaveForUpgrades": {
     "message": "Save for the next upgrade instead of grinding its price away"
+  },
+  "optionsFirstGame": {
+    "message": "Buy this game's upgrades first, before anything else and whatever the XP plan says"
+  },
+  "firstGame_none": {
+    "message": "None, follow the XP plan"
   },
   "panelShop": {
     "message": "Upgrade queue"
@@ -1361,6 +1423,9 @@
   },
   "shopState_xpFarmingBetter": {
     "message": "grinding pays more"
+  },
+  "shopState_noModel": {
+    "message": "no model yet"
   },
   "optionsOddsHeading": {
     "message": "Odds per upgrade"

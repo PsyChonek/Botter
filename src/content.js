@@ -29,6 +29,8 @@
     reserve: 0,
     gameDelayMs: 800,
     playOnScreen: false,
+    hotfixForce: false, // test switch: send hotfixForceValue as force on every Forbes z Chánova spin
+    hotfixForceValue: '',
     autoClaim: true,
     autoMode: false,
     repayDebt: true,
@@ -59,7 +61,7 @@
     buyUpgrades: false,
     saveForUpgrades: true,
     spareUpgrades: true,
-    blazeFirst: true,
+    firstGame: 'hotfix', // game whose upgrades are bought first (shopPriority), '' for none
     recordSpins: true,
     learnBlaze: true,
     captureDebug: false,
@@ -81,6 +83,7 @@
     plainXp: {}, // rows like games, only rounds played off Hackathon weekends (BotterAuto.planXpRate)
     betXp: {}, // game -> bet -> { rounds, xp }, off Hackathon weekends (G.addBetXp)
     betTest: null, // { game, done } of the XP-per-bet test (betTestStep)
+    hotfixTest: null, // { spins, done } of the Forbes z Chánova test (hotfixTestStep)
     work: { tickets: 0, net: 0, xp: 0 },
     free: { daily: 0, bailout: 0 },
     crashBooked: [],
@@ -99,6 +102,10 @@
   // Free-spin option the bot picks in Forbes z Chánova: Postupný rollout (12
   // spins from x1), the best in every variant of the simulation.
   const HOTFIX_CHOICE = 0;
+  // Spins the Forbes test plays: enough for a few free-spin games (about 1 in
+  // 180 spins) to show how the server grows their multiplier and sizes the
+  // Hotfix modifiers. Spins played by hand during the test count too.
+  const HOTFIX_TEST_SPINS = 500;
   const MAX_CAPTURE = 40;
   const SPIN_FLUSH_EVERY = 10;
   const CAPTURE_PATHS = /^\/api\/(loan|crash|shop|leaderboard|bonus|wheel)/;
@@ -358,6 +365,7 @@
     if (data?.by === 'sprint' && Array.isArray(data.entries)) readSprint(data);
     if (path === '/api/slot/spin' && data.result) recordSpin(request, data);
     if (path === '/api/hotfix/spin' || path === '/api/hotfix/free') recordHotfix(path, request, data);
+    if (path === '/api/hotfix/spin' && stats.hotfixTest && !stats.hotfixTest.done) stats.hotfixTest.spins += 1;
 
     if (path === '/api/work/start' && data.task) {
       task = data.task;
@@ -1106,12 +1114,30 @@
   async function playHotfix(bet) {
     const free = () => api('/api/hotfix/free', { choice: HOTFIX_CHOICE });
     if (player.hotfixFree) return free();
-    const res = await api(G.GAMES.hotfix.path, { bet });
+    const body = { bet };
+    if (settings.hotfixForce) {
+      body.force = hotfixForceValue(settings.hotfixForceValue);
+      log.info('hotfix_forced', { bet, force: body.force });
+    }
+    const res = await api(G.GAMES.hotfix.path, body);
     if (!res.ok || !res.data.player?.hotfixFree) return res;
     await sleep(settings.gameDelayMs);
     const paid = await free();
     if (!paid.ok) log.warn('hotfix_free_failed', { status: paid.status, error: paid.data?.error });
     return paid.ok ? paid : res;
+  }
+
+  // The server's test switch for Forbes z Chánova spins (the client sends it as
+  // force but never sets it). The field is read as JSON, so 4, true or "free"
+  // keep their type; anything else is sent as text and an empty field as true.
+  function hotfixForceValue(text) {
+    const value = text.trim();
+    if (!value) return true;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
   }
 
   async function gameStep() {
@@ -1369,7 +1395,7 @@
   // worth buying at this level. Changes are logged, not every review.
   function reviewShop() {
     if (!settings.buyUpgrades || !player) return (shopReview = null);
-    const key = JSON.stringify([accountId, player.level, player.upgrades, bankruptPlanned(), blazeRule().mode, blazeRule().decided, settings.learnBlaze, settings.blazeFirst, Number(planXpRate()?.toFixed(3))]);
+    const key = JSON.stringify([accountId, player.level, player.upgrades, bankruptPlanned(), blazeRule().mode, blazeRule().decided, settings.learnBlaze, settings.firstGame, Number(planXpRate()?.toFixed(3))]);
     if (shopReview?.key === key && Date.now() - shopReview.at < SHOP_REVIEW_MS) return shopReview;
     const queue = G.shopQueue(G.UPGRADE_PLAN, player, upgradeSkip);
     const goal = A.shopGoal(queue, shopPriority());
@@ -1384,8 +1410,8 @@
   }
 
   // Game whose upgrades are bought before any other, whatever their verdict
-  // (Blaze with the Blaze-first setting on), or null.
-  const shopPriority = () => (settings.blazeFirst ? 'blaze' : null);
+  // (the first-game setting), or null.
+  const shopPriority = () => settings.firstGame || null;
 
   // The goal upgrade when it is affordable (goalNeed), or else a spare one
   // (spareOffer), or null. Nothing is bought before the XP rate is measured:
@@ -1898,6 +1924,44 @@
     return true;
   }
 
+  // ---------- Forbes z Chánova test ----------
+
+  // Starts the Forbes test, or stops a running one. Nothing else plays Forbes:
+  // it has no validated model, so the grinder never picks it.
+  function toggleHotfixTest() {
+    if (!player) return;
+    const running = stats.hotfixTest && !stats.hotfixTest.done;
+    stats.hotfixTest = running ? { ...stats.hotfixTest, done: true } : { spins: 0, done: false };
+    log.info(running ? 'hotfix_test_stopped' : 'hotfix_test_started', { spins: stats.hotfixTest.spins });
+    saveStats();
+    render();
+  }
+
+  // Plays the Forbes test at the smallest bet, recording every round
+  // (recordHotfix). It keeps the reserve but not the grinding budget.
+  async function hotfixTestStep() {
+    const test = stats.hotfixTest;
+    if (!test || test.done || Date.now() < grindPausedUntil) return false;
+    if (test.spins >= HOTFIX_TEST_SPINS) {
+      stats.hotfixTest = { ...test, done: true };
+      saveStats();
+      log.info('hotfix_test_done', { spins: test.spins });
+      render();
+      return false;
+    }
+    const bet = G.BET_LEVELS[0];
+    if (player.level < G.GAMES.hotfix.unlock || player.credits - bet < limits().reserve) return false;
+    setStatus('statusHotfixTest', [num.format(test.spins), num.format(HOTFIX_TEST_SPINS)]);
+    const res = await playRound('hotfix', bet);
+    if (!res.ok) {
+      log.warn('hotfix_test_failed', { status: res.status, error: res.data?.error });
+      grindError = res.data?.error ?? String(res.status);
+      grindPausedUntil = Date.now() + CLAIM_RETRY_MS;
+    }
+    await sleep(settings.gameDelayMs);
+    return true;
+  }
+
   async function autoStep() {
     if (!player) return loadPlayer();
     if (await bankruptStep()) return;
@@ -1915,6 +1979,7 @@
     if (settings.autoWork && workAvailable()) return workStep();
     if (games && (await edgeStep())) return;
     if (games && (await betTestStep())) return;
+    if (games && (await hotfixTestStep())) return;
     if (games && (await huntStep())) return;
     if (games && (await grindStep())) return;
     if (await rotateStep()) return;
@@ -1988,9 +2053,10 @@
         .row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
         .title { font-weight: 700; flex: 1; }
         .grow { flex: 1; min-width: 0; }
-        button, select { font: inherit; color: inherit; background: #1f3010; border: 1px solid #7aa02c;
+        button, select, input { font: inherit; color: inherit; background: #1f3010; border: 1px solid #7aa02c;
           border-radius: 6px; padding: 4px 8px; cursor: pointer; }
-        button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid #d4ff6a; outline-offset: 1px; }
+        input { cursor: text; width: 70px; }
+        button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid #d4ff6a; outline-offset: 1px; }
         button.on { background: #7aa02c; color: #101a08; }
         .auto-switches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 6px; }
         .auto-switches button { padding: 3px 4px; }
@@ -2042,6 +2108,11 @@
           <span class="muted grow screen-label"></span>
           <button type="button" class="screen-toggle"></button>
         </div>
+        <div class="row">
+          <label class="muted grow" for="hotfix-force"></label>
+          <input id="hotfix-force" type="text" autocomplete="off" spellcheck="false" />
+          <button type="button" class="force-toggle"></button>
+        </div>
         <div class="auto-label muted"></div>
         <div class="auto-switches" role="group"></div>
         <div class="status" role="status" aria-live="polite"></div>
@@ -2071,6 +2142,11 @@
             <tbody></tbody>
           </table>
         </details>
+        <details class="hotfix">
+          <summary></summary>
+          <p class="muted xp-note hotfix-note"></p>
+          <button type="button" class="bettest-toggle hotfix-toggle"></button>
+        </details>
         <details class="shop">
           <summary></summary>
           <p class="muted xp-note shop-goal"></p>
@@ -2099,6 +2175,9 @@
       gamesToggle: $('.games-toggle'),
       screenLabel: $('.screen-label'),
       screenToggle: $('.screen-toggle'),
+      forceLabel: $('label[for="hotfix-force"]'),
+      forceValue: $('#hotfix-force'),
+      forceToggle: $('.force-toggle'),
       autoLabel: $('.auto-label'),
       autoSwitches: $('.auto-switches'),
       status: $('.status'),
@@ -2116,6 +2195,9 @@
       betToggle: $('.bettest-toggle'),
       betHead: [...shadow.querySelectorAll('.bettest th')],
       betBody: $('.bettest tbody'),
+      hotfixSummary: $('.hotfix summary'),
+      hotfixNote: $('.hotfix-note'),
+      hotfixToggle: $('.hotfix-toggle'),
       shop: $('.shop'),
       shopSummary: $('.shop summary'),
       shopGoal: $('.shop-goal'),
@@ -2134,6 +2216,9 @@
     ui.typeLabel.textContent = msg('panelWork');
     ui.gameLabel.textContent = msg('panelGames');
     ui.screenLabel.textContent = msg('panelOnScreen');
+    ui.forceLabel.textContent = msg('panelHotfixForce');
+    ui.forceValue.placeholder = 'true';
+    ui.forceValue.title = msg('panelHotfixForceHint');
     ui.autoLabel.textContent = msg('panelAutoParts');
     ui.autoSwitches.setAttribute('aria-label', msg('panelAutoParts'));
     for (const [name, key] of AUTO_SWITCHES) {
@@ -2156,6 +2241,8 @@
       (key, i) => (ui.betHead[i].textContent = msg(key)),
     );
     ui.betToggle.addEventListener('click', toggleBetTest);
+    ui.hotfixSummary.textContent = msg('panelHotfixTest');
+    ui.hotfixToggle.addEventListener('click', toggleHotfixTest);
     ui.shopSummary.textContent = msg('panelShop');
     ['colUpgrade', 'colLevel', 'colPrice', 'colState'].forEach((key, i) => (ui.shopHead[i].textContent = msg(key)));
     for (const option of ui.type.options) option.textContent = msg(`type_${option.value}`);
@@ -2175,6 +2262,8 @@
     ui.workToggle.addEventListener('click', () => (settings.enabled ? stopWork() : startWork()));
     ui.gamesToggle.addEventListener('click', () => (settings.gamesEnabled ? stopGames() : startGames()));
     ui.screenToggle.addEventListener('click', () => saveSettings({ playOnScreen: !settings.playOnScreen }));
+    ui.forceToggle.addEventListener('click', () => saveSettings({ hotfixForce: !settings.hotfixForce }));
+    ui.forceValue.addEventListener('change', () => saveSettings({ hotfixForceValue: ui.forceValue.value }));
     ui.type.addEventListener('change', () => saveSettings({ taskType: ui.type.value }));
     ui.game.addEventListener('change', () => saveSettings({ game: ui.game.value }));
     document.documentElement.appendChild(host);
@@ -2250,6 +2339,20 @@
         return tr;
       }),
     );
+  }
+
+  // Forbes z Chánova test: its progress and what has been recorded so far.
+  function renderHotfixTest() {
+    const test = stats.hotfixTest;
+    const running = Boolean(test && !test.done);
+    ui.hotfixToggle.textContent = msg(running ? 'hotfixTestStop' : 'hotfixTestStart');
+    ui.hotfixToggle.disabled = !player || player.level < G.GAMES.hotfix.unlock;
+    const free = hotfixRounds.filter((round) => round.path === '/api/hotfix/free').length;
+    const recorded = msg('hotfixRecorded', [num.format(hotfixRounds.length - free), num.format(free)]);
+    const state = running
+      ? msg('hotfixTestRunning', [num.format(test.spins), num.format(HOTFIX_TEST_SPINS)])
+      : msg('hotfixTestNote', [num.format(HOTFIX_TEST_SPINS), credits(G.BET_LEVELS[0])]);
+    ui.hotfixNote.textContent = `${state} ${recorded}`;
   }
 
   // XP per bet level of the tested game (the grind game before any test), the
@@ -2403,6 +2506,11 @@
     ui.screenToggle.classList.toggle('on', settings.playOnScreen);
     ui.screenToggle.setAttribute('aria-pressed', String(settings.playOnScreen));
     ui.screenToggle.setAttribute('aria-label', msg('panelOnScreen'));
+    ui.forceToggle.textContent = msg(settings.hotfixForce ? 'panelOn' : 'panelOff');
+    ui.forceToggle.classList.toggle('on', settings.hotfixForce);
+    ui.forceToggle.setAttribute('aria-pressed', String(settings.hotfixForce));
+    ui.forceToggle.setAttribute('aria-label', msg('panelHotfixForce'));
+    if (ui.forceValue !== ui.forceValue.getRootNode().activeElement) ui.forceValue.value = settings.hotfixForceValue;
     for (const button of ui.autoSwitches.children) {
       const on = !!settings[button.dataset.setting];
       button.classList.toggle('on', on);
@@ -2424,6 +2532,7 @@
     renderProfit();
     renderXp();
     renderBetTest();
+    renderHotfixTest();
     renderShop();
   }
 
