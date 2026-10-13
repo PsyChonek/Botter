@@ -915,3 +915,17 @@ test('betXpReport gives the time and the loss to the next level at each bet', ()
   assert.ok(Math.abs(big.levelCost - 2600 * (1000 / 26) * 0.027) < 1e-6);
   assert.equal(A.betXpReport(cells, 0.027)[0].levelMs, null);
 });
+
+test('testBet picks the most XP per credit among fully tested bets, the bigger on a tie', () => {
+  const cells = {
+    20: { rounds: 50, xp: 50 }, // 5 XP per 100 credits
+    100: { rounds: 50, xp: 135 },
+    1000: { rounds: 76, xp: 1966 },
+  };
+  assert.equal(A.testBet(cells), 20);
+  // A bet with fewer than a test's rounds does not count, however good it looks.
+  assert.equal(A.testBet({ ...cells, 40: { rounds: 3, xp: 30 } }), 20);
+  assert.equal(A.testBet({ 20: { rounds: 50, xp: 50 }, 40: { rounds: 50, xp: 100 } }), 40);
+  assert.equal(A.testBet({}), null);
+  assert.equal(A.testBet(undefined), null);
+});

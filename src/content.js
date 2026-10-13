@@ -59,6 +59,7 @@
     grindMinBalance: 0,
     grindGame: 'auto',
     grindBet: 20,
+    grindBetFromTest: false, // grind at the bet the XP per bet test found cheapest (wantedGrindBet)
     buyUpgrades: false,
     saveForUpgrades: true,
     spareUpgrades: true,
@@ -1501,8 +1502,18 @@
     if (!game) return 0;
     const edge = learning ? O.edges([game], player.upgrades, blazeMode())[game] : edges[game];
     const variance = O.variances([game], player.upgrades, blazeMode())[game];
-    const bet = learning ? G.BET_LEVELS[0] : Number(settings.grindBet) || G.BET_LEVELS[0];
+    const bet = learning ? G.BET_LEVELS[0] : wantedGrindBet(candidates, edges);
     return A.levelUpCushion(G.xpAhead(player, A.MARGIN_LEVELS), rate, edge, bet, variance, A.MARGIN_SIGMAS);
+  }
+
+  // The bet the grinder wants before its limits: the one picked in the settings,
+  // or with grindBetFromTest the one the XP per bet test found cheapest on the
+  // game it grinds (BotterAuto.testBet), the picked one until that test has data.
+  function wantedGrindBet(candidates, edges) {
+    const picked = Number(settings.grindBet) || G.BET_LEVELS[0];
+    if (!settings.grindBetFromTest) return picked;
+    const game = A.cheapestGame(candidates, player.level, GRIND_UNLOCKS, edges);
+    return A.testBet(stats.betXp[game]) ?? picked;
   }
 
   // The goal upgrade the grinder leaves credits for, or null. Its verdict says
@@ -1838,7 +1849,7 @@
     const { budget, lost } = A.grindBudget(stats.grind, limit.xpBudget, event, now);
     if (A.grindHold(event, now)) return { lost, levels, candidates, edges, plan: null };
     const learning = learningBlaze();
-    const wanted = learning ? G.BET_LEVELS[0] : Number(settings.grindBet) || G.BET_LEVELS[0];
+    const wanted = learning ? G.BET_LEVELS[0] : wantedGrindBet(candidates, edges);
     const bet = A.grindBet({ ...limit, xpBudget: budget }, player.credits, lost, levels, wanted);
     if (learning) return { lost, levels, candidates, edges, plan: bet ? { game: 'blaze', bet } : null };
     // On a Konec kvartálu weekend the bonus on wins lowers each game's loss by its own amount.
@@ -2169,6 +2180,10 @@
           <summary></summary>
           <p class="muted xp-note bettest-note"></p>
           <button type="button" class="bettest-toggle"></button>
+          <div class="row grind-bet-row">
+            <label class="muted grow" for="grind-bet"></label>
+            <select id="grind-bet"></select>
+          </div>
           <table>
             <thead><tr><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th></tr></thead>
             <tbody></tbody>
@@ -2226,6 +2241,8 @@
       betSummary: $('.bettest summary'),
       betNote: $('.bettest-note'),
       betToggle: $('.bettest-toggle'),
+      grindBetLabel: $('label[for="grind-bet"]'),
+      grindBet: $('#grind-bet'),
       betHead: [...shadow.querySelectorAll('.bettest th')],
       betBody: $('.bettest tbody'),
       hotfixSummary: $('.hotfix summary'),
@@ -2274,6 +2291,13 @@
       (key, i) => (ui.betHead[i].textContent = msg(key)),
     );
     ui.betToggle.addEventListener('click', toggleBetTest);
+    ui.grindBetLabel.textContent = msg('panelGrindBet');
+    ui.grindBet.add(new Option('', 'test'));
+    for (const bet of G.BET_LEVELS) ui.grindBet.add(new Option(credits(bet), String(bet)));
+    ui.grindBet.addEventListener('change', () => {
+      const value = ui.grindBet.value;
+      saveSettings(value === 'test' ? { grindBetFromTest: true } : { grindBetFromTest: false, grindBet: Number(value) });
+    });
     ui.hotfixSummary.textContent = msg('panelHotfixTest');
     ui.hotfixToggle.addEventListener('click', toggleHotfixTest);
     ui.shopSummary.textContent = msg('panelShop');
@@ -2418,6 +2442,9 @@
       : msg('betTestNoPace', [num.format(xpLeft)]);
     ui.betNote.textContent = `${note} ${paceNote}`;
     const best = report.reduce((a, b) => ((b.rate ?? 0) > (a?.rate ?? 0) ? b : a), null);
+    const found = A.testBet(stats.betXp[game]);
+    ui.grindBet.options[0].textContent = found ? msg('panelGrindBetTest', [credits(found)]) : msg('panelGrindBetNoTest');
+    ui.grindBet.value = settings.grindBetFromTest ? 'test' : String(settings.grindBet);
     ui.betBody.replaceChildren(
       ...report.map((row) => {
         const tr = document.createElement('tr');

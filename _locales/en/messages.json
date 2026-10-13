@@ -701,6 +701,9 @@
   "optionsGrindBet": {
     "message": "XP grinding bet"
   },
+  "optionsGrindBetFromTest": {
+    "message": "Grind at the bet the XP per bet test found cheapest (the bet above until the test has data)"
+  },
   "optionsGrindHint": {
     "message": "Auto game picks the unlocked game with the lowest simulated house edge at your upgrades. XP per round is proportional to the bet, so every bet level costs the same per XP: the bet only sets how fast XP comes in and how much rides on one round. Near a limit the grinder steps down to a smaller bet, and under a daily budget it never bets more than is left of it."
   },
@@ -1226,6 +1229,20 @@
   },
   "colLevelCost": {
     "message": "Level loss"
+  },
+  "panelGrindBet": {
+    "message": "Grind bet"
+  },
+  "panelGrindBetTest": {
+    "message": "Test result ($P1$)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "panelGrindBetNoTest": {
+    "message": "Test result (not tested)"
   },
   "betTestPace": {
     "message": "To level and Level loss: grinding the $P1$ XP left in this level at that bet, at the measured $P2$ s a round.",

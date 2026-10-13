@@ -87,10 +87,13 @@ progress shows at `chrome://on-device-internals`.
   Skeleton Slots about 71 % to 94 %, Blaze about 63 % to 95 % (or 67 % to 108 % if the
   star scatter counts symbols; the Blaze model check decides once 50 spins are
   recorded, until then the lower rule is used). A game without a model is
-  never picked. XP per round is proportional
-  to the bet the same way in every game, so the grinder plays the unlocked game with the
-  lowest simulated edge, every bet level costs the same per XP and the bet is simply the
-  one picked in the settings. The panel shows each game's XP per credit and loss per XP
+  never picked. XP per round grows with the bet the same way in every game, so the
+  grinder plays the unlocked game with the lowest simulated edge. Every round pays at
+  least 1 XP (since 2026-10-09), so small bets can be cheaper per XP (see XP per bet);
+  the bet is the one picked in the settings, or with **Grind at the bet the XP per bet
+  test found cheapest** (`grindBetFromTest`, off by default) the bet with the most XP
+  per credit in that test (`A.testBet`, bets with a full test's rounds, the bigger on a
+  tie), the picked one until the test has data. The panel shows each game's XP per credit and loss per XP
   measured from its tracked rounds, for information only. Near a limit the grinder
   steps down to a smaller bet; under a daily budget it never bets more than what is
   left of it.
@@ -352,7 +355,8 @@ progress shows at `chrome://on-device-internals`.
   rounds played back to back, gaps over 20 seconds left out, older rounds halving in
   weight every 100). The bet with the most XP per credit is highlighted. The server
   pays at least 1 XP a round (since 2026-10-09), so the smallest bet is the cheapest
-  per XP but the slowest. The result
+  per XP but the slowest. **Grind bet** under the test picks what the grinder bets:
+  the test result or a fixed size (the same settings as on the Auto tab). The result
   is logged as `bet_test_done`.
 - A small panel in the bottom-left corner of the page has Start/Stop for work and
   for games, the ticket type, the game, accuracy per answer source, AI cost and

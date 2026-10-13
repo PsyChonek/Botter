@@ -296,6 +296,14 @@
       .sort((a, b) => a.bet - b.bet);
   }
 
+  // The bet the XP per bet test found cheapest: the most XP per credit among the
+  // bets with a full test's rounds, the bigger bet on a tie since it levels
+  // faster. null until some bet has them.
+  function testBet(cells, minRounds = BET_TEST_ROUNDS) {
+    const tested = betXpReport(cells).filter((row) => row.rounds >= minRounds && row.rate !== null);
+    return tested.reduce((best, row) => (!best || row.rate >= best.rate ? row : best), null)?.bet ?? null;
+  }
+
   // An upgrade has to raise its game's return by at least this much per credit
   // of its remaining levels: 0.5 percentage points per 10,000 credits. Below
   // that sit blackjack's hint (the bot already plays perfectly), its
@@ -962,6 +970,7 @@
     xpCost,
     grindBets,
     grindBet,
+    testBet,
     grindAllowed,
     workDue,
     grindVolume,

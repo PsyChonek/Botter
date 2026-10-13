@@ -701,6 +701,9 @@
   "optionsGrindBet": {
     "message": "Sázka při farmění XP"
   },
+  "optionsGrindBetFromTest": {
+    "message": "Grindovat sázkou, kterou test XP podle sázky našel jako nejlevnější (do té doby sázkou výše)"
+  },
   "optionsGrindHint": {
     "message": "Auto hra vybere odemčenou hru s nejnižší simulovanou výhodou kasina při tvých vylepšeních. XP za kolo roste přímo úměrně sázce, takže každá výše sázky stojí za XP stejně: sázka určuje jen to, jak rychle XP přibývá a kolik je v jednom kole ve hře. U limitu grinder přejde na menší sázku a při denním rozpočtu nikdy nevsadí víc, než z něj zbývá."
   },
@@ -1226,6 +1229,20 @@
   },
   "colLevelCost": {
     "message": "Ztráta"
+  },
+  "panelGrindBet": {
+    "message": "Sázka grindu"
+  },
+  "panelGrindBetTest": {
+    "message": "Výsledek testu ($P1$)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "panelGrindBetNoTest": {
+    "message": "Výsledek testu (netestováno)"
   },
   "betTestPace": {
     "message": "Do levelu a Ztráta: dohrání $P1$ XP, které v tomto levelu chybí, tou sázkou, při naměřených $P2$ s na kolo.",
