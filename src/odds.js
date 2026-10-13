@@ -133,7 +133,7 @@
     return symbols.match !== reels.match || symbols.total >= tieSpins;
   }
 
-  const api = { UPGRADES, combo, comboUpgrades, rtp, edges, chances, winRates, gains, variances, bigRates, table, blazeMode, blazeDecided, BLAZE_TIE_SPINS };
+  const api = { UPGRADES, ROULETTE_EXTRA_ZEROS, combo, comboUpgrades, rtp, edges, chances, winRates, gains, variances, bigRates, table, blazeMode, blazeDecided, BLAZE_TIE_SPINS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BotterOdds = api;
 })(globalThis);

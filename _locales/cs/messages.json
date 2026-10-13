@@ -106,6 +106,31 @@
       }
     }
   },
+  "panelBundleStale": {
+    "message": "Kasino má novou verzi ($P1$): $P2$ rozdílů proti modelům, šance můžou být zastaralé. $P3$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "panelBundleChanged": {
+    "message": "Kasino má novou verzi ($P1$, změny z $P2$). Všechny tabulky modelů sedí.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
   "panelWork": {
     "message": "Práce"
   },
@@ -307,6 +332,33 @@
   },
   "optionsCombosEmpty": {
     "message": "Od začátku sledování podle vylepšení se nic nehrálo."
+  },
+  "optionsRouletteHeading": {
+    "message": "Kontrola rulety"
+  },
+  "optionsRouletteHint": {
+    "message": "Každé zatočení rulety podle toho, kolik nul kolo ještě má. Nuly ukazují, kolikrát padla nula, proti tomu, kolik by jich kolo mělo dát. Návratnost kola je, co server vyplatil proti vsazenému, Model co platí pravidla klienta na tom kole, Odchylky kolik směrodatných odchylek je mezi nimi (nad 3 už to není náhoda). Skrytá cena je, co kredity ztratily nad rámec výplaty, jako podíl vsazeného: náklad, který odpověď neukazuje. Chyby výplaty jsou zatočení vyplacená jinak, než pravidla dávají pro padlé číslo."
+  },
+  "optionsRouletteEmpty": {
+    "message": "Od začátku kontroly se ruleta netočila."
+  },
+  "colZerosLeft": {
+    "message": "Nuly"
+  },
+  "colZeroPockets": {
+    "message": "Padlé nuly"
+  },
+  "colWheelReturn": {
+    "message": "Návratnost kola"
+  },
+  "colDeviations": {
+    "message": "Odchylky"
+  },
+  "colHiddenCost": {
+    "message": "Skrytá cena"
+  },
+  "colPayoutErrors": {
+    "message": "Chyby výplaty"
   },
   "colModelRtp": {
     "message": "Model"

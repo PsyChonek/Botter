@@ -106,6 +106,31 @@
       }
     }
   },
+  "panelBundleStale": {
+    "message": "Casino app updated $P1$: $P2$ model differences, the odds may be stale. $P3$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "panelBundleChanged": {
+    "message": "Casino app updated $P1$ (changelog $P2$). Every model table still matches.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
   "panelWork": {
     "message": "Work"
   },
@@ -307,6 +332,33 @@
   },
   "optionsCombosEmpty": {
     "message": "Nothing played since per-upgrade tracking started."
+  },
+  "optionsRouletteHeading": {
+    "message": "Roulette check"
+  },
+  "optionsRouletteHint": {
+    "message": "Every roulette spin, by the zeros the wheel still has. Zero pockets are the ones seen against what the wheel should give. Wheel return is what the server paid against the stakes, Model what the client's rules pay on that wheel, Deviations how many standard deviations apart the two are (beyond 3 is not luck). Hidden cost is what the credits lost beyond the payout, as a share of the stakes: a cost the response does not show. Payout errors are spins paid differently from the rules for the pocket that came up."
+  },
+  "optionsRouletteEmpty": {
+    "message": "No roulette spin since the check started."
+  },
+  "colZerosLeft": {
+    "message": "Zeros"
+  },
+  "colZeroPockets": {
+    "message": "Zero pockets"
+  },
+  "colWheelReturn": {
+    "message": "Wheel return"
+  },
+  "colDeviations": {
+    "message": "Deviations"
+  },
+  "colHiddenCost": {
+    "message": "Hidden cost"
+  },
+  "colPayoutErrors": {
+    "message": "Payout errors"
   },
   "colModelRtp": {
     "message": "Model"

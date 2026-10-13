@@ -10,6 +10,7 @@
   const O = globalThis.BotterOdds;
   const Z = globalThis.BotterBlaze;
   const S = globalThis.BotterScreen;
+  const B = globalThis.BotterBundle;
   const msg = (key, subs) => chrome.i18n.getMessage(key, subs) || key;
 
   const DEFAULT_SETTINGS = {
@@ -80,6 +81,7 @@
     spend: { usd: 0, calls: 0 },
     games: {},
     combos: {}, // game -> upgrade combination (BotterOdds.combo) -> the same rows as games
+    roulette: {}, // zeros level -> roulette model check (G.addRouletteSpin)
     plainXp: {}, // rows like games, only rounds played off Hackathon weekends (BotterAuto.planXpRate)
     betXp: {}, // game -> bet -> { rounds, xp }, off Hackathon weekends (G.addBetXp)
     betTest: null, // { game, done } of the XP-per-bet test (betTestStep)
@@ -186,6 +188,7 @@
   let unsavedHotfix = 0;
   let hotfixBet = 0; // bet of the last Forbes spin, to book the XP of its free spins
   let capture = []; // raw responses of rarely seen endpoints, for debugging
+  let bundle = null; // the casino app bundle last checked (trackBundle)
   let unsavedSpins = 0;
   let grindPausedUntil = 0;
   let grindError = null; // why the last grinding round failed, shown while paused
@@ -231,6 +234,7 @@
     spins = stored.spins ?? [];
     hotfixRounds = stored.hotfixRounds ?? [];
     capture = stored.capture ?? [];
+    bundle = stored.bundle ?? null;
     settings = { ...DEFAULT_SETTINGS, ...stored.settings };
     bank = stored.bank ?? {};
     statsCache = byPrefix(stored, STATS_PREFIX);
@@ -261,6 +265,7 @@
     if (changes.spins) spins = changes.spins.newValue ?? [];
     if (changes.hotfixRounds) hotfixRounds = changes.hotfixRounds.newValue ?? [];
     if (changes.capture) capture = changes.capture.newValue ?? [];
+    if (changes.bundle) bundle = changes.bundle.newValue ?? null;
     render();
   });
 
@@ -387,6 +392,9 @@
         bjStake = data.hand && !data.hand.done ? delta.stake : 0;
         G.addDelta(stats.games, delta);
         bookCombo(delta, data.player.upgrades ?? player?.upgrades);
+        if (path === '/api/roulette/spin') {
+          G.addRouletteSpin(stats.roulette, (data.player.upgrades ?? player?.upgrades)?.roulette?.zeros ?? 0, request, data, delta.net);
+        }
         if (path === '/api/blackjack/deal') bjBet = request?.bet ?? delta.wagered;
         if (path === '/api/hotfix/spin') hotfixBet = request?.bet ?? delta.wagered;
         const carried = { '/api/blackjack/action': bjBet, '/api/hotfix/free': hotfixBet };
@@ -2072,6 +2080,8 @@
         th { color: #b5c99a; font-weight: 600; border-bottom: 1px solid #3d5420; }
         .pos { color: #a6e05a; }
         .neg { color: #ff8f7a; }
+        .bundle { margin-top: 4px; }
+        .bundle.neg { font-weight: 600; }
         .xp-note { margin: 4px 0 0; }
         .bettest-toggle { margin-top: 4px; }
         tr.group td { text-align: left; padding-top: 6px; font-weight: 600; color: #e8f5c8; }
@@ -2118,6 +2128,7 @@
         <div class="status" role="status" aria-live="polite"></div>
         <div class="stats muted"></div>
         <div class="cost muted"></div>
+        <div class="bundle" role="status"></div>
         <details class="profit">
           <summary></summary>
           <table>
@@ -2183,6 +2194,7 @@
       status: $('.status'),
       stats: $('.stats'),
       cost: $('.cost'),
+      bundle: $('.bundle'),
       summary: $('.profit summary'),
       head: [...shadow.querySelectorAll('.profit th')],
       body: $('.profit tbody'),
@@ -2529,6 +2541,7 @@
     ]);
     const { usd: spent, calls } = stats.spend;
     ui.cost.textContent = msg('panelCost', [usd.format(spent), usd.format(calls ? spent / calls : 0)]);
+    renderBundle();
     renderProfit();
     renderXp();
     renderBetTest();
@@ -2536,13 +2549,60 @@
     renderShop();
   }
 
+  // ---------- app bundle ----------
+
+  // The casino ships as one bundle whose file name changes with every deploy.
+  // A name not seen before is fetched once and checked against the client
+  // tables the models copy (BotterBundle.check), so a change to the game math
+  // shows before the grinder plans with stale odds. Stored for every account:
+  // { name, at, from, changelog, problems }, from being the name it replaced.
+  const BUNDLE_NEWS_MS = 24 * 3600_000;
+  async function trackBundle() {
+    const src = document.querySelector('script[src*="/assets/index-"]')?.src;
+    const name = B.bundleName(src);
+    if (!name || name === bundle?.name) return;
+    let result;
+    try {
+      const res = await fetch(src);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      result = B.check(await res.text(), G, O);
+    } catch (err) {
+      log.warn('bundle_check_failed', { name, error: String(err) });
+      return;
+    }
+    const from = bundle?.name ?? null;
+    bundle = { name, at: Date.now(), from, changelog: result.facts.changelog, problems: result.problems };
+    chrome.storage.local.set({ bundle });
+    const fields = { name, from, changelog: bundle.changelog, problems: result.problems };
+    if (result.problems.length) log.warn('bundle_models_stale', fields);
+    else log.info(from ? 'bundle_changed' : 'bundle_seen', fields);
+    render();
+  }
+
+  // A stale model stays on the panel; a harmless update shows for a day.
+  function renderBundle() {
+    const stale = bundle?.problems?.length > 0;
+    const news = bundle?.from && Date.now() - bundle.at < BUNDLE_NEWS_MS;
+    ui.bundle.hidden = !stale && !news;
+    ui.bundle.classList.toggle('neg', stale);
+    if (ui.bundle.hidden) return;
+    const when = new Date(bundle.at).toLocaleString(locale, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
+    ui.bundle.textContent = stale
+      ? msg('panelBundleStale', [when, String(bundle.problems.length), bundle.problems.join('; ')])
+      : msg('panelBundleChanged', [when, bundle.changelog ?? '-']);
+  }
+
   // ---------- boot ----------
 
   load().then(() => {
     for (const data of early.splice(0)) onHookEvent(data);
     early = null;
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountPanel);
-    else mountPanel();
+    const ready = () => {
+      mountPanel();
+      trackBundle();
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready);
+    else ready();
     setInterval(tick, TICK_MS);
   });
 })();

@@ -283,6 +283,13 @@ progress shows at `chrome://on-device-internals`.
   **Profit per upgrade level** table shows each combination's rounds, wagered, net,
   measured return and the return the model gives it (Blaze on the per reel rule), so an
   upgrade can be checked against what it promised.
+  The **Roulette check** table below it splits roulette's measured return into its
+  causes, per zeros level (`stats.roulette`, `G.addRouletteSpin`): zero pockets seen
+  against the wheel's share, what the server paid against what the client's rules pay
+  on that wheel (with how many standard deviations apart, so luck and a changed wheel
+  can be told apart), the hidden cost (credits lost beyond the payout the response
+  reports, as a share of the stakes; this is where a player-paid 1 % payroll fund
+  would show) and payouts that break the rules for the pocket that came up.
   A profile reset (Začít úplně od nuly, `/api/profile/reset`) wipes the account on the
   server, so its stats start over too: profit, XP per game, free income and the
   achievement flags, so the clean-loan trick and the podium run again. Only the submit
@@ -401,6 +408,19 @@ browser, never adds the stats again.
 ```
 npm run check
 ```
+
+**App bundle tracking**: the casino ships as one bundle (`/assets/index-<hash>.js`)
+whose name changes with every deploy. When a page loads a name not seen before, the
+content script fetches it once and checks it with `src/bundle.js`: every client table
+the models copy (slot weights, paytables, upgrade effects, blackjack and roulette
+rules, the payroll share, big-win multiples, max bet by level) must still be in it,
+and the shop catalog, unlock levels, bet levels and roulette zeros are read out and
+compared with `src/games.js` and `src/odds.js`. The panel shows a red line naming
+every difference until a bundle matches again, and a new bundle that matches for a
+day; the log gets `bundle_models_stale`, `bundle_changed` or `bundle_seen`.
+`node scripts/bundle.mjs [saved bundle]` runs the same check on the live site (or a
+saved copy) and exits with 1 when a model is stale. When a table changes, update the
+model, its needle in `src/bundle.js` and rerun the simulation below.
 
 `node scripts/odds.mjs [spins]` regenerates `src/odds-table.js` (about 10 minutes at
 the default 300,000 spins per combination). Besides the slot returns it records, for
