@@ -192,3 +192,10 @@ test('addBetXp books XP per game and bet level', () => {
   G.addBetXp(table, 'blackjack', 100, 0, 2);
   assert.deepEqual(table, { roulette: { 20: { rounds: 2, xp: 7 } }, blackjack: { 100: { rounds: 0, xp: 2 } } });
 });
+
+test('gameDelta books a Forbes spin as the round and its free spins as payout only', () => {
+  const spin = G.gameDelta('/api/hotfix/spin', { bet: 20 }, { player: { credits: 980 }, xpGain: 1 }, 1000);
+  assert.deepEqual(spin, { game: 'hotfix', rounds: 1, wagered: 20, net: -20, xp: 1, stake: 0 });
+  const free = G.gameDelta('/api/hotfix/free', { choice: 0 }, { player: { credits: 1300 }, xpGain: 2 }, 980);
+  assert.deepEqual(free, { game: 'hotfix', rounds: 0, wagered: 0, net: 320, xp: 2, stake: 0 });
+});

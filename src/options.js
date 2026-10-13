@@ -323,6 +323,23 @@ $('clearSpins').addEventListener('click', async () => {
   $('modelResult').textContent = '';
 });
 
+// Forbes z Chánova responses recorded for its model check (scripts/hotfix-sim.mjs).
+async function showHotfixCount() {
+  const { hotfixRounds = [] } = await chrome.storage.local.get('hotfixRounds');
+  const free = hotfixRounds.filter((round) => round.path === '/api/hotfix/free').length;
+  $('hotfixCount').textContent = msg('optionsHotfixCount', [num.format(hotfixRounds.length - free), num.format(free)]);
+  return hotfixRounds;
+}
+showHotfixCount();
+
+$('exportHotfix').addEventListener('click', async () => download('botter-hotfix-rounds.json', await showHotfixCount()));
+
+$('clearHotfix').addEventListener('click', async () => {
+  if (!confirm(msg('optionsClearHotfixConfirm'))) return;
+  await chrome.storage.local.set({ hotfixRounds: [] });
+  showHotfixCount();
+});
+
 $('exportCapture').addEventListener('click', async () => {
   const { capture = [] } = await chrome.storage.local.get('capture');
   download('botter-capture.json', capture);
@@ -603,6 +620,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (keys.some((key) => key === 'stats' || key.startsWith(STATS_PREFIX) || key.startsWith(ACCOUNT_PREFIX))) showAccounts();
   if (changes.bank) showBankSize(changes.bank.newValue ?? {});
   if (changes.levels) showLevels(changes.levels.newValue);
+  if (changes.hotfixRounds) showHotfixCount();
   if (changes.settings && !saveTimer) fill({ ...DEFAULTS, ...changes.settings.newValue });
 });
 

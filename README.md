@@ -51,8 +51,8 @@ progress shows at `chrome://on-device-internals`.
   3. **Guess** (optional): a random valid choice. A wrong answer costs energy
      but teaches the bank.
 - **Game bot** (`src/games.js`, game loop in `src/content.js`): plays Blaze 20 Wild,
-  Skeleton Slots, Slotingi, Roulette (one outside bet, red by default) and Blackjack
-  (follows the table's own hint) through the casino API. The page hook performs the
+  Skeleton Slots, Slotingi, Forbes z Chánova, Roulette (one outside bet, red by default)
+  and Blackjack (follows the table's own hint) through the casino API. The page hook performs the
   calls with the session the app already holds (supabase session in localStorage,
   falling back to the last Authorization header the app sent), so the bot never
   sends the token anywhere itself (saved sessions for account switching are
@@ -298,6 +298,16 @@ progress shows at `chrome://on-device-internals`.
   weekend, all from the simulation in `scripts/odds.mjs`. Roulette is an even-money bet, blackjack the bot's own strategy,
   Blaze is listed per scatter rule; once the recorded spins settle the rule, the other
   table is marked as ruled out. The current account's upgrades are marked.
+- **Forbes z Chánova** (from level 13, game bot only): a Megaways slot with cascades,
+  the Hotfix wheel of modifiers and free spins on 4+ incidents. When free spins start,
+  the bot plays them at once with Postupný rollout (`HOTFIX_CHOICE`). The grinder never
+  picks it and the shop plan never buys its upgrades: it has no validated model yet.
+  `scripts/hotfix-sim.mjs` simulates it from the client's tables, but the client does
+  not show how the free-spin multiplier grows (per winning spin or per cascade step)
+  or how big the modifiers are, and that moves the return from about 80 % to 102 %
+  unupgraded. Every spin and free-spin response, from the bot or played by hand, is
+  recorded (`hotfixRounds`, up to 800, free-spin games kept first) and can be exported
+  from the settings (Data tab) to settle those against the server.
 - **XP per game** (panel): for each game the house edge the grinder plans with, XP per
   100 credits wagered, credits lost per XP point and its state (locked or playing at
   the chosen bet). The row the grinder plays next is highlighted.

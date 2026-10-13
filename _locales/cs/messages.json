@@ -124,6 +124,9 @@
   "game_slotingi": {
     "message": "Slotingi"
   },
+  "game_hotfix": {
+    "message": "Forbes z Chánova"
+  },
   "game_blackjack": {
     "message": "Blackjack"
   },
@@ -680,6 +683,32 @@
   },
   "optionsClearSpinsConfirm": {
     "message": "Smazat všechna uložená točení?"
+  },
+  "optionsHotfixHeading": {
+    "message": "Kola Forbes z Chánova"
+  },
+  "optionsHotfixHint": {
+    "message": "Každé zatočení a free spiny ve Forbes z Chánova se zaznamenají, ať hrál bot nebo ty, aby šel model hry ověřit proti serveru. Při free spinech bot volí Postupný rollout. Pro kontrolu soubor exportuj."
+  },
+  "optionsHotfixCount": {
+    "message": "Zaznamenaná zatočení: $P1$, hry s free spiny: $P2$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "optionsExportHotfix": {
+    "message": "Exportovat kola Forbes"
+  },
+  "optionsClearHotfix": {
+    "message": "Smazat kola Forbes"
+  },
+  "optionsClearHotfixConfirm": {
+    "message": "Smazat všechna zaznamenaná kola Forbes z Chánova?"
   },
   "optionsModelEmpty": {
     "message": "Zatím žádná točení. Nejdřív odehraj pár kol Blaze."

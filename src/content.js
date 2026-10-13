@@ -95,6 +95,10 @@
   const SPRINT_MAX_AGE_MS = 10 * 60_000;
   const CLEAN_LOAN = 500;
   const MAX_SPINS = 2000;
+  const MAX_HOTFIX_ROUNDS = 800;
+  // Free-spin option the bot picks in Forbes z Chánova: Postupný rollout (12
+  // spins from x1), the best in every variant of the simulation.
+  const HOTFIX_CHOICE = 0;
   const MAX_CAPTURE = 40;
   const SPIN_FLUSH_EVERY = 10;
   const CAPTURE_PATHS = /^\/api\/(loan|crash|shop|leaderboard|bonus|wheel)/;
@@ -171,6 +175,9 @@
   let lottery = null; // last lottery state from /api/lottery, with the local time it came
   let edgeAt = 0; // when edgeStep last found a round that pays by itself
   let spins = []; // recorded Blaze spins for the model check
+  let hotfixRounds = []; // recorded Forbes z Chánova responses for its model check
+  let unsavedHotfix = 0;
+  let hotfixBet = 0; // bet of the last Forbes spin, to book the XP of its free spins
   let capture = []; // raw responses of rarely seen endpoints, for debugging
   let unsavedSpins = 0;
   let grindPausedUntil = 0;
@@ -215,6 +222,7 @@
   async function load() {
     const stored = await chrome.storage.local.get(null);
     spins = stored.spins ?? [];
+    hotfixRounds = stored.hotfixRounds ?? [];
     capture = stored.capture ?? [];
     settings = { ...DEFAULT_SETTINGS, ...stored.settings };
     bank = stored.bank ?? {};
@@ -244,6 +252,7 @@
       }
     }
     if (changes.spins) spins = changes.spins.newValue ?? [];
+    if (changes.hotfixRounds) hotfixRounds = changes.hotfixRounds.newValue ?? [];
     if (changes.capture) capture = changes.capture.newValue ?? [];
     render();
   });
@@ -348,6 +357,7 @@
     if (data?.crash) bookCrash(data.crash);
     if (data?.by === 'sprint' && Array.isArray(data.entries)) readSprint(data);
     if (path === '/api/slot/spin' && data.result) recordSpin(request, data);
+    if (path === '/api/hotfix/spin' || path === '/api/hotfix/free') recordHotfix(path, request, data);
 
     if (path === '/api/work/start' && data.task) {
       task = data.task;
@@ -370,7 +380,9 @@
         G.addDelta(stats.games, delta);
         bookCombo(delta, data.player.upgrades ?? player?.upgrades);
         if (path === '/api/blackjack/deal') bjBet = request?.bet ?? delta.wagered;
-        const bet = path === '/api/blackjack/action' ? bjBet : (request?.bet ?? delta.wagered);
+        if (path === '/api/hotfix/spin') hotfixBet = request?.bet ?? delta.wagered;
+        const carried = { '/api/blackjack/action': bjBet, '/api/hotfix/free': hotfixBet };
+        const bet = carried[path] ?? request?.bet ?? delta.wagered;
         if (!hackathonOn()) {
           G.addDelta(stats.plainXp, delta);
           if (bet > 0) G.addBetXp(stats.betXp, delta.game, bet, delta.rounds, delta.xp);
@@ -451,6 +463,30 @@
     if (++unsavedSpins >= SPIN_FLUSH_EVERY) {
       unsavedSpins = 0;
       chrome.storage.local.set({ spins });
+    }
+  }
+
+  // Every Forbes z Chánova spin and free-spin response, played by the bot or by
+  // hand, kept whole: the client shows the game's tables but not how the server
+  // grows the free-spin multiplier or sizes the Hotfix modifiers, so the model
+  // (scripts/hotfix-sim.mjs) is checked against these. Free-spin responses are
+  // rare and carry the most, so they are kept first when the list is trimmed.
+  function recordHotfix(path, request, data) {
+    hotfixRounds.push({
+      at: Date.now(),
+      path,
+      request,
+      upgrades: data.player?.upgrades?.hotfix ?? {},
+      event: A.weekendEvent().active ? A.weekendEvent().key : null,
+      data: { ...data, player: undefined },
+    });
+    if (hotfixRounds.length > MAX_HOTFIX_ROUNDS) {
+      const i = hotfixRounds.findIndex((round) => round.path === '/api/hotfix/spin');
+      hotfixRounds.splice(i < 0 ? 0 : i, 1);
+    }
+    if (path === '/api/hotfix/free' || ++unsavedHotfix >= SPIN_FLUSH_EVERY) {
+      unsavedHotfix = 0;
+      chrome.storage.local.set({ hotfixRounds });
     }
   }
 
@@ -1051,7 +1087,8 @@
   // spot is the roulette bet; the screen can only lay chips on the even-money
   // spots, so other bets always go through the API.
   async function playRound(game, bet, spot = settings.rouletteBet) {
-    if (settings.playOnScreen && (game !== 'roulette' || G.ROULETTE_BETS.includes(spot))) {
+    // Forbes z Chánova has no screen play: its free-spin pick needs its own clicks.
+    if (settings.playOnScreen && game !== 'hotfix' && (game !== 'roulette' || G.ROULETTE_BETS.includes(spot))) {
       const res = await playOnScreen(game, bet, spot);
       if (res.ok || res.status !== 0) return res;
       log.warn('screen_play_failed', { game, bet, error: res.data?.error });
@@ -1059,7 +1096,22 @@
     }
     if (game === 'blackjack') return playBlackjack(bet);
     if (game === 'roulette') return api('/api/roulette/spin', { bets: { [spot]: bet } });
+    if (game === 'hotfix') return playHotfix(bet);
     return api(G.GAMES[game].path, { bet });
+  }
+
+  // One Forbes z Chánova spin. Four or more incidents leave free spins pending
+  // (player.hotfixFree) and the game takes no spin until they are played, so
+  // they are played at once with HOTFIX_CHOICE, also ones left from before.
+  async function playHotfix(bet) {
+    const free = () => api('/api/hotfix/free', { choice: HOTFIX_CHOICE });
+    if (player.hotfixFree) return free();
+    const res = await api(G.GAMES.hotfix.path, { bet });
+    if (!res.ok || !res.data.player?.hotfixFree) return res;
+    await sleep(settings.gameDelayMs);
+    const paid = await free();
+    if (!paid.ok) log.warn('hotfix_free_failed', { status: paid.status, error: paid.data?.error });
+    return paid.ok ? paid : res;
   }
 
   async function gameStep() {

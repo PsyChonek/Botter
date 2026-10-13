@@ -124,6 +124,9 @@
   "game_slotingi": {
     "message": "Slotingi"
   },
+  "game_hotfix": {
+    "message": "Forbes z Chánova"
+  },
   "game_blackjack": {
     "message": "Blackjack"
   },
@@ -680,6 +683,32 @@
   },
   "optionsClearSpinsConfirm": {
     "message": "Delete every recorded spin?"
+  },
+  "optionsHotfixHeading": {
+    "message": "Forbes z Chánova rounds"
+  },
+  "optionsHotfixHint": {
+    "message": "Every Forbes z Chánova spin and free-spin response is recorded, whether the bot or you played it, to check the game model against the server. The bot picks Postupný rollout when free spins start. Export the file to run the check."
+  },
+  "optionsHotfixCount": {
+    "message": "Recorded spins: $P1$, free-spin games: $P2$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "optionsExportHotfix": {
+    "message": "Export Forbes rounds"
+  },
+  "optionsClearHotfix": {
+    "message": "Clear Forbes rounds"
+  },
+  "optionsClearHotfixConfirm": {
+    "message": "Delete every recorded Forbes z Chánova round?"
   },
   "optionsModelEmpty": {
     "message": "No spins recorded yet. Play some Blaze rounds first."

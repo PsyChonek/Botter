@@ -14,6 +14,7 @@
     skeleton: { unlock: 5, path: '/api/skeleton/spin' },
     slotingi: { unlock: 7, path: '/api/slotingi/spin' },
     blackjack: { unlock: 10 },
+    hotfix: { unlock: 13, path: '/api/hotfix/spin' },
     roulette: { unlock: 15 },
   };
   const LOTTERY_UNLOCK = 4;
@@ -26,6 +27,8 @@
     '/api/slot/spin': 'blaze',
     '/api/skeleton/spin': 'skeleton',
     '/api/slotingi/spin': 'slotingi',
+    '/api/hotfix/spin': 'hotfix',
+    '/api/hotfix/free': 'hotfix',
     '/api/roulette/spin': 'roulette',
     '/api/blackjack/deal': 'blackjack',
     '/api/blackjack/action': 'blackjack',
@@ -40,9 +43,10 @@
     skeleton: { team: [4, 4000, 1.8], wild: [4, 5000, 1.8], deploy: [3, 6000, 2] },
     slotingi: { crown: [3, 6000, 2], gulas: [4, 5000, 1.8], mint: [3, 8000, 2.2] },
     blackjack: { ties: [4, 8000, 1.8], bjpay: [2, 10000, 2], soft17: [1, 6000, 1], double: [1, 4000, 1], hint: [1, 3000, 1] },
+    hotfix: { oncall: [3, 9000, 2], fix: [3, 8000, 2], review: [4, 7000, 1.8] },
     roulette: { zeros: [2, 15000, 2.5] },
   };
-  const SHOP_UNLOCK = { global: 1, blaze: 1, crash: 3, skeleton: 5, slotingi: 7, blackjack: 10, roulette: 15 };
+  const SHOP_UNLOCK = { global: 1, blaze: 1, crash: 3, skeleton: 5, slotingi: 7, blackjack: 10, hotfix: 13, roulette: 15 };
 
   // Next level of an upgrade: its price and the player level it needs.
   function upgradeOffer(upgrades, game, key) {
@@ -152,6 +156,10 @@
       wagered = data.hand?.stake ?? request?.bet ?? 0;
     } else if (path === '/api/lottery/buy') {
       wagered = request?.price ?? 0;
+    } else if (path === '/api/hotfix/free') {
+      // Free spins finish the spin that triggered them and pay its win with theirs.
+      rounds = 0;
+      wagered = 0;
     } else if (path === '/api/blackjack/action') {
       // Only a double adds to the stake; hit and stand cost nothing.
       rounds = 0;
