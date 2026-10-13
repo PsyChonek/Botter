@@ -3,6 +3,7 @@
 // guesses about server behaviour the client does not show are marked GUESS.
 // Usage: node scripts/hotfix-sim.mjs [spins] [oncall] [fix] [review], with
 // VARIANT=perStep,option (e.g. 0,2) to run a single variant.
+import { pathToFileURL } from 'node:url';
 
 // CLIENT: symbols 0-4 low (10 J Q K A), 5-10 high (hi1-hi6), 11 wild, 12 scatter.
 const LOW = 5, PAYING = 11, WILD = 11, SCATTER = 12;
@@ -84,11 +85,16 @@ function cascade(grid, remove, cfg, noLow) {
 
 const countScatters = (grid) => grid.reduce((n, reel) => n + reel.filter((x) => x === SCATTER).length, 0);
 
-// GUESS: the modifier sizes the client does not give.
+// The modifier sizes the client does not give. MEASURED: from 491 recorded
+// spins at 2026-10-13 (scripts/hotfix-check.mjs), GUESS: not seen yet.
 const G = {
-  wildsAdded: [2, 4], // 'wilds': this many random cells on reels 2-5 turn wild
-  mysteryCells: [4, 9], // 'mystery': this many random non-scatter cells resolve to one paying symbol
-  syncReels: [2, 3], // 'sync': this many adjacent reels copy the leftmost of them
+  // MEASURED: 'wilds' turns 3 to 6 cells wild on reels 2-6 (17 seen: 3, 8, 5 and 1 times).
+  wildsAdded: { 3: 3, 4: 8, 5: 5, 6: 1 },
+  wildsReels: [1, 2, 3, 4, 5],
+  mysteryCells: [5, 9], // MEASURED: 'mystery' resolves 5 to 9 random non-scatter cells to one paying symbol
+  // MEASURED: 'sync' copies the leftmost of 2 or 3 adjacent reels onto the others,
+  // wilds included, even onto reel 6. GUESS: any reel can be the leftmost (5 seen, all from reel 3 on).
+  syncReels: [2, 3],
   boost: [2, 5], // 'boost': multiplier added in free spins
   retrigger: (n) => (n >= 3 ? 2 + 2 * (n - 3) : 0), // free spins added by 3+ scatters in free spins
 };
@@ -102,8 +108,8 @@ function applyModifier(key, cfg, ctx) {
   const cells = (reels) => reels.flatMap((r) => grid[r].map((_, i) => [r, i]));
   if (key === 'wildreel') grid[randInt(1, 4)].fill(WILD);
   if (key === 'wilds') {
-    const pool = cells([1, 2, 3, 4]);
-    for (let k = randInt(...G.wildsAdded); k > 0 && pool.length; k--) {
+    const pool = cells(G.wildsReels);
+    for (let k = Number(pickKey(G.wildsAdded)); k > 0 && pool.length; k--) {
       const [r, i] = pool.splice(randInt(0, pool.length - 1), 1)[0];
       grid[r][i] = WILD;
     }
@@ -119,7 +125,7 @@ function applyModifier(key, cfg, ctx) {
   if (key === 'sync') {
     const len = randInt(...G.syncReels);
     const start = randInt(0, 6 - len);
-    for (let r = start + 1; r < start + len; r++) grid[r] = grid[start].map((x) => (x === WILD && (r < 1 || r > 4) ? 0 : x));
+    for (let r = start + 1; r < start + len; r++) grid[r] = grid[start].slice();
   }
   if (key === 'boost') ctx.mult = Math.min(cfg.multCap, ctx.mult + randInt(...G.boost));
   return { grid, noLow };
@@ -175,14 +181,19 @@ function simulate(cfg, spins, option, perStep) {
   return { rtp: mean, free: freePaid / spins, triggerEvery: spins / triggers, sd: Math.sqrt(sq / spins - mean * mean) };
 }
 
-const [spins = 300_000, oncall = 0, fix = 0, review = 0] = process.argv.slice(2).map(Number);
-const cfg = config(oncall, fix, review);
-const pct = (x) => (x * 100).toFixed(1) + ' %';
-const only = process.env.VARIANT?.split(',').map(Number); // perStep,option
-for (const perStep of [false, true]) {
-  for (let option = 0; option < OPTIONS.length; option++) {
-    if (only && (only[0] !== Number(perStep) || only[1] !== option)) continue;
-    const r = simulate(cfg, spins, option, perStep);
-    console.log(`${perStep ? 'mult +1 per win step ' : 'mult +1 per win spin '} ${OPTIONS[option].name.padEnd(8)} RTP ${pct(r.rtp)} (free spins ${pct(r.free)}), free spins every ${r.triggerEvery.toFixed(0)} spins, sd ${r.sd.toFixed(1)}x bet`);
+export { LOW, PAYING, WILD, SCATTER, BASE, OPTIONS, G as GUESS, optionFor, config, evaluate, simulate };
+
+// Run as a script, not when imported (scripts/hotfix-check.mjs uses the model).
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const [spins = 300_000, oncall = 0, fix = 0, review = 0] = process.argv.slice(2).map(Number);
+  const cfg = config(oncall, fix, review);
+  const pct = (x) => (x * 100).toFixed(1) + ' %';
+  const only = process.env.VARIANT?.split(',').map(Number); // perStep,option
+  for (const perStep of [false, true]) {
+    for (let option = 0; option < OPTIONS.length; option++) {
+      if (only && (only[0] !== Number(perStep) || only[1] !== option)) continue;
+      const r = simulate(cfg, spins, option, perStep);
+      console.log(`${perStep ? 'mult +1 per win step ' : 'mult +1 per win spin '} ${OPTIONS[option].name.padEnd(8)} RTP ${pct(r.rtp)} (free spins ${pct(r.free)}), free spins every ${r.triggerEvery.toFixed(0)} spins, sd ${r.sd.toFixed(1)}x bet`);
+    }
   }
 }

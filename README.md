@@ -319,6 +319,17 @@ progress shows at `chrome://on-device-internals`.
   unupgraded. Every spin and free-spin response, from the bot or played by hand, is
   recorded (`hotfixRounds`, up to 800, free-spin games kept first) and can be exported
   from the settings (Data tab) to settle those against the server.
+  `node scripts/hotfix-check.mjs <export> [spins]` does that: it recomputes every
+  cascade step's wins from its grid, checks row heights and symbol weights on clean
+  spins, measures how often the Hotfix wheel turns and what it picks, the modifier
+  sizes and how the free-spin multiplier grows, then simulates the model at the
+  client's and the measured wheel chance. The 2026-10-13 test (491 spins) matched all
+  887 cascade steps exactly and showed the multiplier grows +1 per winning spin; the
+  modifier sizes it measured are now in the simulation (wilds 3 to 6 cells on reels
+  2-6, mystery 5 to 9 cells, sync copies wilds onto reel 6). With them the return is
+  about 88 % at the client's 7 % wheel chance and about 104 % at the 9.4 % measured
+  (46 of 491, 2 deviations above 7 %), so the wheel chance decides whether Forbes
+  pays and needs a longer test.
   **Forbes force** (panel, off by default) sends the server's test switch `force` on
   every Forbes spin the bot plays (the client has the field but never sets it). The
   value field is read as JSON (`4`, `true`, `"free"`), anything else is sent as text,
