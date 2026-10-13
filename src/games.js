@@ -234,6 +234,63 @@
     return table;
   }
 
+  // What the client's roulette rules pay for these bets on this pocket: a
+  // number 36 times the chip, a dozen 3 times, red/black, even/odd and
+  // low/high 2 times, and every outside bet loses on a zero (0, 00 or the
+  // skull S). null when a bet spot is one the check does not know (columns).
+  const ROULETTE_RED = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
+  function roulettePayout(bets, pocket) {
+    const n = /^\d+$/.test(pocket) ? Number(pocket) : 0;
+    let paid = 0;
+    for (const [spot, amount] of Object.entries(bets ?? {})) {
+      let hit;
+      if (spot.startsWith('n:')) hit = spot.slice(2) === pocket ? 36 : 0;
+      else if (spot.startsWith('dozen:')) hit = n > 0 && Math.ceil(n / 12) === Number(spot.slice(6)) ? 3 : 0;
+      else {
+        const outside = { red: ROULETTE_RED.has(n), black: n > 0 && !ROULETTE_RED.has(n), even: n > 0 && n % 2 === 0, odd: n % 2 === 1, low: n >= 1 && n <= 18, high: n >= 19 }[spot];
+        if (outside === undefined) return null;
+        hit = outside ? 2 : 0;
+      }
+      paid += amount * hit;
+    }
+    return paid;
+  }
+
+  // Pockets of the wheel with this many zeros removed by the upgrade: 0 to 36
+  // plus the skull S and the double zero 00 that are left, as in the client.
+  const ROULETTE_EXTRA = ['S', '00'];
+  const roulettePockets = (zeros) => [...Array.from({ length: 37 }, (_, n) => String(n)), ...ROULETTE_EXTRA.slice(Math.min(ROULETTE_EXTRA.length, zeros))];
+
+  // Roulette model check per zeros upgrade level: { [zeros]: { spins, wagered,
+  // paid, net, greens, checked, mismatches, expected, variance } }. paid is the
+  // server's payout, net the profit booked from the credits (gameDelta), so
+  // paid - wagered - net is a cost the response does not show (such as the
+  // payroll fund's 1 %). greens counts zero pockets, mismatches payouts that
+  // differ from the rules; expected and variance are the payout's mean and
+  // variance by the rules, summed over the checked spins.
+  function addRouletteSpin(check, zeros, request, data, net) {
+    const row = (check[zeros] ??= { spins: 0, wagered: 0, paid: 0, net: 0, greens: 0, checked: 0, mismatches: 0, expected: 0, variance: 0, checkedPaid: 0, checkedWagered: 0 });
+    const pocket = String(data.pocket);
+    const paid = Number(data.payout) || 0;
+    row.spins += 1;
+    row.wagered += Number(data.total) || Object.values(request?.bets ?? {}).reduce((sum, amount) => sum + amount, 0);
+    row.paid += paid;
+    row.net += net;
+    if (!/^\d+$/.test(pocket) || Number(pocket) === 0) row.greens += 1;
+    const rule = roulettePayout(request?.bets, pocket);
+    if (rule !== null) {
+      const pays = roulettePockets(zeros).map((p) => roulettePayout(request.bets, p));
+      const mean = pays.reduce((sum, x) => sum + x, 0) / pays.length;
+      row.checked += 1;
+      if (Math.abs(rule - paid) > 0.5) row.mismatches += 1;
+      row.expected += mean;
+      row.variance += pays.reduce((sum, x) => sum + (x - mean) ** 2, 0) / pays.length;
+      row.checkedPaid += paid;
+      row.checkedWagered += Object.values(request.bets).reduce((sum, amount) => sum + amount, 0);
+    }
+    return check;
+  }
+
   function totalNet(games) {
     return Object.values(games).reduce((sum, row) => sum + row.net, 0);
   }
@@ -280,6 +337,9 @@
     dailyBonus,
     addDelta,
     addBetXp,
+    roulettePayout,
+    roulettePockets,
+    addRouletteSpin,
     totalNet,
     profitRows,
   };

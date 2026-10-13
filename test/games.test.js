@@ -199,3 +199,28 @@ test('gameDelta books a Forbes spin as the round and its free spins as payout on
   const free = G.gameDelta('/api/hotfix/free', { choice: 0 }, { player: { credits: 1300 }, xpGain: 2 }, 980);
   assert.deepEqual(free, { game: 'hotfix', rounds: 0, wagered: 0, net: 320, xp: 2, stake: 0 });
 });
+
+test('roulettePayout follows the client rules and loses outside bets on every zero', () => {
+  assert.equal(G.roulettePayout({ red: 100 }, '1'), 200);
+  assert.equal(G.roulettePayout({ red: 100 }, '2'), 0);
+  for (const zero of ['0', '00', 'S']) assert.equal(G.roulettePayout({ red: 100, even: 100, low: 100 }, zero), 0);
+  assert.equal(G.roulettePayout({ 'n:0': 20 }, '0'), 720);
+  assert.equal(G.roulettePayout({ 'n:0': 20 }, '00'), 0);
+  assert.equal(G.roulettePayout({ 'dozen:3': 10 }, '36'), 30);
+  assert.equal(G.roulettePayout({ 'col:1': 10 }, '1'), null);
+});
+
+test('addRouletteSpin separates a hidden cost from the luck of the wheel', () => {
+  const check = {};
+  // The server pays by the rules but the credits drop 1 % more than the payout says.
+  G.addRouletteSpin(check, 2, { bets: { red: 1000 } }, { pocket: '0', payout: 0, total: 1000 }, -1010);
+  G.addRouletteSpin(check, 2, { bets: { red: 1000 } }, { pocket: '3', payout: 2000, total: 1000 }, 990);
+  const row = check[2];
+  assert.equal(row.spins, 2);
+  assert.equal(row.greens, 1);
+  assert.equal(row.mismatches, 0);
+  assert.equal(row.paid - row.wagered - row.net, 20);
+  assert.ok(Math.abs(row.expected - 2 * (36 / 37) * 1000) < 1e-6);
+  assert.equal(G.roulettePockets(0).length, 39);
+  assert.equal(G.roulettePockets(2).length, 37);
+});

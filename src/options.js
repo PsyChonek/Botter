@@ -399,6 +399,35 @@ function showProfit(stats = {}) {
   $('profitFoot').replaceChildren(...(rows.length ? [foot] : []));
   $('profitEmpty').hidden = rows.length > 0;
   showCombos(stats.combos ?? {});
+  showRoulette(stats.roulette ?? {});
+}
+
+// Roulette model check per zeros level (G.addRouletteSpin): zero pockets seen
+// against the wheel's share, what the wheel paid against the rules, how many
+// standard deviations apart that is, the cost the credits show beyond the
+// payout, and payouts that broke the rules.
+function showRoulette(check) {
+  const rows = [];
+  for (const [zeros, row] of Object.entries(check).sort(([a], [b]) => a - b)) {
+    const left = 1 + O.ROULETTE_EXTRA_ZEROS - Number(zeros);
+    const greens = (row.spins * left) / (37 + O.ROULETTE_EXTRA_ZEROS - Number(zeros));
+    const deviations = row.variance > 0 ? (row.checkedPaid - row.expected) / Math.sqrt(row.variance) : null;
+    const hidden = row.wagered ? (row.paid - row.wagered - row.net) / row.wagered : null;
+    const tr = document.createElement('tr');
+    tr.append(
+      cell(num.format(left)),
+      cell(num.format(row.spins)),
+      cell(`${num.format(row.greens)} / ${num.format(greens)}`),
+      cell(row.checkedWagered ? pct2.format(row.checkedPaid / row.checkedWagered) : '-'),
+      cell(row.checkedWagered ? pct2.format(row.expected / row.checkedWagered) : '-'),
+      cell(deviations === null ? '-' : signed.format(deviations), deviations !== null && Math.abs(deviations) >= 3 ? 'neg' : ''),
+      cell(hidden === null ? '-' : pct2.format(hidden), hidden !== null && Math.abs(hidden) >= 0.001 ? 'neg' : ''),
+      cell(num.format(row.mismatches), row.mismatches ? 'neg' : ''),
+    );
+    rows.push(tr);
+  }
+  $('rouletteBody').replaceChildren(...rows);
+  $('rouletteEmpty').hidden = rows.length > 0;
 }
 
 // Profit per game and upgrade combination, next to the return the model gives
@@ -429,11 +458,15 @@ function showCombos(combos) {
 
 // Totals of several accounts' stats, for the "all accounts" profit view.
 function sumStats(list) {
-  const total = { games: {}, combos: {}, work: { tickets: 0, net: 0, xp: 0 }, free: {} };
+  const total = { games: {}, combos: {}, roulette: {}, work: { tickets: 0, net: 0, xp: 0 }, free: {} };
   for (const stats of list) {
     for (const [game, row] of Object.entries(stats.games ?? {})) G.addDelta(total.games, { game, ...row });
     for (const [game, rows] of Object.entries(stats.combos ?? {})) {
       for (const [combo, row] of Object.entries(rows)) G.addDelta((total.combos[game] ??= {}), { ...row, game: combo });
+    }
+    for (const [zeros, row] of Object.entries(stats.roulette ?? {})) {
+      const sum = (total.roulette[zeros] ??= {});
+      for (const [field, value] of Object.entries(row)) sum[field] = (sum[field] ?? 0) + value;
     }
     for (const key of Object.keys(total.work)) total.work[key] += stats.work?.[key] ?? 0;
     for (const [kind, amount] of Object.entries(stats.free ?? {})) total.free[kind] = (total.free[kind] ?? 0) + amount;
