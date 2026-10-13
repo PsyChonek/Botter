@@ -224,3 +224,11 @@ test('addRouletteSpin separates a hidden cost from the luck of the wheel', () =>
   assert.equal(G.roulettePockets(0).length, 39);
   assert.equal(G.roulettePockets(2).length, 37);
 });
+
+test('addRouletteSpin keys rows only by a zeros level the wheel can have', () => {
+  const check = {};
+  G.addRouletteSpin(check, '__proto__', { bets: { red: 20 } }, { pocket: '1', payout: 40, total: 20 }, 20);
+  G.addRouletteSpin(check, 7, { bets: { red: 20 } }, { pocket: '1', payout: 40, total: 20 }, 20);
+  assert.deepEqual(Object.keys(check).sort(), ['0', '2']);
+  assert.equal(Object.prototype.spins, undefined);
+});

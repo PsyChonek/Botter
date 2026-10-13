@@ -422,7 +422,9 @@ function showRoulette(check) {
       cell(row.checkedWagered ? pct2.format(row.expected / row.checkedWagered) : '-'),
       cell(deviations === null ? '-' : signed.format(deviations), deviations !== null && Math.abs(deviations) >= 3 ? 'neg' : ''),
       cell(hidden === null ? '-' : pct2.format(hidden), hidden !== null && Math.abs(hidden) >= 0.001 ? 'neg' : ''),
-      cell(num.format(row.mismatches), row.mismatches ? 'neg' : ''),
+      // Spins with a bet spot the rules check does not know are not checked, so
+      // the errors are shown out of the spins that were.
+      cell(`${num.format(row.mismatches)} / ${num.format(row.checked)}`, row.mismatches || row.checked < row.spins ? 'neg' : ''),
     );
     rows.push(tr);
   }

@@ -269,6 +269,8 @@
   // differ from the rules; expected and variance are the payout's mean and
   // variance by the rules, summed over the checked spins.
   function addRouletteSpin(check, zeros, request, data, net) {
+    // The key comes from the server's upgrade level: only 0 to 2 are kept apart.
+    zeros = Math.max(0, Math.min(ROULETTE_EXTRA.length, Math.trunc(Number(zeros)) || 0));
     const row = (check[zeros] ??= { spins: 0, wagered: 0, paid: 0, net: 0, greens: 0, checked: 0, mismatches: 0, expected: 0, variance: 0, checkedPaid: 0, checkedWagered: 0 });
     const pocket = String(data.pocket);
     const paid = Number(data.payout) || 0;
