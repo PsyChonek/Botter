@@ -604,6 +604,43 @@
   "optionsLotteryTickets": {
     "message": "Tickets per draw (1 to 5)"
   },
+  "optionsLotteryPick": {
+    "message": "Ticket numbers"
+  },
+  "lotteryPick_random": {
+    "message": "Random for every ticket"
+  },
+  "lotteryPick_fixed": {
+    "message": "My numbers for each ticket"
+  },
+  "lotteryPick_hot": {
+    "message": "Random, favouring often drawn numbers"
+  },
+  "lotteryPick_cold": {
+    "message": "Random, favouring rarely drawn numbers"
+  },
+  "optionsLotteryLines": {
+    "message": "One line per ticket, six numbers from 1 to 49 (line 1 is the first ticket of a draw)"
+  },
+  "optionsLotteryLinesOk": {
+    "message": "$P1$ of 5 tickets set; the rest are random.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsLotteryLinesBad": {
+    "message": "Line $P1$ is not six different numbers from 1 to 49; those tickets are random.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsLotteryPickHint": {
+    "message": "Applies to every ticket the bot buys, on every account. Every ticket has the same odds whatever its numbers, so this only decides which numbers you hold. Often and rarely drawn are counted over the recent draws the lottery screen lists."
+  },
   "optionsXpBudget": {
     "message": "Daily loss budget for XP grinding (0 = off)"
   },
@@ -1124,6 +1161,15 @@
   },
   "optionsRotateHint": {
     "message": "An account not visited today goes first, so its daily bonus and checks run. Otherwise the account with the most energy, above 15, or, in auto mode, the richest one that can still grind XP once this one cannot. After that it returns to the home account: the one picked in the panel or the one auto mode was started on. Each switch reloads the casino tab."
+  },
+  "optionsRotateCrash": {
+    "message": "Switch to accounts that have not yet bet on the running Produkce padá round"
+  },
+  "optionsRotateLottery": {
+    "message": "Switch to accounts that have not yet bought their tickets for the next lottery draw"
+  },
+  "optionsRotateRoundsHint": {
+    "message": "Once one account finds a crash bet worth it, every other saved account that has not entered that round is visited while entering still pays; each one checks the round again before it bets. Lottery visits go to every account from level 4 that has not finished buying for the next draw (with \"Feeling lucky\" or the achievement hunt on), and stop 2 minutes before the draw. An account that still owes a bet or tickets stays up to 5 minutes. A crash visit comes before everything else, a lottery visit after accounts not seen today."
   },
   "optionsAccountsHeading": {
     "message": "Accounts"

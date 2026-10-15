@@ -182,6 +182,13 @@ progress shows at `chrome://on-device-internals`.
     of tickets (1 to 5) every draw at a chosen price, or the biggest affordable one
     below it, whatever they are worth. It keeps the reserve and runs without the hunt;
     with the hunt on, the hunt can still add cheap tickets up to five.
+  - **Ticket numbers** (settings, Auto tab; `lotteryNumbers` in `src/auto.js`) apply to
+    every ticket the bot buys: random for every ticket (default), my numbers for each
+    ticket (one line per ticket in buying order, six different numbers from 1 to 49;
+    a blank or invalid line is bought on random numbers and the settings page names
+    the bad lines), or random weighted toward the numbers drawn most or least often in
+    the recent draws the lottery screen lists. Every ticket has the same odds, so this
+    only chooses which numbers are held.
 - **Auto mode switches** (panel, all on by default): Games (crash, lottery, standup,
   payroll and wins-bonus bets, achievement hunt and XP grinding), Work, Wheel (the free
   hourly spin; the daily bonus and bailout stay), Achievements (the hunt), Payroll fund
@@ -416,6 +423,21 @@ progress shows at `chrome://on-device-internals`.
     When that account is done it returns to the **home** account: the one picked in
     the dropdown, or the one auto mode was started on (marked in the dropdown). It
     stays at least a minute on each account. With one saved account it does nothing.
+  - **Crash and lottery visits** (settings, Auto tab, both on by default, need auto mode
+    with Games on; `roundsDue` in `src/auto.js`): each saved login records the crash
+    round it bet in (`crashRound`) and the lottery draw it finished buying for with the
+    tickets it held (`lotteryDraw`, `lotteryBought`). The rounds themselves are shared
+    under the `rounds` storage key. When an account bets on a running Produkce padá
+    round because it pays, the round stays open to the others for 10 minutes (each bet
+    there extends it), and every account from level 3 that has not entered it is
+    visited first, before accounts not seen today. Each one checks the round again
+    and closes it when entering no longer pays. Lottery visits go to every account
+    from level 4 that has not finished buying for the next draw, while "Feeling lucky"
+    or the hunt buys tickets, after accounts not seen today and before a ready wheel,
+    and stop 2 minutes before the draw. An account the hunt bought nothing for last
+    draw is skipped unless "Feeling lucky" is on. Both check the reserve against the
+    smallest stake or price. An account that still owes a bet or tickets is not left
+    for up to 5 minutes.
   - Work starts only once energy is above 5 and then works it down to zero, so single
     refilled points do not keep interrupting the grinder. In auto mode, while the
     account can still grind XP, it grinds first and works only to keep energy 2 below

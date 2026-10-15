@@ -906,3 +906,101 @@ test('huntPlan takes the baccarat side bet that pays more and questGame reads Ba
   assert.equal(A.huntPlan(hunter({ achievements: { ...done, bac_tie: { tier: 1 }, bac_pair: { tier: 1 } } }), ctx), null);
   assert.equal(A.questGame({ key: 'rounds_x', text: 'Odehraj 10 her Bakaratu' }), 'baccarat');
 });
+
+test('urgentAccount sends a crash bet before fresh accounts and lottery tickets before the wheel', () => {
+  const today = '2026-10-07';
+  const accounts = [
+    { id: 'b', seenAt: 3, seenDay: today, wheel: true },
+    { id: 'c', seenAt: 2, seenDay: today, lottery: true },
+    { id: 'd', seenAt: 1, seenDay: '2026-10-06' },
+    { id: 'e', seenAt: 4, seenDay: today, crash: true },
+  ];
+  assert.equal(A.urgentAccount(accounts, today), 'e');
+  assert.equal(A.urgentAccount(accounts.slice(0, 3), today), 'd');
+  assert.equal(A.urgentAccount(accounts.slice(0, 2), today), 'c');
+  assert.equal(A.urgentAccount(accounts.slice(0, 1), today), 'b');
+});
+
+const roundsCtx = (extra = {}) => ({
+  now: 1000,
+  crash: true,
+  lottery: true,
+  lucky: false,
+  reserve: 0,
+  crashLevel: 3,
+  lotteryLevel: 4,
+  crashStake: 20,
+  ...extra,
+});
+
+test('roundsDue sends an account to a running crash round it has not entered while entering pays', () => {
+  const rounds = { crash: { startAt: 500, openUntil: 2000 } };
+  const saved = { level: 5, credits: 100 };
+  assert.equal(A.roundsDue(saved, rounds, roundsCtx()).crash, true);
+  assert.equal(A.roundsDue({ ...saved, crashRound: 500 }, rounds, roundsCtx()).crash, false);
+  assert.equal(A.roundsDue({ ...saved, crashRound: 400 }, rounds, roundsCtx()).crash, true);
+  assert.equal(A.roundsDue(saved, rounds, roundsCtx({ now: 2000 })).crash, false);
+  assert.equal(A.roundsDue({ ...saved, level: 2 }, rounds, roundsCtx()).crash, false);
+  assert.equal(A.roundsDue(saved, rounds, roundsCtx({ reserve: 90 })).crash, false);
+  assert.equal(A.roundsDue(saved, rounds, roundsCtx({ crash: false })).crash, false);
+  assert.equal(A.roundsDue(saved, { crash: null }, roundsCtx()).crash, false);
+});
+
+test('roundsDue sends an account to the next lottery draw until it has finished buying for it', () => {
+  const drawAt = 1000 + 60 * 60_000;
+  const rounds = { lottery: { drawAt, minPrice: 20 } };
+  const saved = { level: 4, credits: 100 };
+  assert.equal(A.roundsDue(saved, rounds, roundsCtx()).lottery, true);
+  assert.equal(A.roundsDue({ ...saved, lotteryDraw: drawAt, lotteryBought: 5 }, rounds, roundsCtx()).lottery, false);
+  assert.equal(A.roundsDue({ ...saved, lotteryDraw: 1, lotteryBought: 1 }, rounds, roundsCtx()).lottery, true);
+  // Nothing was worth buying for the hunt last draw: only "Feeling lucky" goes back.
+  assert.equal(A.roundsDue({ ...saved, lotteryDraw: 1, lotteryBought: 0 }, rounds, roundsCtx()).lottery, false);
+  assert.equal(A.roundsDue({ ...saved, lotteryDraw: 1, lotteryBought: 0 }, rounds, roundsCtx({ lucky: true })).lottery, true);
+  assert.equal(A.roundsDue(saved, rounds, roundsCtx({ now: drawAt - 60_000 })).lottery, false);
+  assert.equal(A.roundsDue({ ...saved, level: 3 }, rounds, roundsCtx()).lottery, false);
+  assert.equal(A.roundsDue({ ...saved, credits: 19 }, rounds, roundsCtx()).lottery, false);
+  assert.equal(A.roundsDue(saved, rounds, roundsCtx({ lottery: false })).lottery, false);
+});
+
+test('parseTicket reads six different numbers from 1 to 49 and parseTickets keeps one line per ticket', () => {
+  assert.deepEqual(A.parseTicket(' 44, 7;12 19  23 38 '), [7, 12, 19, 23, 38, 44]);
+  assert.equal(A.parseTicket('1 2 3 4 5'), null);
+  assert.equal(A.parseTicket('1 2 3 4 5 50'), null);
+  assert.equal(A.parseTicket('1 1 2 3 4 5'), null);
+  assert.equal(A.parseTicket('1 2 3 4 5 x'), null);
+  assert.deepEqual(A.parseTickets('1 2 3 4 5 6\n\nbad\n7 8 9 10 11 12\n13 14 15 16 17 18\n19 20 21 22 23 24'), [
+    [1, 2, 3, 4, 5, 6],
+    null,
+    null,
+    [7, 8, 9, 10, 11, 12],
+    [13, 14, 15, 16, 17, 18],
+  ]);
+  assert.deepEqual(A.parseTickets(''), [null]);
+});
+
+test('lotteryNumbers uses the fixed line of each ticket and draws six different numbers otherwise', () => {
+  const tickets = A.parseTickets('1 2 3 4 5 6\n\n7 8 9 10 11 12');
+  assert.deepEqual(A.lotteryNumbers('fixed', 0, { tickets }), [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(A.lotteryNumbers('fixed', 2, { tickets }), [7, 8, 9, 10, 11, 12]);
+  for (const [mode, index] of [['fixed', 1], ['fixed', 4], ['random', 0], ['hot', 0], ['cold', 0]]) {
+    const numbers = A.lotteryNumbers(mode, index, { tickets, history: [{ numbers: [1, 2, 3, 4, 5, 6] }] });
+    assert.equal(new Set(numbers).size, 6);
+    assert.ok(numbers.every((n) => n >= 1 && n <= 49));
+    assert.deepEqual(numbers, [...numbers].sort((a, b) => a - b));
+  }
+  // The fixed tickets are never handed out for the caller to change.
+  A.lotteryNumbers('fixed', 0, { tickets }).push(99);
+  assert.equal(tickets[0].length, 6);
+});
+
+test('lotteryNumbers leans toward often or rarely drawn numbers', () => {
+  const history = Array.from({ length: 10 }, () => ({ numbers: [1, 2, 3, 4, 5, 6] }));
+  const hits = (mode) => {
+    let count = 0;
+    for (let i = 0; i < 2000; i++) count += A.lotteryNumbers(mode, 0, { history }).filter((n) => n <= 6).length;
+    return count / 2000;
+  };
+  // Uniform picks hold 6 * 6 / 49, about 0.73 of the six drawn numbers.
+  assert.ok(hits('hot') > 2.5);
+  assert.ok(hits('cold') < 0.2);
+});

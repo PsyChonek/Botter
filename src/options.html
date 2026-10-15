@@ -131,6 +131,11 @@
           <label class="check"><span data-i18n="optionsEdgeBets"></span><input type="checkbox" role="switch" name="edgeBets" /></label>
           <label class="check"><span data-i18n="optionsRotateAccounts"></span><input type="checkbox" role="switch" name="rotateAccounts" /></label>
           <p class="hint" data-when="rotateAccounts" data-i18n="optionsRotateHint"></p>
+          <div data-when="rotateAccounts">
+            <label class="check"><span data-i18n="optionsRotateCrash"></span><input type="checkbox" role="switch" name="rotateCrash" /></label>
+            <label class="check"><span data-i18n="optionsRotateLottery"></span><input type="checkbox" role="switch" name="rotateLottery" /></label>
+            <p class="hint" data-when="rotateCrash | rotateLottery" data-i18n="optionsRotateRoundsHint"></p>
+          </div>
           <label class="check"><span data-i18n="optionsCrashEnabled"></span><input type="checkbox" role="switch" name="crashEnabled" /></label>
           <div class="grid" data-when="crashEnabled">
             <div>
@@ -157,6 +162,18 @@
               <input id="lotteryTickets" name="lotteryTickets" type="number" min="1" max="5" step="1" />
             </div>
           </div>
+          <div class="grid">
+            <div>
+              <label for="lotteryPick" data-i18n="optionsLotteryPick"></label>
+              <select id="lotteryPick" name="lotteryPick"></select>
+            </div>
+          </div>
+          <div data-when="lotteryPick:fixed">
+            <label for="lotteryLines" data-i18n="optionsLotteryLines"></label>
+            <textarea id="lotteryLines" name="lotteryLines" rows="5" spellcheck="false" aria-describedby="lotteryLinesCheck" placeholder="7 12 19 23 38 44"></textarea>
+            <p class="hint" id="lotteryLinesCheck" aria-live="polite"></p>
+          </div>
+          <p class="hint" data-i18n="optionsLotteryPickHint"></p>
           <div class="grid">
             <div>
               <label for="grindLimit" data-i18n="optionsGrindLimit"></label>

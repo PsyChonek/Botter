@@ -21,12 +21,14 @@ const CHECKBOXES = [
   'captureDebug',
   'panelHidden',
   'rotateAccounts',
+  'rotateCrash',
+  'rotateLottery',
   'playOnScreen',
 ];
-const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet', 'grindLimit', 'grindGame', 'firstGame'];
+const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet', 'grindLimit', 'grindGame', 'firstGame', 'lotteryPick'];
 const BET_SELECTS = ['gameBet', 'crashBet', 'grindBet', 'lotteryPrice'];
 const INT_SELECTS = [...BET_SELECTS, 'huntRoundsGoal'];
-const TEXTS = ['openrouterModel'];
+const TEXTS = ['openrouterModel', 'lotteryLines'];
 const NUMBERS = [
   'minDelayMs',
   'maxDelayMs',
@@ -60,6 +62,8 @@ const DEFAULTS = {
   lotteryLucky: false,
   lotteryPrice: 20,
   lotteryTickets: 5,
+  lotteryPick: 'random',
+  lotteryLines: '',
   grindLimit: 'daily',
   xpBudget: 0,
   grindMinBalance: 0,
@@ -74,6 +78,8 @@ const DEFAULTS = {
   captureDebug: false,
   panelHidden: false,
   rotateAccounts: true,
+  rotateCrash: true,
+  rotateLottery: true,
   playOnScreen: false,
   model: 'claude-opus-5-5',
   openrouterModel: 'google/gemini-2.5-flash',
@@ -118,6 +124,7 @@ for (const name of BET_SELECTS) {
   for (const bet of G.BET_LEVELS) field(name).add(new Option(num.format(bet), String(bet)));
 }
 for (const rounds of globalThis.BotterAuto.HUNT_ROUNDS_TIERS) field('huntRoundsGoal').add(new Option(num.format(rounds), String(rounds)));
+for (const mode of globalThis.BotterAuto.LOTTERY_PICK_MODES) field('lotteryPick').add(new Option(msg(`lotteryPick_${mode}`), mode));
 for (const key of G.ROULETTE_BETS) field('rouletteBet').add(new Option(msg(`roulette_${key}`), key));
 field('grindGame').add(new Option(msg('grind_auto'), 'auto'));
 for (const game of G.GAME_KEYS) field('grindGame').add(new Option(msg(`game_${game}`), game));
@@ -151,6 +158,18 @@ function fill(values) {
     if (field(name) !== document.activeElement) field(name).value = values[name];
   }
   showRelevant();
+  showLotteryLines();
+}
+
+// Which fixed ticket lines the bot can use: the line numbers of any it cannot
+// read (they are bought on random numbers), else how many tickets are set.
+function showLotteryLines() {
+  const lines = field('lotteryLines').value.split('\n');
+  const bad = lines.flatMap((line, i) => (line.trim() && !globalThis.BotterAuto.parseTicket(line) ? [i + 1] : []));
+  const set = globalThis.BotterAuto.parseTickets(field('lotteryLines').value).filter(Boolean).length;
+  $('lotteryLinesCheck').textContent = bad.length
+    ? msg('optionsLotteryLinesBad', [bad.join(', ')])
+    : msg('optionsLotteryLinesOk', [String(set)]);
 }
 
 // data-when="name" shows an element while that checkbox is ticked or that
@@ -247,6 +266,7 @@ async function save() {
 // Toggles and dropdowns save at once; typing waits for a pause.
 document.querySelector('main').addEventListener('input', (event) => {
   showRelevant();
+  if (event.target.name === 'lotteryLines') showLotteryLines();
   if (!isSetting(event.target)) return;
   const typing = event.target.matches('input:not([type="checkbox"]), textarea');
   clearTimeout(saveTimer);

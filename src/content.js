@@ -55,6 +55,8 @@
     lotteryLucky: false,
     lotteryPrice: 20,
     lotteryTickets: 5,
+    lotteryPick: 'random', // how ticket numbers are chosen (BotterAuto.LOTTERY_PICK_MODES)
+    lotteryLines: '', // fixed numbers, one line per ticket (BotterAuto.parseTickets)
     grindLimit: 'daily',
     xpBudget: 0,
     grindMinBalance: 0,
@@ -71,6 +73,8 @@
     panelHidden: false,
     panelOpen: [], // panel sections left open (data-section names)
     rotateAccounts: true,
+    rotateCrash: true, // visit accounts that still owe the running crash round a bet
+    rotateLottery: true, // visit accounts that still owe the next draw their tickets
     homeAccount: '', // user id rotation returns to; the account picked in the panel
   };
   const EMPTY_STATS = {
@@ -136,6 +140,12 @@
   const ROTATE_DWELL_MS = 60_000;
   // Another account is worth a switch (a page reload) only above this much energy.
   const ROTATE_MIN_ENERGY = 15;
+  // Other accounts are sent to the running crash round this long after one
+  // found entering it worth it; each account that bets there extends it.
+  const CRASH_OPEN_MS = 10 * 60_000;
+  // An account that still owes a crash bet or lottery tickets is not left for
+  // up to this long, so a quick visit always finishes them.
+  const ROUNDS_STAY_MS = 5 * 60_000;
   // A work run starts only above this much energy and then drains it, so single
   // refilled points do not keep interrupting the grinder.
   const WORK_MIN_ENERGY = 5;
@@ -182,6 +192,7 @@
   let sprint = null; // { rank, score, endAt, at } of this account in the weekly sprint
   let payroll = null; // { amount, seed, cap, at } of the shared payroll fund
   let lottery = null; // last lottery state from /api/lottery, with the local time it came
+  let rounds = {}; // crash and lottery rounds other accounts still owe (BotterAuto.roundsDue), shared
   let edgeAt = 0; // when edgeStep last found a round that pays by itself
   let spins = []; // recorded Blaze spins for the model check
   let hotfixRounds = []; // recorded Forbes z Chánova responses for its model check
@@ -244,6 +255,7 @@
     bank = stored.bank ?? {};
     statsCache = byPrefix(stored, STATS_PREFIX);
     accounts = byPrefix(stored, ACCOUNT_PREFIX);
+    rounds = stored.rounds ?? {};
     legacyStats = stored.stats ?? null;
     log = C.createLogger(settings.logLevel);
   }
@@ -271,6 +283,7 @@
     if (changes.hotfixRounds) hotfixRounds = changes.hotfixRounds.newValue ?? [];
     if (changes.capture) capture = changes.capture.newValue ?? [];
     if (changes.bundle) bundle = changes.bundle.newValue ?? null;
+    if (changes.rounds) rounds = changes.rounds.newValue ?? {};
     render();
   });
 
@@ -278,6 +291,10 @@
   // Nothing is saved until a response says whose stats these are.
   const statsEntry = () => (accountId ? { [STATS_PREFIX + accountId]: stats } : {});
   const saveStats = () => chrome.storage.local.set(statsEntry());
+  const saveRounds = (patch) => {
+    rounds = { ...rounds, ...patch };
+    return chrome.storage.local.set({ rounds });
+  };
 
   // ---------- messages from the page hook ----------
 
@@ -531,6 +548,11 @@
   // server credits them at the draw, so they show up only here.
   function readLottery(state) {
     lottery = { ...state, at: Date.now() };
+    const drawAt = state.next?.drawAt;
+    const minPrice = Math.min(...(state.prices ?? []));
+    if (drawAt && (rounds.lottery?.drawAt !== drawAt || rounds.lottery?.minPrice !== minPrice)) {
+      saveRounds({ lottery: { drawAt, minPrice: Number.isFinite(minPrice) ? minPrice : 0 } });
+    }
     const last = state.last;
     if (!last?.id || !last.mine?.length || stats.flags.lotteryDraw === last.id) return;
     stats.flags.lotteryDraw = last.id;
@@ -710,6 +732,31 @@
     log.debug('session_refreshed', { login: saved.login });
   }
 
+  // Notes on the saved login what this account has done in the shared rounds
+  // (crashRound, lotteryDraw, lotteryBought), so rotation knows who still owes them.
+  function markAccount(patch) {
+    const saved = accounts[accountId];
+    if (!saved || Object.entries(patch).every(([key, value]) => saved[key] === value)) return;
+    accounts[accountId] = { ...saved, ...patch };
+    chrome.storage.local.set({ [ACCOUNT_PREFIX + accountId]: accounts[accountId] });
+  }
+
+  // What an account still owes the shared crash and lottery rounds
+  // (BotterAuto.roundsDue), from its saved record or the live player.
+  function dueRounds(saved, now = Date.now()) {
+    const games = settings.autoMode && settings.autoGames && settings.rotateAccounts;
+    return A.roundsDue(saved, rounds, {
+      now,
+      crash: games && settings.rotateCrash && settings.crashEnabled,
+      lottery: games && settings.rotateLottery && (huntOn() || settings.lotteryLucky),
+      lucky: settings.lotteryLucky,
+      reserve: settings.reserve,
+      crashLevel: CRASH_UNLOCK,
+      lotteryLevel: G.LOTTERY_UNLOCK,
+      crashStake: G.CRASH_LEVELS[0],
+    });
+  }
+
   // Logs the page in as a saved account: its session goes where the app keeps
   // it, then the page reloads. The current session is saved first so it can return,
   // after any refresh in flight has landed, or the saved copy would hold a
@@ -784,6 +831,8 @@
     if (!settings.rotateAccounts || !player || Date.now() - accountSince < ROTATE_DWELL_MS) return false;
     if (urgent && document.querySelector('.work-screen section.task')) return false;
     const now = Date.now();
+    const here = dueRounds({ ...accounts[accountId], level: player.level, credits: player.credits }, now);
+    if ((here.crash || here.lottery) && now - accountSince < ROUNDS_STAY_MS) return false;
     const today = A.dayKey(now);
     const candidates = Object.entries(accounts)
       .filter(([id, saved]) => id !== accountId && saved.session)
@@ -796,10 +845,12 @@
         credits: saved.credits ?? 0,
         canGrind: canGrind(id, saved),
         wheel: settings.autoClaim && A.wheelReady(saved.wheelNextAt, now) && now - (saved.seenAt ?? 0) > CLAIM_RETRY_MS,
+        ...dueRounds(saved, now),
       }));
     const home = settings.homeAccount && settings.homeAccount !== accountId ? settings.homeAccount : null;
     const id = urgent ? A.urgentAccount(candidates, today) : A.pickAccount(candidates, today, ROTATE_MIN_ENERGY, home);
     if (!id) return false;
+    const picked = candidates.find((c) => c.id === id);
     log.info('account_rotate', {
       to: accounts[id].login,
       urgent,
@@ -807,6 +858,8 @@
       energy: G.energyNow(accounts[id].work, now),
       credits: accounts[id].credits,
       wheel: A.wheelReady(accounts[id].wheelNextAt, now),
+      crash: picked.crash,
+      lottery: picked.lottery,
     });
     await switchAccount(id);
     return true;
@@ -1555,11 +1608,17 @@
     crashPolledAt = Date.now();
     const res = await api('/api/crash');
     const crash = res.data?.crash;
-    if (!res.ok || !crash || crash.status !== 'running' || crash.bets?.some((bet) => bet.me)) return true;
+    if (res.ok && crash?.status !== 'running' && rounds.crash) saveRounds({ crash: null });
+    if (!res.ok || !crash || crash.status !== 'running') return true;
+    if (crash.bets?.some((bet) => bet.me)) {
+      markAccount({ crashRound: crash.startAt });
+      return true;
+    }
 
     const entry = A.crashMult(crash.startAt, crash.serverNow ?? Date.now());
     const plan = settings.crashEnabled ? A.bestCrashTarget(crash.history, entry, crash.rate ?? 1) : null;
     if (!plan || plan.ev < settings.crashMinEv) {
+      if (rounds.crash?.startAt === crash.startAt) saveRounds({ crash: null });
       if (hunting) return crashHunt(crash, entry);
       log.info('crash_skip', { entry, rate: crash.rate, history: crash.history?.length ?? 0, ev: plan?.ev ?? null });
       return true;
@@ -1579,6 +1638,9 @@
     const bet = await api('/api/crash/bet', { stake, auto: plan.target });
     if (!bet.ok) log.warn('crash_bet_failed', { status: bet.status, error: bet.data?.error });
     else log.info('crash_bet', { stake, entry, target: plan.target, ev: plan.ev, kelly: settings.crashKelly });
+    // A refused bet does not hold rotation here; this account still polls while it stays.
+    markAccount({ crashRound: crash.startAt });
+    saveRounds({ crash: { startAt: crash.startAt, openUntil: Date.now() + CRASH_OPEN_MS } });
     return true;
   }
 
@@ -1596,6 +1658,7 @@
     const bet = await api('/api/crash/bet', { stake, auto: A.CRASH_ACHIEVEMENT_TARGET });
     if (!bet.ok) log.warn('crash_bet_failed', { status: bet.status, error: bet.data?.error });
     else log.info('hunt_crash_bet', { stake, entry, p });
+    markAccount({ crashRound: crash.startAt });
     return true;
   }
 
@@ -1634,7 +1697,7 @@
     return true;
   }
 
-  // Lottery tickets for the next draw, one a tick on random numbers: with
+  // Lottery tickets for the next draw, one a tick on the numbers lotteryPick chooses: with
   // "Feeling lucky" the wanted number at the wanted price whatever they are
   // worth (BotterAuto.luckyPlan), then for the achievement hunt while its
   // achievements pay for them at the cheapest price (BotterAuto.lotteryPlan).
@@ -1655,25 +1718,24 @@
     const prices = (lottery.prices ?? []).filter((price) => player.credits - price >= reserve);
     const luckyBuy = lucky ? A.luckyPlan({ mine, prices, price: settings.lotteryPrice, tickets: settings.lotteryTickets }) : null;
     const plan = luckyBuy ?? (huntOn() ? A.lotteryPlan(player, { mine, prices }) : null);
-    if (!plan) return false;
-    const numbers = lotteryNumbers();
+    if (!plan) {
+      markAccount({ lotteryDraw: lottery.next.drawAt, lotteryBought: mine });
+      return false;
+    }
+    const numbers = A.lotteryNumbers(settings.lotteryPick, mine, {
+      tickets: A.parseTickets(settings.lotteryLines),
+      history: lottery.history,
+    });
     setStatus(luckyBuy ? 'statusLotteryLucky' : 'statusLottery', [String(mine + 1), String(mine + plan.tickets), credits(plan.price)]);
     const res = await api('/api/lottery/buy', { numbers, price: plan.price });
     if (!res.ok) {
       claimTried.lotteryBuy = Date.now();
+      markAccount({ lotteryDraw: lottery.next.drawAt, lotteryBought: mine });
       log.warn('lottery_buy_failed', { price: plan.price, status: res.status, error: res.data?.error });
     } else {
       log.info('lottery_ticket', { numbers, price: plan.price, tickets: mine + 1, lucky: Boolean(luckyBuy), value: plan.value });
     }
     return true;
-  }
-
-  // Six distinct numbers of 1 to 49; every ticket has the same odds.
-  function lotteryNumbers() {
-    const pool = Array.from({ length: 49 }, (_, i) => i + 1);
-    const out = [];
-    while (out.length < 6) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
-    return out.sort((a, b) => a - b);
   }
 
   // Logged when what edgeStep bets on changes, not on every round.

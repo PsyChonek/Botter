@@ -430,13 +430,19 @@
     return energy > minEnergy || (running && energy >= 1);
   }
 
-  // Account with free credits waiting, worth leaving even a busy one for: one
-  // not visited today (its daily bonus and checks are waiting), then one whose
-  // free wheel spin is ready, longest unseen first. Null when there is none.
+  // Account worth leaving even a busy one for, longest unseen first: one that
+  // still owes the running Produkce padá round its bet while entering pays (the
+  // entry gets worse as the round ages), one not visited today (its daily bonus
+  // and checks are waiting), one that still owes the next lottery draw its
+  // tickets, then one whose free wheel spin is ready. Null when there is none.
   function urgentAccount(candidates, today) {
     const oldest = (list) => list.reduce((a, b) => (b.seenAt < a.seenAt ? b : a)).id;
+    const crash = candidates.filter((a) => a.crash);
+    if (crash.length) return oldest(crash);
     const fresh = candidates.filter((a) => a.seenDay !== today);
     if (fresh.length) return oldest(fresh);
+    const lottery = candidates.filter((a) => a.lottery);
+    if (lottery.length) return oldest(lottery);
     const spin = candidates.filter((a) => a.wheel);
     if (spin.length) return oldest(spin);
     return null;
@@ -444,7 +450,7 @@
 
   // Account to switch to once the current one has nothing left to do. Each
   // candidate is { id, seenAt, seenDay, energy, normDone, credits, canGrind,
-  // wheel }. An urgent one goes first (see urgentAccount). Away from the home
+  // wheel, crash, lottery }. An urgent one goes first (see urgentAccount). Away from the home
   // account, the next stop is home. From home, the one with the most refilled
   // energy above minEnergy, else the richest one that can still grind XP, so
   // betting carries on when home has run out of credits.
@@ -756,6 +762,94 @@
     return { price, tickets: tickets - (ctx.mine ?? 0) };
   }
 
+  // A switch for the lottery waits this long before a draw: the draw is
+  // already running by the time the other account has loaded.
+  const LOTTERY_CLOSE_MS = 2 * 60_000;
+
+  // What a saved account still owes the shared rounds, judged from its saved
+  // record: { crash, lottery }. rounds is what the bot last saw: crash
+  // { startAt, openUntil } while entering the running round pays, lottery
+  // { drawAt, minPrice } of the next draw. The record keeps crashRound (startAt
+  // of the round it is in) and lotteryDraw / lotteryBought (the draw it has
+  // finished buying for and the tickets it held then). One that finished a
+  // draw with no tickets bought only for the hunt, which then had nothing worth
+  // buying, is not due again unless "Feeling lucky" buys regardless.
+  // ctx: { now, crash, lottery, lucky (switches), reserve, crashLevel,
+  // lotteryLevel (unlocks), crashStake (smallest stake) }.
+  function roundsDue(saved, rounds, ctx) {
+    const level = saved.level ?? 0;
+    const credits = saved.credits ?? 0;
+    const crash = rounds?.crash;
+    const draw = rounds?.lottery;
+    return {
+      crash: Boolean(
+        ctx.crash &&
+          crash &&
+          ctx.now < crash.openUntil &&
+          level >= ctx.crashLevel &&
+          saved.crashRound !== crash.startAt &&
+          credits - ctx.crashStake >= ctx.reserve,
+      ),
+      lottery: Boolean(
+        ctx.lottery &&
+          draw &&
+          ctx.now < draw.drawAt - LOTTERY_CLOSE_MS &&
+          level >= ctx.lotteryLevel &&
+          saved.lotteryDraw !== draw.drawAt &&
+          (ctx.lucky || saved.lotteryBought !== 0) &&
+          credits - (draw.minPrice ?? 0) >= ctx.reserve,
+      ),
+    };
+  }
+
+  const LOTTERY_BALLS = 49;
+  const LOTTERY_PICKS = 6;
+  const LOTTERY_PICK_MODES = ['random', 'fixed', 'hot', 'cold'];
+
+  // Six distinct numbers from 1 to 49 written on one line, separated by
+  // spaces, commas or semicolons, sorted; null when the line is anything else.
+  function parseTicket(line) {
+    const parts = String(line).trim().split(/[\s,;]+/).filter(Boolean);
+    const numbers = parts.map(Number);
+    const valid =
+      numbers.length === LOTTERY_PICKS &&
+      numbers.every((n) => Number.isInteger(n) && n >= 1 && n <= LOTTERY_BALLS) &&
+      new Set(numbers).size === LOTTERY_PICKS;
+    return valid ? numbers.sort((a, b) => a - b) : null;
+  }
+
+  // The fixed tickets from the settings, one line per ticket in buying order:
+  // [numbers | null] for up to five tickets, null for a blank or invalid line.
+  const parseTickets = (text) =>
+    String(text ?? '')
+      .split('\n')
+      .slice(0, LOTTERY_MAX_TICKETS)
+      .map((line) => (line.trim() ? parseTicket(line) : null));
+
+  // Numbers for ticket index (0 to 4) of a draw. random: six at random. fixed:
+  // that ticket's line from the settings (ctx.tickets, see parseTickets), at
+  // random when it has none. hot / cold: at random, weighted toward the numbers
+  // drawn most / least often in the recent draws (ctx.history: [{ numbers }]).
+  // Every ticket has the same odds whatever its numbers; this only picks them.
+  function lotteryNumbers(mode, index, ctx = {}, random = Math.random) {
+    const fixed = mode === 'fixed' ? ctx.tickets?.[index] : null;
+    if (fixed) return [...fixed];
+    const counts = new Array(LOTTERY_BALLS + 1).fill(0);
+    for (const draw of ctx.history ?? []) for (const n of draw.numbers ?? []) if (n >= 1 && n <= LOTTERY_BALLS) counts[n]++;
+    const most = Math.max(...counts);
+    const weight = (n) => (mode === 'hot' ? 1 + counts[n] : mode === 'cold' ? 1 + most - counts[n] : 1);
+    const pool = Array.from({ length: LOTTERY_BALLS }, (_, i) => i + 1);
+    const out = [];
+    while (out.length < LOTTERY_PICKS) {
+      const total = pool.reduce((sum, n) => sum + weight(n), 0);
+      let r = random() * total;
+      let i = 0;
+      while (i < pool.length - 1 && (r -= weight(pool[i])) >= 0) i++;
+      out.push(pool.splice(i, 1)[0]);
+    }
+    return out.sort((a, b) => a - b);
+  }
+
   // Mzdový fond: 1 % of every bet goes into a shared fund, and the bet that
   // takes it to its cap (12,000) drops it and takes it all. A bet whose 1 %
   // covers the room left wins the fund outright. Short of that, the bot pushes:
@@ -990,6 +1084,11 @@
     lotteryChance,
     lotteryPlan,
     luckyPlan,
+    roundsDue,
+    LOTTERY_PICK_MODES,
+    parseTicket,
+    parseTickets,
+    lotteryNumbers,
     payrollWorth,
     payrollPollMs,
     WINS_BONUS,

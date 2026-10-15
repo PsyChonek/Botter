@@ -604,6 +604,43 @@
   "optionsLotteryTickets": {
     "message": "Tiketů na tah (1 až 5)"
   },
+  "optionsLotteryPick": {
+    "message": "Čísla na tiketech"
+  },
+  "lotteryPick_random": {
+    "message": "Náhodná pro každý tiket"
+  },
+  "lotteryPick_fixed": {
+    "message": "Moje čísla pro každý tiket"
+  },
+  "lotteryPick_hot": {
+    "message": "Náhodná, častěji tažená čísla"
+  },
+  "lotteryPick_cold": {
+    "message": "Náhodná, méně často tažená čísla"
+  },
+  "optionsLotteryLines": {
+    "message": "Jeden řádek na tiket, šest čísel od 1 do 49 (řádek 1 je první tiket tahu)"
+  },
+  "optionsLotteryLinesOk": {
+    "message": "Nastaveno $P1$ z 5 tiketů, ostatní jsou náhodné.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsLotteryLinesBad": {
+    "message": "Řádek $P1$ není šest různých čísel od 1 do 49, tyto tikety budou náhodné.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsLotteryPickHint": {
+    "message": "Platí pro každý tiket, který bot koupí, na každém účtu. Každý tiket má stejnou šanci bez ohledu na čísla, takže se tím volí jen to, která čísla budeš mít. Častěji a méně často tažená čísla se počítají z posledních tahů, které ukazuje obrazovka loterie."
+  },
   "optionsXpBudget": {
     "message": "Denní rozpočet ztráty na farmění XP (0 = vypnuto)"
   },
@@ -1124,6 +1161,15 @@
   },
   "optionsRotateHint": {
     "message": "Přednost má účet, který dnes ještě nebyl otevřený, aby si vybral denní bonus a proběhly kontroly. Jinak účet s nejvíc energií, víc než 15, nebo v auto režimu nejbohatší účet, který ještě může grindovat XP, když tento už nemůže. Potom se vrátí na hlavní účet: ten vybraný v panelu, nebo ten, na kterém byl auto režim zapnutý. Každé přepnutí znovu načte záložku kasina."
+  },
+  "optionsRotateCrash": {
+    "message": "Přepnout na účty, které ještě nevsadily na běžící kolo Produkce padá"
+  },
+  "optionsRotateLottery": {
+    "message": "Přepnout na účty, které ještě nekoupily tikety na další tah loterie"
+  },
+  "optionsRotateRoundsHint": {
+    "message": "Jakmile jeden účet najde sázku na crash, která se vyplatí, navštíví se každý další uložený účet, který do kola ještě nevstoupil, dokud se vstup vyplácí; každý kolo před sázkou znovu ověří. Kvůli loterii se navštíví každý účet od úrovně 4, který ještě nedokoupil tikety na další tah (se zapnutým „Mám štěstí“ nebo lovem achievementů), nejpozději 2 minuty před tahem. Účet, který ještě dluží sázku nebo tikety, zůstane až 5 minut. Návštěva kvůli crashi má přednost před vším, kvůli loterii přijde po účtech, které dnes ještě nebyly otevřené."
   },
   "optionsAccountsHeading": {
     "message": "Účty"
