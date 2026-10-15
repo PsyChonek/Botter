@@ -402,6 +402,38 @@ function showProfit(stats = {}) {
   $('profitEmpty').hidden = rows.length > 0;
   showCombos(stats.combos ?? {});
   showRoulette(stats.roulette ?? {});
+  showBaccarat(stats.baccarat ?? {});
+}
+
+// Baccarat model check per upgrade combination (BotterBaccarat.addHand): the
+// winners and pairs seen against the infinite-deck model, what the server paid
+// against what the client's pays give, the cost the credits show beyond the
+// payout, hands dealt against the drawing rules and payouts that broke the pays.
+function showBaccarat(check) {
+  const B = globalThis.BotterBaccarat;
+  const odds = B.outcomes();
+  const pairChance = 1 - (1 - B.PAIR_CHANCE) ** 2;
+  const share = (seen, chance, hands) => `${num.format(seen)} / ${num.format(Math.round(chance * hands))}`;
+  const rows = [];
+  for (const [combo, row] of Object.entries(check).sort(([a], [b]) => a.localeCompare(b))) {
+    const upgrades = O.comboUpgrades('baccarat', combo);
+    const hidden = row.wagered ? (row.paid - row.wagered - row.net) / row.wagered : null;
+    const tr = document.createElement('tr');
+    tr.append(
+      cell(Object.entries(upgrades).map(([name, level]) => `${name} ${level}`).join(', ')),
+      cell(num.format(row.hands)),
+      cell(['player', 'banker', 'tie'].map((w) => share(row[w], odds[w], row.hands)).join(' · ')),
+      cell(share(row.pairs, pairChance, row.hands)),
+      cell(row.checkedWagered ? pct2.format(row.checkedPaid / row.checkedWagered) : '-'),
+      cell(row.checkedWagered ? pct2.format(row.expected / row.checkedWagered) : '-'),
+      cell(hidden === null ? '-' : pct2.format(hidden), hidden !== null && Math.abs(hidden) >= 0.001 ? 'neg' : ''),
+      cell(num.format(row.drawErrors + row.winnerErrors), row.drawErrors + row.winnerErrors ? 'neg' : ''),
+      cell(`${num.format(row.payErrors)} / ${num.format(row.checked)}`, row.payErrors || row.checked < row.hands ? 'neg' : ''),
+    );
+    rows.push(tr);
+  }
+  $('baccaratBody').replaceChildren(...rows);
+  $('baccaratEmpty').hidden = rows.length > 0;
 }
 
 // Roulette model check per zeros level (G.addRouletteSpin): zero pockets seen
@@ -462,15 +494,17 @@ function showCombos(combos) {
 
 // Totals of several accounts' stats, for the "all accounts" profit view.
 function sumStats(list) {
-  const total = { games: {}, combos: {}, roulette: {}, work: { tickets: 0, net: 0, xp: 0 }, free: {} };
+  const total = { games: {}, combos: {}, roulette: {}, baccarat: {}, work: { tickets: 0, net: 0, xp: 0 }, free: {} };
   for (const stats of list) {
     for (const [game, row] of Object.entries(stats.games ?? {})) G.addDelta(total.games, { game, ...row });
     for (const [game, rows] of Object.entries(stats.combos ?? {})) {
       for (const [combo, row] of Object.entries(rows)) G.addDelta((total.combos[game] ??= {}), { ...row, game: combo });
     }
-    for (const [zeros, row] of Object.entries(stats.roulette ?? {})) {
-      const sum = (total.roulette[zeros] ??= {});
-      for (const [field, value] of Object.entries(row)) sum[field] = (sum[field] ?? 0) + value;
+    for (const check of ['roulette', 'baccarat']) {
+      for (const [key, row] of Object.entries(stats[check] ?? {})) {
+        const sum = (total[check][key] ??= {});
+        for (const [field, value] of Object.entries(row)) sum[field] = (sum[field] ?? 0) + value;
+      }
     }
     for (const key of Object.keys(total.work)) total.work[key] += stats.work?.[key] ?? 0;
     for (const [kind, amount] of Object.entries(stats.free ?? {})) total.free[kind] = (total.free[kind] ?? 0) + amount;

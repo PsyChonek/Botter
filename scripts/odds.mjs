@@ -3,16 +3,21 @@
 // the tables in the casino client (weights, paytables, upgrade effects, rules).
 // The slots are evaluated on the server, so Skeleton Slots and Slotingi follow
 // the client's rules text where it leaves details open (see the notes below).
-// For every game, roulette and blackjack included, it also records how often a
-// round ends ahead and how often a session of 1,000 rounds does.
-// Usage: node scripts/odds.mjs [spins per combination]
+// For every game, roulette, blackjack and baccarat included, it also records how
+// often a round ends ahead and how often a session of 1,000 rounds does.
+// Usage: node scripts/odds.mjs [spins per combination] [--only game,game]
+// --only regenerates the listed games and keeps the rest of the current table.
 import { writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const Blaze = require('../src/blaze.js');
 const BJ = require('../src/blackjack.js');
-const SPINS = Number(process.argv[2] ?? 300_000);
+const BAC = require('../src/baccarat.js');
+const args = process.argv.slice(2);
+const onlyAt = args.indexOf('--only');
+const ONLY = onlyAt >= 0 ? new Set(args.splice(onlyAt, 2)[1].split(',')) : null;
+const SPINS = Number(args[0] ?? 300_000);
 const SESSIONS = 10_000;
 const SESSION_ROUNDS = 1000;
 const rand = Math.random;
@@ -340,30 +345,58 @@ function blackjackSim([bjpay, ties, soft17, double]) {
   return summary(returns);
 }
 
+// ---------- Baccarat: the better even-money spot from src/baccarat.js ----------
+// Infinite deck, the standard tableau, the client's pays.
+const bacCard = () => BAC.points(BAC.RANKS[(rand() * 13) | 0]);
+
+function baccaratSim([cut, push]) {
+  const upgrades = { cut, push };
+  const rules = BAC.rulesFromUpgrades(upgrades);
+  const spot = BAC.bestSpot(upgrades);
+  const returns = new Float64Array(SPINS);
+  for (let n = 0; n < SPINS; n++) {
+    let p = (bacCard() + bacCard()) % 10;
+    let b = (bacCard() + bacCard()) % 10;
+    if (p < 8 && b < 8) {
+      let third = null;
+      if (p <= 5) {
+        third = bacCard();
+        p = (p + third) % 10;
+      }
+      if (BAC.bankerDraws(b, third)) b = (b + bacCard()) % 10;
+    }
+    returns[n] = BAC.spotReturn(spot, p > b ? 'player' : b > p ? 'banker' : 'tie', false, rules);
+  }
+  return summary(returns);
+}
+
 // ---------- write ----------
-const table = { blaze: { symbols: {}, reels: {} }, skeleton: {}, slotingi: {}, chances: { blaze: { symbols: {}, reels: {} } } };
+const kept = ONLY ? require('../src/odds-table.js') : null;
+const table = kept ?? { blaze: { symbols: {}, reels: {} }, skeleton: {}, slotingi: {}, chances: { blaze: { symbols: {}, reels: {} } } };
+const wanted = (game) => !ONLY || ONLY.has(game);
 const started = Date.now();
 const done = (game) => console.log(`${game} done in ${Math.round((Date.now() - started) / 1000)} s`);
-for (const [levels, key] of combos([5, 5, 5])) {
+for (const [levels, key] of wanted('blaze') ? combos([5, 5, 5]) : []) {
   const sim = blazeSim(levels);
   for (const mode of Blaze.SCATTER_MODES) {
     table.blaze[mode][key] = sim[mode].rtp;
     table.chances.blaze[mode][key] = sim[mode].chances;
   }
 }
-done('blaze');
+if (wanted('blaze')) done('blaze');
 for (const [game, sim, maxLevels] of [
   ['skeleton', skeletonSim, [4, 4, 3]],
   ['slotingi', slotingiSim, [3, 4, 3]],
   ['roulette', rouletteSim, [2]],
   ['blackjack', blackjackSim, [2, 4, 1, 1]],
-]) {
+  ['baccarat', baccaratSim, [3, 1]],
+].filter(([game]) => wanted(game))) {
   table.chances[game] = {};
   for (const [levels, key] of combos(maxLevels)) {
     const { rtp, chances } = sim(levels);
     if (table[game]) table[game][key] = rtp;
     table.chances[game][key] = chances;
-    // Roulette and blackjack returns are exact in src/odds.js; this checks the simulation.
+    // Roulette, blackjack and baccarat returns are exact in src/odds.js; this checks the simulation.
     if (key === '0'.repeat(maxLevels.length) && !table[game]) console.log(`${game} simulated return ${rtp}`);
   }
   done(game);
@@ -378,8 +411,8 @@ writeFileSync(
 // share of ${SESSION_ROUNDS.toLocaleString('en')}-round sessions that end ahead, mean net profit per unit
 // bet of the rounds that end ahead, variance of one round's return, share of
 // rounds paying ${BIG_WINS.join(' / ')} times the bet or more] per game and
-// combination, also for roulette zeros (an even-money bet) and blackjack
-// bjpay/ties/soft17/double.
+// combination, also for roulette zeros (an even-money bet), blackjack
+// bjpay/ties/soft17/double and baccarat cut/push (the better even-money spot).
 (function (root) {
   const table = ${JSON.stringify(table)};
   if (typeof module !== 'undefined' && module.exports) module.exports = table;

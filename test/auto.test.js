@@ -939,3 +939,27 @@ test('testBet picks the most XP per credit among fully tested bets, the bigger o
   assert.equal(A.testBet({}), null);
   assert.equal(A.testBet(undefined), null);
 });
+
+test('finalGame with a cost weighs the price of the upgrades left', () => {
+  const maxed = { roulette: 0.027, baccarat: 0.022 };
+  const price = { roulette: 52_500, baccarat: 109_000 };
+  const edge = (g) => maxed[g];
+  assert.equal(A.finalGame(['roulette', 'baccarat'], edge), 'baccarat');
+  // 0.5 % less edge pays back 56,500 more only over about 11.5M credits wagered.
+  assert.equal(A.finalGame(['roulette', 'baccarat'], edge, { price: (g) => price[g], wagered: 2_000_000 }), 'roulette');
+  assert.equal(A.finalGame(['roulette', 'baccarat'], edge, { price: (g) => price[g], wagered: 20_000_000 }), 'baccarat');
+  assert.equal(A.finalGame(['roulette', 'baccarat'], edge, { price: (g) => price[g], budget: 150_000 }), 'roulette');
+});
+
+test('huntPlan takes the baccarat side bet that pays more and questGame reads Bakarat', () => {
+  const ctx = huntCtx({ unlocks: { roulette: 15, baccarat: 20 }, edges: { roulette: 1 - 36 / 39, baccarat: 0.095 } });
+  const done = { zero_hero: { tier: 1 }, regular: { tier: 3 } };
+  const plan = A.huntPlan(hunter({ achievements: done }), ctx);
+  assert.equal(plan.game, 'baccarat');
+  assert.equal(plan.spot, 'tie');
+  assert.deepEqual(plan.targets, ['bac_tie']);
+  const pair = A.huntPlan(hunter({ achievements: { ...done, bac_tie: { tier: 1 } } }), ctx);
+  assert.equal(pair.spot, 'ppair');
+  assert.equal(A.huntPlan(hunter({ achievements: { ...done, bac_tie: { tier: 1 }, bac_pair: { tier: 1 } } }), ctx), null);
+  assert.equal(A.questGame({ key: 'rounds_x', text: 'Odehraj 10 her Bakaratu' }), 'baccarat');
+});

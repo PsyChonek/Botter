@@ -1656,5 +1656,35 @@
   },
   "colWinsRtp": {
     "message": "Konec kvartálu"
+  },
+  "game_baccarat": {
+    "message": "Bakarat"
+  },
+  "ach_bac_pair": {
+    "message": "výhra na pár"
+  },
+  "ach_bac_tie": {
+    "message": "výhra na remízu"
+  },
+  "optionsBaccaratHeading": {
+    "message": "Kontrola bakaratu"
+  },
+  "optionsBaccaratHint": {
+    "message": "Každá hra bakaratu podle upgradů, se kterými byla rozdaná. Bot ji počítá jako punto banco s nekonečným balíčkem a standardními pravidly dobírání, která server neukazuje, a tady se to ověřuje. Výsledky jsou výhry Hráče, Bankéře a remízy proti tomu, co čeká model, Páry hry s párem na kterékoli straně. Návratnost serveru je, co server vyplatil proti vsazenému, Model co by za stejné sázky platila pravidla klienta. Skrytá cena je, co kredity ztratily nad rámec výplaty, jako podíl vsazeného. Chyby dobírání jsou hry rozdané proti pravidlům nebo s vítězem, kterého součty nedávají, Chyby výplaty hry vyplacené o víc než kredit jinak než podle pravidel klienta (třeba provize stržená z výhry na remízu nebo pár)."
+  },
+  "optionsBaccaratEmpty": {
+    "message": "Od začátku kontroly se bakarat nehrál."
+  },
+  "colBaccaratWinners": {
+    "message": "Hráč · Bankéř · Remíza"
+  },
+  "colBaccaratPairs": {
+    "message": "Páry"
+  },
+  "colServerReturn": {
+    "message": "Návratnost serveru"
+  },
+  "colDrawErrors": {
+    "message": "Chyby dobírání"
   }
 }

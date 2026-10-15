@@ -52,3 +52,15 @@ test('bundleName reads the file name from a script URL', () => {
   assert.equal(B.bundleName('https://skeleton-casino.vercel.app/assets/index-DD7zv7qF.js'), 'index-DD7zv7qF.js');
   assert.equal(B.bundleName('https://example.com/app.js'), null);
 });
+
+test('a new game or shop game in the bundle is reported, a coming one is not', () => {
+  const games = { ...G.GAMES };
+  delete games.baccarat;
+  const shop = { ...G.SHOP };
+  delete shop.baccarat;
+  const bot = { ...G, GAMES: games, SHOP: shop };
+  const text = fakeBundle() + ';[{key:`dice`,name:`n`,icon:`i`,blurb:`b`,unlock:25,soon:`s`}]';
+  const { facts, problems } = B.check(text, bot, O);
+  assert.deepEqual(facts.soon, ['dice']);
+  assert.deepEqual(problems, ['baccarat: new game from level 20', 'shop baccarat: new game in the shop']);
+});

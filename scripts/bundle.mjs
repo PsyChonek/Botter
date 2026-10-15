@@ -24,7 +24,7 @@ async function load(path) {
 const { name, text } = await load(process.argv[2]);
 const { facts, problems } = B.check(text, G, O);
 console.log(`bundle ${name}, changelog ${facts.changelog ?? 'not found'}`);
-console.log(`games: ${Object.entries(facts.games ?? {}).map(([game, unlock]) => `${game} ${unlock}`).join(', ')}`);
+console.log(`games: ${Object.entries(facts.games ?? {}).map(([game, unlock]) => `${game} ${unlock}${facts.soon?.includes(game) ? ' (soon)' : ''}`).join(', ')}`);
 console.log(`${B.NEEDLES.length} model tables checked`);
 if (problems.length) {
   console.log(`${problems.length} differences:`);

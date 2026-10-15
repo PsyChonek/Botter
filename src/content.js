@@ -6,6 +6,7 @@
   const C = globalThis.BotterCore;
   const G = globalThis.BotterGames;
   const BJ = globalThis.BotterBlackjack;
+  const BAC = globalThis.BotterBaccarat;
   const A = globalThis.BotterAuto;
   const O = globalThis.BotterOdds;
   const Z = globalThis.BotterBlaze;
@@ -83,6 +84,7 @@
     games: {},
     combos: {}, // game -> upgrade combination (BotterOdds.combo) -> the same rows as games
     roulette: {}, // zeros level -> roulette model check (G.addRouletteSpin)
+    baccarat: {}, // upgrade combination -> baccarat model check (BotterBaccarat.addHand)
     plainXp: {}, // rows like games, only rounds played off Hackathon weekends (BotterAuto.planXpRate)
     betXp: {}, // game -> bet -> { rounds, xp }, off Hackathon weekends (G.addBetXp)
     pace: {}, // game -> { ms, rounds } between consecutive rounds (trackPace)
@@ -405,6 +407,10 @@
         if (delta.rounds > 0) trackPace(delta.game);
         if (path === '/api/roulette/spin') {
           G.addRouletteSpin(stats.roulette, (data.player.upgrades ?? player?.upgrades)?.roulette?.zeros ?? 0, request, data, delta.net);
+        }
+        if (path === '/api/baccarat/deal') {
+          const own = (data.player.upgrades ?? player?.upgrades)?.baccarat;
+          BAC.addHand((stats.baccarat ??= {}), O.combo('baccarat', { baccarat: own }), own, request, data, delta.net);
         }
         if (path === '/api/blackjack/deal') bjBet = request?.bet ?? delta.wagered;
         if (path === '/api/hotfix/spin') hotfixBet = request?.bet ?? delta.wagered;
@@ -1122,11 +1128,12 @@
   const screenUnsent = (game, error) =>
     SCREEN_UNSENT.includes(error) || (error === 'button_missing' && game !== 'blackjack');
 
-  // spot is the roulette bet; the screen can only lay chips on the even-money
-  // spots, so other bets always go through the API.
+  // spot is the roulette or baccarat bet; the screen can only lay chips on the
+  // even-money roulette spots, so other bets always go through the API.
+  // Baccarat bets the better of Hráč and Bankéř unless a side bet is asked for.
   async function playRound(game, bet, spot = settings.rouletteBet) {
-    // Forbes z Chánova has no screen play: its free-spin pick needs its own clicks.
-    if (settings.playOnScreen && game !== 'hotfix' && (game !== 'roulette' || G.ROULETTE_BETS.includes(spot))) {
+    // Forbes z Chánova has no screen play: its free-spin pick needs its own clicks. Nor has baccarat yet.
+    if (settings.playOnScreen && game !== 'hotfix' && game !== 'baccarat' && (game !== 'roulette' || G.ROULETTE_BETS.includes(spot))) {
       const res = await playOnScreen(game, bet, spot);
       if (res.ok || res.status !== 0) return res;
       log.warn('screen_play_failed', { game, bet, error: res.data?.error });
@@ -1134,6 +1141,10 @@
     }
     if (game === 'blackjack') return playBlackjack(bet);
     if (game === 'roulette') return api('/api/roulette/spin', { bets: { [spot]: bet } });
+    if (game === 'baccarat') {
+      const side = BAC.SPOTS.includes(spot) ? spot : BAC.bestSpot(player.upgrades?.baccarat);
+      return api('/api/baccarat/deal', { bets: { [side]: bet } });
+    }
     if (game === 'hotfix') return playHotfix(bet);
     return api(G.GAMES[game].path, { bet });
   }
@@ -1410,10 +1421,18 @@
     // Until the spins settle the Blaze star rule, the final game is unknown when the two rules
     // disagree on it. With learning switched off nothing would settle it, so the bot goes on the
     // rule it uses (per reel until the spins say otherwise).
-    const finals = new Set(Z.SCATTER_MODES.map((rule) => A.finalGame(candidates, maxedEdge(rule))));
+    // The final game weighs what its upgrades still cost against the loss on the
+    // credits wagered over the horizon (the XP to the next levels once the rate is
+    // measured), so a game whose small edge gain costs far more does not win.
+    const xpRate = planXpRate();
+    const price = (game) => G.upgradeRest(player.upgrades, game, Object.keys(G.SHOP[game])).price;
+    const cost = xpRate > 0
+      ? { price, wagered: G.xpAhead(player, A.UPGRADE_HORIZON_LEVELS) / xpRate }
+      : { price, budget: A.grindVolume(limits(), player.credits) };
+    const finals = new Set(Z.SCATTER_MODES.map((rule) => A.finalGame(candidates, maxedEdge(rule), cost)));
     return A.upgradeVerdict(offer, {
       games: candidates.filter((game) => player.level >= GRIND_UNLOCKS[game]),
-      finalGame: A.finalGame(candidates, maxedEdge(mode)),
+      finalGame: A.finalGame(candidates, maxedEdge(mode), cost),
       finalUnknown: settings.learnBlaze && !blazeRule().decided && finals.size > 1,
       xpAhead: G.xpAhead(player, A.UPGRADE_HORIZON_LEVELS),
       xpRate: planXpRate(),

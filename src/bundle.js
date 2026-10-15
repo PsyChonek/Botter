@@ -53,18 +53,29 @@
     ['blackjack', 'blackjack pays', '[1,1.2,1.5];'],
     ['roulette', 'pays', 'číslo 35:1 · tucet a sloupec 2:1 · barva, sudá/lichá, polovina 1:1'],
     ['roulette', 'red numbers', 'new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36])'],
+    ['baccarat', 'cut upgrade', '[0.08,0.06,0.04,0.025]'],
+    ['baccarat', 'banker extra', 'Bankéř platí navíc 5 % jako všude.'],
+    ['baccarat', 'tie pays', '{key:`tie`,label:`Remíza`,pays:`8:1`}'],
+    ['baccarat', 'pair pays', '{key:`ppair`,label:`Pár hráče`,pays:`10:1`}'],
+    ['baccarat', 'tie refund', 'remíza vrací polovinu sázky na Hráče a Bankéře'],
+    ['baccarat', 'card points', 'e.rank===`A`?1:[`10`,`J`,`Q`,`K`].includes(e.rank)?0:Number(e.rank)'],
     ['payroll', 'share', 'Mzdový fond · 1 % z každé sázky'],
     ['xp', 'big wins', '[{key:`big`,x:10,xp:15},{key:`mega`,x:25,xp:40},{key:`super`,x:50,xp:100}]'],
     ['bets', 'max bet by level', 'e>=15?1000:e>=10?400:e>=6?200:e>=3?100:40'],
   ];
 
-  // Facts read from the bundle: { changelog, games, shop, betLevels,
-  // rouletteZeros }, a field null when its pattern is not found.
+  // Facts read from the bundle: { changelog, games, soon, shop, betLevels,
+  // rouletteZeros }, a field null when its pattern is not found. soon lists the
+  // games the lobby shows as coming.
   function readFacts(text) {
     const src = canon(text);
     const dates = [...src.matchAll(/\{date:`(\d{4}-\d{2}-\d{2})`,changes:\[/g)].map((m) => m[1]).sort();
     const games = {};
-    for (const m of src.matchAll(/\{key:`(\w+)`,name:`[^`]*`,icon:`[^`]*`,blurb:`[^`]*`,unlock:(\d+)/g)) games[m[1]] = Number(m[2]);
+    const soon = [];
+    for (const m of src.matchAll(/\{key:`(\w+)`,name:`[^`]*`,icon:`[^`]*`,blurb:`[^`]*`,unlock:(\d+)(,soon:)?/g)) {
+      games[m[1]] = Number(m[2]);
+      if (m[3]) soon.push(m[1]);
+    }
     const zeros = /\w+=\[((?:`\w+`,?)*)\],\w+=\[0,32,15,19,4,21,2,25,17,34/.exec(src);
     const rouletteZeros = zeros ? zeros[1].split(',').filter(Boolean).length : null;
     const bets = /\w+=\[([\d,]+)\],\w+=\w+\[0\],\w+=\[\{key:`big`/.exec(src);
@@ -86,12 +97,14 @@
     return {
       changelog: dates.at(-1) ?? null,
       games: Object.keys(games).length ? games : null,
+      soon,
       shop: Object.keys(shop).length ? shop : null,
       betLevels: bets ? bets[1].split(',').map(Number) : null,
       rouletteZeros,
     };
   }
 
+  const OUTSIDE_GAMES = ['crash', 'lottery'];
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
   // Compares the bundle with what the bot plans with (BotterGames as G,
@@ -117,6 +130,10 @@
       for (const [game, unlock] of Object.entries(expected.games)) {
         if (facts.games[game] !== unlock) problems.push(`${game}: unlock level ${facts.games[game] ?? 'gone'}, bot has ${unlock}`);
       }
+      // Crash and the lottery are played outside the game list; coming games are not playable yet.
+      for (const [game, unlock] of Object.entries(facts.games)) {
+        if (!expected.games[game] && !OUTSIDE_GAMES.includes(game) && !facts.soon.includes(game)) problems.push(`${game}: new game from level ${unlock}`);
+      }
     }
     if (facts.shop) {
       for (const [game, items] of Object.entries(expected.shop)) {
@@ -126,6 +143,7 @@
         }
         for (const key of Object.keys(facts.shop[game] ?? {})) if (!items[key]) problems.push(`shop ${game}:${key}: new upgrade`);
       }
+      for (const game of Object.keys(facts.shop)) if (!expected.shop[game]) problems.push(`shop ${game}: new game in the shop`);
     }
     if (facts.betLevels && !same(facts.betLevels, expected.betLevels)) problems.push(`bet levels ${facts.betLevels.join('/')}, bot has ${expected.betLevels.join('/')}`);
     if (facts.rouletteZeros !== null && facts.rouletteZeros !== expected.rouletteZeros) {

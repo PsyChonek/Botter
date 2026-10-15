@@ -2,6 +2,7 @@
 // history, debt repayment and choosing the cheapest game to grind XP on.
 // Classic script: globalThis.BotterAuto in the extension, require() in Node.
 (function (root) {
+  const BAC = root.BotterBaccarat ?? require('./baccarat.js');
   const CRASH_DOUBLING_MS = 4 * 60 * 60 * 1000;
   // A round that survives until the next 9:00 deploy pays every open bet at the
   // production multiplier reached after 24 hours.
@@ -330,12 +331,26 @@
   // Game the grinder ends on: the one with the lowest edge once every upgrade
   // is bought and it is unlocked, or null when no game has a model. Upgrades
   // of any other game stop paying as soon as a cheaper game unlocks, so only
-  // this one is upgraded. maxedEdge(game) is that edge, or null.
-  function finalGame(games, maxedEdge) {
+  // this one is upgraded. maxedEdge(game) is that edge, or null. With cost
+  // ({ price(game): what its remaining upgrades cost, and wagered: credits to
+  // be wagered over the horizon, or budget: credits to be lost over it, see
+  // grindVolume }) the price counts too, so a slightly lower edge behind far
+  // dearer upgrades (Bakarat against roulette) does not win on edge alone:
+  // with wagered the game where the price plus the loss on it is smallest,
+  // with budget the one where what is left of it after the price buys the
+  // most wagering.
+  function finalGame(games, maxedEdge, cost = null) {
+    const score = (game, edge) => {
+      if (!cost) return edge;
+      if (cost.wagered != null) return cost.price(game) + cost.wagered * edge;
+      return edge <= 0 ? -Infinity : -(cost.budget - cost.price(game)) / edge;
+    };
     let best = null;
     for (const game of games) {
       const edge = maxedEdge(game);
-      if (edge !== null && (best === null || edge < best.edge)) best = { game, edge };
+      if (edge === null) continue;
+      const total = score(game, edge);
+      if (best === null || total < best.total) best = { game, total };
     }
     return best?.game ?? null;
   }
@@ -503,6 +518,7 @@
     slotingi: /sloting/,
     blackjack: /blackjack/,
     roulette: /rulet|roulette/,
+    baccarat: /bakarat|baccarat/,
     crash: /produkce|crash/,
   };
 
@@ -625,6 +641,8 @@
     lottery_5: { reward: 20_000 }, // 5 numbers on one ticket (secret)
     lottery_full: { reward: 300 }, // all 5 tickets on one draw
     lottery_days: { reward: [300, 2000, 5000], tiers: [1, 7, 30] }, // tickets on 1 / 7 / 30 draws
+    bac_pair: { reward: 1000 }, // win a baccarat bet on a pair
+    bac_tie: { reward: 1000 }, // win a baccarat bet on a tie
   };
   // Per hand of the bot's strategy, from 2,000,000 simulated hands with no
   // upgrades (natural 4.76 %, five-card win 0.51 %; maxed upgrades 0.65 %).
@@ -656,10 +674,18 @@
     return d.getDay() === 5 && d.getHours() >= 17;
   };
 
+  // Baccarat side bets the hunt places, with their chance to win and their
+  // edge. Neither depends on the upgrades: the cut is taken from Hráč and
+  // Bankéř wins only.
+  const BAC_HUNT = {
+    bac_tie: { spot: 'tie', chance: BAC.outcomes().tie, edge: 1 - BAC.spotRtp('tie', {}) },
+    bac_pair: { spot: 'ppair', chance: BAC.PAIR_CHANCE, edge: 1 - BAC.spotRtp('ppair', {}) },
+  };
+
   // Next game round worth playing for achievements, or null. Every round is
   // valued at the rewards it can unlock times their chance: a natural and a
-  // five-card win per blackjack hand, a straight bet on 0 per roulette spin,
-  // any round at night, and the next rounds-played tier spread over the rounds
+  // five-card win per blackjack hand, a straight bet on 0 per roulette spin, a
+  // tie or pair bet per baccarat hand (whichever pays more), any round at night, and the next rounds-played tier spread over the rounds
   // it still needs (finishing it costs those rounds, so a round is worth the
   // reward over that count). A round is played when that beats its expected
   // loss, on the game where the margin is biggest, at the smallest bet.
@@ -690,16 +716,29 @@
         if (open('five_cards')) own.push({ key: 'five_cards', value: BJ_FIVE_CARD_WIN * achievementReward('five_cards', 0) });
       }
       let spot = null;
+      let spotEdge = edge;
       if (game === 'roulette' && open('zero_hero')) {
         // A straight bet pays 36 like the outside bets, so it has the same edge.
         const pockets = 36 / (1 - edge);
         own.push({ key: 'zero_hero', value: achievementReward('zero_hero', 0) / pockets });
         spot = ROULETTE_ZERO_SPOT;
       }
+      if (game === 'baccarat') {
+        // One side bet a hand, the one with the best value over its own loss.
+        const side = Object.entries(BAC_HUNT)
+          .filter(([key]) => open(key))
+          .map(([key, bac]) => ({ key, ...bac, value: bac.chance * achievementReward(key, 0) }))
+          .reduce((a, b) => (a && a.value - bet * a.edge >= b.value - bet * b.edge ? a : b), null);
+        if (side) {
+          own.push({ key: side.key, value: side.value });
+          spot = side.spot;
+          spotEdge = side.edge;
+        }
+      }
       const targets = [...shared, ...own];
       if (!targets.length) continue;
       const value = targets.reduce((sum, t) => sum + t.value, 0);
-      const loss = bet * Math.max(0, edge);
+      const loss = bet * Math.max(0, spotEdge);
       if (value <= loss) continue;
       const plan = { game, bet, spot, targets: targets.map((t) => t.key), value, loss };
       if (!best || value - loss > best.value - best.loss) best = plan;

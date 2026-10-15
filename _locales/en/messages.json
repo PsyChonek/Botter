@@ -1656,5 +1656,35 @@
   },
   "colWinsRtp": {
     "message": "Konec kvartálu"
+  },
+  "game_baccarat": {
+    "message": "Baccarat"
+  },
+  "ach_bac_pair": {
+    "message": "pair win"
+  },
+  "ach_bac_tie": {
+    "message": "tie win"
+  },
+  "optionsBaccaratHeading": {
+    "message": "Baccarat check"
+  },
+  "optionsBaccaratHint": {
+    "message": "Every baccarat hand, by the upgrades it was dealt with. The bot models it as punto banco on an infinite deck with the standard drawing rules, which the server does not show, so this checks it. Winners are Player, Banker and Tie hands seen against what the model expects, Pairs the hands with a pair on either side. Server return is what the server paid against the stakes, Model what the client's pays give for the same bets. Hidden cost is what the credits lost beyond the payout, as a share of the stakes. Draw errors are hands dealt against the drawing rules or with a winner the totals do not give, Payout errors hands paid more than a credit off the client's pays (such as a cut taken from a tie or pair win)."
+  },
+  "optionsBaccaratEmpty": {
+    "message": "No baccarat hand since the check started."
+  },
+  "colBaccaratWinners": {
+    "message": "Player · Banker · Tie"
+  },
+  "colBaccaratPairs": {
+    "message": "Pairs"
+  },
+  "colServerReturn": {
+    "message": "Server return"
+  },
+  "colDrawErrors": {
+    "message": "Draw errors"
   }
 }
