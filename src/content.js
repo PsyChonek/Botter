@@ -1041,10 +1041,7 @@
 
     const pick = screen.querySelector('.work-pick');
     if (!pick) return;
-    // Auto mode works "Přepiš kód" unless a type is pinned: it is never wrong,
-    // and a wrong answer spends the energy without pay.
-    const preference = settings.autoMode && settings.taskType === 'alternate' ? 'typing' : settings.taskType;
-    const type = C.nextType(preference, lastType);
+    const type = C.nextType(settings.taskType, lastType);
     const card = pick.querySelectorAll('.job-card')[C.TYPES.indexOf(type)];
     if (!card || card.disabled) {
       setStatus('statusNoEnergy');

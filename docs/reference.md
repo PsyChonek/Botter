@@ -17,9 +17,9 @@ The full description of every feature, model and setting. The short version is t
   and "Přepiš kód" (retype a line of code character by character; the app blocks
   pasting, so the bot types the line from the task at a quick typist's pace through the
   input's native value setter and sends it with Enter). **Alternate** cycles through
-  all four. In auto mode **Alternate** works only "Přepiš kód": its answer is in the
-  task, so it is never wrong, and a wrong answer spends the energy without pay. Pick a
-  type in the panel to override that.
+  all four, in auto mode too. "Přepiš kód" is never wrong, since its answer is in the
+  task, while a wrong answer on the others spends the energy without pay; pick it in
+  the panel to work only those.
   When energy runs out it waits for the refill. It also dismisses the level-up
   and daily-bonus modals, which would otherwise block the screen.
 - The answer is chosen in this order:
