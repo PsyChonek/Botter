@@ -3,3 +3,4 @@ node_modules/
 *.crx
 *.pem
 botter-bank.json
+.playwright-mcp/

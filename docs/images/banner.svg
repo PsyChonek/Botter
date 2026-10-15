@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="title desc">
+  <title id="title">Botter</title>
+  <desc id="desc">Autopilot for Skeleton Casino</desc>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="75%">
+      <stop offset="0" stop-color="#1d3011"/>
+      <stop offset="1" stop-color="#090f07"/>
+    </radialGradient>
+    <linearGradient id="ink" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f1ffb8"/>
+      <stop offset="0.55" stop-color="#b8e04a"/>
+      <stop offset="1" stop-color="#6f9a1c"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-50%" width="140%" height="200%">
+      <feGaussianBlur stdDeviation="9" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <g id="chip">
+      <circle r="38" fill="none" stroke="#a6d13c" stroke-width="10" stroke-dasharray="15 15"/>
+      <circle r="27" fill="none" stroke="#a6d13c" stroke-width="2"/>
+    </g>
+  </defs>
+  <rect width="1200" height="300" rx="18" fill="url(#bg)"/>
+  <rect x="1" y="1" width="1198" height="298" rx="17" fill="none" stroke="#3f5a1d" stroke-width="2"/>
+  <g opacity="0.16">
+    <use href="#chip" transform="translate(120 82) rotate(12)"/>
+    <use href="#chip" transform="translate(62 248) rotate(40) scale(0.7)"/>
+    <use href="#chip" transform="translate(1140 250) rotate(-8) scale(0.8)"/>
+    <use href="#chip" transform="translate(995 74) rotate(25) scale(0.6)"/>
+  </g>
+  <text x="600" y="168" text-anchor="middle" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="112" font-weight="800" letter-spacing="4" fill="url(#ink)" filter="url(#glow)">BOTTER</text>
+  <text x="600" y="226" text-anchor="middle" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="27" fill="#cfe59a">Autopilot for Skeleton Casino: works the tickets, plays the odds, keeps the books.</text>
+</svg>
