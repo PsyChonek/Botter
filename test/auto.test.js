@@ -865,39 +865,7 @@ test('grindBudget pools the held weekday budgets into the Hackathon weekend', ()
   assert.deepEqual(A.grindBudget(stale, 1000, event, sunday), { budget: 3000, lost: 0 });
 });
 
-test('betTestNext plays the bet levels in turn until each has its rounds', () => {
-  const levels = [20, 100, 1000];
-  assert.equal(A.betTestNext(undefined, levels), 20);
-  assert.equal(A.betTestNext({ 20: { rounds: 1, xp: 3 } }, levels), 100);
-  assert.equal(A.betTestNext({ 20: { rounds: 2 }, 100: { rounds: 1 }, 1000: { rounds: 1 } }, levels), 100);
-  const done = Object.fromEntries(levels.map((bet) => [bet, { rounds: A.BET_TEST_ROUNDS, xp: 1 }]));
-  assert.equal(A.betTestNext(done, levels), null);
-});
-
-test('betTestNext waits when the credits allow no level still due', () => {
-  const levels = [20, 1000];
-  const cells = { 20: { rounds: 5, xp: 1 }, 1000: { rounds: 0, xp: 0 } };
-  assert.equal(A.betTestNext(cells, levels, [20], 5), 0);
-  assert.equal(A.betTestNext(cells, levels, [20, 1000], 5), 1000);
-});
-
-test('betXpReport gives XP per round, per credit and the loss per XP by bet', () => {
-  const report = A.betXpReport({ 1000: { rounds: 10, xp: 300 }, 20: { rounds: 10, xp: 30 }, 40: { rounds: 0, xp: 0 } }, 0.027);
-  assert.deepEqual(report.map((row) => row.bet), [20, 40, 1000]);
-  assert.equal(report[0].xpPerRound, 3);
-  assert.equal(report[0].rate, 0.15);
-  assert.ok(Math.abs(report[0].cost - 0.18) < 1e-12);
-  assert.equal(report[1].rate, null);
-  assert.equal(report[1].cost, null);
-  assert.equal(report[2].rate, 0.03);
-  assert.equal(A.betXpReport({ 20: { rounds: 1, xp: 3 } })[0].cost, null);
-});
-
-test('betXpReport and grindReport put the výpověď bonus on the tracked XP', () => {
-  const [row] = A.betXpReport({ 20: { rounds: 10, xp: 30 } }, 0.03, { xpLeft: 60, msPerRound: 1000, bonus: 1.5 });
-  assert.equal(row.xpPerRound, 4.5);
-  assert.ok(Math.abs(row.cost - 0.03 / 0.225) < 1e-12);
-  assert.equal(row.levelMs, (60 / 4.5) * 1000);
+test('grindReport puts the výpověď bonus on the tracked XP', () => {
   const [game] = A.grindReport(['blaze'], 10, { blaze: { wagered: 100, xp: 10 } }, { blaze: 1 }, { blaze: 0.02 }, 1.2);
   assert.ok(Math.abs(game.rate - 0.12) < 1e-12);
   assert.ok(Math.abs(game.cost - 0.2 / 1.2) < 1e-12);
@@ -913,31 +881,6 @@ test('a game without a model is bought only as the first-game pick', () => {
   ];
   assert.equal(A.shopGoal(queue, 'hotfix'), queue[2]);
   assert.equal(A.shopGoal(queue, null), queue[0]);
-});
-
-test('betXpReport gives the time and the loss to the next level at each bet', () => {
-  const cells = { 20: { rounds: 50, xp: 50 }, 1000: { rounds: 50, xp: 1300 } };
-  const [small, big] = A.betXpReport(cells, 0.027, { xpLeft: 2600, msPerRound: 2000 });
-  // 2,600 XP at 1 XP a round is 2,600 rounds of 2 s; at 26 XP a round, 100 rounds.
-  assert.equal(small.levelMs, 2600 * 2000);
-  assert.equal(big.levelMs, 100 * 2000);
-  assert.ok(Math.abs(small.levelCost - 2600 * 20 * 0.027) < 1e-6);
-  assert.ok(Math.abs(big.levelCost - 2600 * (1000 / 26) * 0.027) < 1e-6);
-  assert.equal(A.betXpReport(cells, 0.027)[0].levelMs, null);
-});
-
-test('testBet picks the most XP per credit among fully tested bets, the bigger on a tie', () => {
-  const cells = {
-    20: { rounds: 50, xp: 50 }, // 5 XP per 100 credits
-    100: { rounds: 50, xp: 135 },
-    1000: { rounds: 76, xp: 1966 },
-  };
-  assert.equal(A.testBet(cells), 20);
-  // A bet with fewer than a test's rounds does not count, however good it looks.
-  assert.equal(A.testBet({ ...cells, 40: { rounds: 3, xp: 30 } }), 20);
-  assert.equal(A.testBet({ 20: { rounds: 50, xp: 50 }, 40: { rounds: 50, xp: 100 } }), 40);
-  assert.equal(A.testBet({}), null);
-  assert.equal(A.testBet(undefined), null);
 });
 
 test('finalGame with a cost weighs the price of the upgrades left', () => {

@@ -26,6 +26,15 @@
 /* .grid and label.check set display, which would otherwise override hidden. */
 [hidden] { display: none !important; }
 * { box-sizing: border-box; }
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--track) transparent;
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--track); border-radius: 5px; border: 2px solid var(--bg); }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+::-webkit-scrollbar-corner { background: transparent; }
 body {
   margin: 0;
   min-width: 280px;

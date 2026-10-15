@@ -197,14 +197,6 @@ test('dailyBonus follows the client formula', () => {
   assert.equal(G.dailyBonus(3, 10), 1000 * 2.2);
 });
 
-test('addBetXp books XP per game and bet level', () => {
-  const table = {};
-  G.addBetXp(table, 'roulette', 20, 1, 3);
-  G.addBetXp(table, 'roulette', 20, 1, 4);
-  G.addBetXp(table, 'blackjack', 100, 0, 2);
-  assert.deepEqual(table, { roulette: { 20: { rounds: 2, xp: 7 } }, blackjack: { 100: { rounds: 0, xp: 2 } } });
-});
-
 test('gameDelta books a Forbes spin as the round and its free spins as payout only', () => {
   const spin = G.gameDelta('/api/hotfix/spin', { bet: 20 }, { player: { credits: 980 }, xpGain: 1 }, 1000);
   assert.deepEqual(spin, { game: 'hotfix', rounds: 1, wagered: 20, net: -20, xp: 1, stake: 0 });
@@ -245,13 +237,3 @@ test('addRouletteSpin keys rows only by a zeros level the wheel can have', () =>
   assert.equal(Object.prototype.spins, undefined);
 });
 
-test('addPace keeps a mean that follows the recent rounds', () => {
-  const pace = {};
-  for (let i = 0; i < 200; i++) G.addPace(pace, 'roulette', 4000);
-  for (let i = 0; i < 300; i++) G.addPace(pace, 'roulette', 1000);
-  // Older rounds lose half their weight every 100 rounds: 300 rounds on, the
-  // old 4 s pace weighs about an eighth.
-  const mean = pace.roulette.ms / pace.roulette.rounds;
-  assert.ok(mean > 1000 && mean < 1500);
-  assert.equal(pace.roulette.rounds, 200);
-});

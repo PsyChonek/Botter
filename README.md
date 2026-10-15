@@ -89,11 +89,9 @@ progress shows at `chrome://on-device-internals`.
   recorded, until then the lower rule is used). A game without a model is
   never picked. XP per round grows with the bet the same way in every game, so the
   grinder plays the unlocked game with the lowest simulated edge. Every round pays at
-  least 1 XP (since 2026-10-09), so small bets can be cheaper per XP (see XP per bet);
-  the bet is the one picked in the settings, or with **Grind at the bet the XP per bet
-  test found cheapest** (`grindBetFromTest`, off by default) the bet with the most XP
-  per credit in that test (`A.testBet`, bets with a full test's rounds, the bigger on a
-  tie), the picked one until the test has data. The panel shows each game's XP per credit and loss per XP
+  least 1 XP (since 2026-10-09), so small bets are cheaper per XP but slower (a
+  2026-10 test on roulette: 1.4 credits lost per XP at 20, about 2.5 from 100 up); the
+  bet is the one picked in the settings. The panel shows each game's XP per credit and loss per XP
   measured from its tracked rounds, for information only. Near a limit the grinder
   steps down to a smaller bet; under a daily budget it never bets more than what is
   left of it.
@@ -378,30 +376,13 @@ progress shows at `chrome://on-device-internals`.
 - **XP per game** (panel): for each unlocked game and the next one to unlock, the house
   edge the grinder plans with, credits lost per XP point and its state (locked or
   playing at the chosen bet). The row the grinder plays next is highlighted.
-- **XP per bet** (panel): checks whether XP per round really grows in proportion to
-  the bet, the assumption the grinder plans with. Every round played off a Hackathon
-  weekend is booked by game and bet level (`stats.betXp`, `G.addBetXp`). **Test XP per
-  bet** clears the grind game's samples and, in auto mode with games on, plays 50
-  rounds at every bet level up to the max bet, the levels in turn so a level-up or
-  upgrade during the test hits them all alike (`betTestNext` in `src/auto.js`). It
-  keeps the reserve but not the grinding budget, and waits out Hackathon weekends.
-  The table shows XP per round, the loss per XP at the game's edge and the time to
-  finish the current level grinding at that bet (rounds tested and the expected loss to
-  the level in the row tooltip), from the XP left in
-  the level and the measured pace (`stats.pace`, `G.addPace`: the mean time between
-  rounds played back to back, gaps over 20 seconds left out, older rounds halving in
-  weight every 100). The bet with the most XP per credit is highlighted. The server
-  pays at least 1 XP a round (since 2026-10-09), so the smallest bet is the cheapest
-  per XP but the slowest. **Grind bet** under the test picks what the grinder bets:
-  the test result or a fixed size (the same settings as on the Auto tab). The result
-  is logged as `bet_test_done`.
 - A small panel in the bottom-left corner of the page (300 px wide, no table wider
   than four columns) has the auto switch, the account, the status line, Start/Stop
   for work and for games with the ticket type and the game, and the auto mode parts
   as chips. Below them are collapsible sections, which stay open or closed across
   reloads (`panelOpen`): **Profit** (net and return per game, work, bonuses summed,
   a total; rounds in the row tooltip), **XP per game** (unlocked games and the next
-  unlock only), **XP per bet**, **Upgrade queue** and **More** (play on the game
+  unlock only), **Upgrade queue** and **More** (play on the game
   screen, the Forbes z Chánova test, Forbes force, answer accuracy and AI cost).
   Longer explanations are tooltips. A bundle update shows as one small line at the
   bottom. **Hide** collapses it to a small Botter button in the same corner

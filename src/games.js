@@ -234,16 +234,6 @@
     return games;
   }
 
-  // XP per game and bet level: { [game]: { [bet]: { rounds, xp } } }, to test
-  // whether XP per round really grows with the bet. A blackjack action adds its
-  // XP to the hand's opening bet with no round.
-  function addBetXp(table, game, bet, rounds, xp) {
-    const cell = ((table[game] ??= {})[bet] ??= { rounds: 0, xp: 0 });
-    cell.rounds += rounds;
-    cell.xp += xp;
-    return table;
-  }
-
   // What the client's roulette rules pay for these bets on this pocket: a
   // number 36 times the chip, a dozen 3 times, red/black, even/odd and
   // low/high 2 times, and every outside bet loses on a zero (0, 00 or the
@@ -303,21 +293,6 @@
     return check;
   }
 
-  // Mean time between consecutive rounds per game: { [game]: { ms, rounds } }.
-  // Past PACE_WINDOW rounds both halve before a round is added, so the mean
-  // follows the recent pace.
-  const PACE_WINDOW = 200;
-  function addPace(pace, game, ms) {
-    const row = (pace[game] ??= { ms: 0, rounds: 0 });
-    if (row.rounds >= PACE_WINDOW) {
-      row.ms /= 2;
-      row.rounds /= 2;
-    }
-    row.ms += ms;
-    row.rounds += 1;
-    return pace;
-  }
-
   function totalNet(games) {
     return Object.values(games).reduce((sum, row) => sum + row.net, 0);
   }
@@ -364,11 +339,9 @@
     xpAhead,
     dailyBonus,
     addDelta,
-    addBetXp,
     roulettePayout,
     roulettePockets,
     addRouletteSpin,
-    addPace,
     totalNet,
     profitRows,
   };

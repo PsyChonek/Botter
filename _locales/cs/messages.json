@@ -701,9 +701,6 @@
   "optionsGrindBet": {
     "message": "Sázka při farmění XP"
   },
-  "optionsGrindBetFromTest": {
-    "message": "Grindovat sázkou, kterou test XP podle sázky našel jako nejlevnější (do té doby sázkou výše)"
-  },
   "optionsGrindHint": {
     "message": "Auto hra vybere odemčenou hru s nejnižší simulovanou výhodou kasina při tvých vylepšeních. XP za kolo roste přímo úměrně sázce, takže každá výše sázky stojí za XP stejně: sázka určuje jen to, jak rychle XP přibývá a kolik je v jednom kole ve hře. U limitu grinder přejde na menší sázku a při denním rozpočtu nikdy nevsadí víc, než z něj zbývá."
   },
@@ -1221,34 +1218,6 @@
   "colCostPerXp": {
     "message": "Ztráta/XP"
   },
-  "colLevelIn": {
-    "message": "Do levelu"
-  },
-  "panelGrindBet": {
-    "message": "Sázka grindu"
-  },
-  "panelGrindBetTest": {
-    "message": "Výsledek testu ($P1$)",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      }
-    }
-  },
-  "panelGrindBetNoTest": {
-    "message": "Výsledek testu (netestováno)"
-  },
-  "betTestPace": {
-    "message": "Do levelu a Ztráta: dohrání $P1$ XP, které v tomto levelu chybí, tou sázkou, při naměřených $P2$ s na kolo.",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      }
-    }
-  },
   "colState": {
     "message": "Stav"
   },
@@ -1267,62 +1236,6 @@
         "content": "$1"
       }
     }
-  },
-  "statusBetTest": {
-    "message": "Testuji XP podle sázky na $P1$ se sázkou $P2$, $P3$ z $P4$ kol na této sázce",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      },
-      "p3": {
-        "content": "$3"
-      },
-      "p4": {
-        "content": "$4"
-      }
-    }
-  },
-  "panelBetTest": {
-    "message": "XP podle sázky"
-  },
-  "betTestNote": {
-    "message": "Odehraje $P2$ kol $P1$ na každé výši sázky střídavě, aby se ukázalo, jestli menší sázka dává víc XP na kredit. Běží v automatickém režimu se zapnutými hrami, drží rezervu a o víkendu Hackathonu čeká. Spuštění smaže dřívější vzorky této hry.",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      }
-    }
-  },
-  "betTestRunning": {
-    "message": "Testuji $P1$: $P2$ kol na každé výši sázky.",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      }
-    }
-  },
-  "betTestHackathon": {
-    "message": "Test $P1$ čeká na konec víkendu Hackathonu: jeho bonus XP by výsledek zkreslil.",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      }
-    }
-  },
-  "betTestStart": {
-    "message": "Otestovat XP podle sázky"
-  },
-  "betTestStop": {
-    "message": "Zastavit test"
   },
   "panelHotfixTest": {
     "message": "Test Forbes z Chánova"
@@ -1379,9 +1292,6 @@
   },
   "colBet": {
     "message": "Sázka"
-  },
-  "colXpPerRound": {
-    "message": "XP/kolo"
   },
   "statusWaitEnergy": {
     "message": "Čekám na víc než $P1$ energie, pak začnu pracovat (teď $P2$).",
@@ -1694,42 +1604,6 @@
   },
   "panelFree": {
     "message": "Bonusy"
-  },
-  "betTestLine": {
-    "message": "$P1$ · $P2$ XP do levelu · $P3$ s na kolo",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      },
-      "p3": {
-        "content": "$3"
-      }
-    }
-  },
-  "betTestLineNoPace": {
-    "message": "$P1$ · $P2$ XP do levelu",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      }
-    }
-  },
-  "panelBetRow": {
-    "message": "Otestováno $P1$ kol · očekávaná ztráta do levelu: $P2$",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      }
-    }
   },
   "shopNextShort": {
     "message": "Další: $P1$ za $P2$, chybí $P3$.",

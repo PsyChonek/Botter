@@ -701,9 +701,6 @@
   "optionsGrindBet": {
     "message": "XP grinding bet"
   },
-  "optionsGrindBetFromTest": {
-    "message": "Grind at the bet the XP per bet test found cheapest (the bet above until the test has data)"
-  },
   "optionsGrindHint": {
     "message": "Auto game picks the unlocked game with the lowest simulated house edge at your upgrades. XP per round is proportional to the bet, so every bet level costs the same per XP: the bet only sets how fast XP comes in and how much rides on one round. Near a limit the grinder steps down to a smaller bet, and under a daily budget it never bets more than is left of it."
   },
@@ -1221,34 +1218,6 @@
   "colCostPerXp": {
     "message": "Loss/XP"
   },
-  "colLevelIn": {
-    "message": "To level"
-  },
-  "panelGrindBet": {
-    "message": "Grind bet"
-  },
-  "panelGrindBetTest": {
-    "message": "Test result ($P1$)",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      }
-    }
-  },
-  "panelGrindBetNoTest": {
-    "message": "Test result (not tested)"
-  },
-  "betTestPace": {
-    "message": "To level and Level loss: grinding the $P1$ XP left in this level at that bet, at the measured $P2$ s a round.",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      }
-    }
-  },
   "colState": {
     "message": "State"
   },
@@ -1267,62 +1236,6 @@
         "content": "$1"
       }
     }
-  },
-  "statusBetTest": {
-    "message": "Testing XP per bet on $P1$ at $P2$ a round, $P3$ of $P4$ rounds at this bet",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      },
-      "p3": {
-        "content": "$3"
-      },
-      "p4": {
-        "content": "$4"
-      }
-    }
-  },
-  "panelBetTest": {
-    "message": "XP per bet"
-  },
-  "betTestNote": {
-    "message": "Plays $P2$ rounds of $P1$ at every bet level in turn, to see whether a smaller bet earns more XP per credit. Runs in auto mode with games on, keeps the reserve, and pauses on Hackathon weekends. Starting it clears the earlier samples of this game.",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      }
-    }
-  },
-  "betTestRunning": {
-    "message": "Testing $P1$: $P2$ rounds at every bet level.",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      }
-    }
-  },
-  "betTestHackathon": {
-    "message": "Testing $P1$ waits until the Hackathon weekend ends: its XP bonus would skew the result.",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      }
-    }
-  },
-  "betTestStart": {
-    "message": "Test XP per bet"
-  },
-  "betTestStop": {
-    "message": "Stop the test"
   },
   "panelHotfixTest": {
     "message": "Forbes z Chánova test"
@@ -1379,9 +1292,6 @@
   },
   "colBet": {
     "message": "Bet"
-  },
-  "colXpPerRound": {
-    "message": "XP/round"
   },
   "statusWaitEnergy": {
     "message": "Waiting for more than $P1$ energy before working ($P2$ now).",
@@ -1694,42 +1604,6 @@
   },
   "panelFree": {
     "message": "Bonuses"
-  },
-  "betTestLine": {
-    "message": "$P1$ · $P2$ XP to level · $P3$ s a round",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      },
-      "p3": {
-        "content": "$3"
-      }
-    }
-  },
-  "betTestLineNoPace": {
-    "message": "$P1$ · $P2$ XP to level",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      }
-    }
-  },
-  "panelBetRow": {
-    "message": "$P1$ rounds tested · expected loss to level: $P2$",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      }
-    }
   },
   "shopNextShort": {
     "message": "Next: $P1$ for $P2$, $P3$ to go.",
