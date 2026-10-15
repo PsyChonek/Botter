@@ -70,6 +70,7 @@
     captureDebug: false,
     logLevel: 'info',
     panelHidden: false,
+    panelOpen: [], // panel sections left open (data-section names)
     rotateAccounts: true,
     homeAccount: '', // user id rotation returns to; the account picked in the panel
   };
@@ -2111,37 +2112,39 @@
       <style>
         :host { all: initial; }
         [hidden] { display: none !important; }
-        .panel { position: fixed; left: 12px; bottom: 12px; z-index: 2147483647; width: 290px;
-          max-height: calc(100vh - 24px); overflow: auto; box-sizing: border-box;
+        .panel { position: fixed; left: 12px; bottom: 12px; z-index: 2147483647; width: 300px;
+          max-height: calc(100vh - 24px); overflow: hidden auto; box-sizing: border-box;
           font: 12px/1.4 system-ui, sans-serif; color: #e8f5c8; background: #101a08f2;
           border: 1px solid #7aa02c; border-radius: 10px; padding: 10px; box-shadow: 0 4px 16px #0008; }
         .row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
         .title { font-weight: 700; flex: 1; }
         .grow { flex: 1; min-width: 0; }
+        .name { width: 52px; flex: none; }
         button, select, input { font: inherit; color: inherit; background: #1f3010; border: 1px solid #7aa02c;
-          border-radius: 6px; padding: 4px 8px; cursor: pointer; }
+          border-radius: 6px; padding: 3px 8px; cursor: pointer; }
+        select { min-width: 0; }
         input { cursor: text; width: 70px; }
+        button:disabled { opacity: 0.5; cursor: default; }
         button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid #d4ff6a; outline-offset: 1px; }
         button.on { background: #7aa02c; color: #101a08; }
-        .auto-switches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 6px; }
-        .auto-switches button { padding: 3px 4px; }
+        .auto-switches { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+        .auto-switches button { padding: 1px 8px; border-radius: 999px; font-size: 11px; }
         .show { position: fixed; left: 12px; bottom: 12px; z-index: 2147483647; font-weight: 700;
           background: #101a08f2; box-shadow: 0 4px 16px #0008; }
-        .status { min-height: 1.4em; margin-bottom: 4px; }
+        .status { min-height: 1.4em; margin: 2px 0 6px; padding: 4px 6px; border-radius: 6px; background: #1f3010; font-weight: 600; }
         .muted { color: #b5c99a; }
-        details { margin-top: 6px; }
-        summary { cursor: pointer; font-weight: 600; }
+        .note { margin: 4px 0; }
+        details { border-top: 1px solid #3d5420; padding-top: 4px; margin-top: 4px; }
+        summary { cursor: pointer; font-weight: 600; padding: 2px 0; }
         table { width: 100%; border-collapse: collapse; margin-top: 4px; font-variant-numeric: tabular-nums; }
-        th, td { padding: 2px 4px; text-align: right; white-space: nowrap; }
+        th, td { padding: 2px 3px; text-align: right; white-space: nowrap; }
         th:first-child, td:first-child { text-align: left; white-space: normal; }
         th { color: #b5c99a; font-weight: 600; border-bottom: 1px solid #3d5420; }
+        tfoot td { border-top: 1px solid #3d5420; font-weight: 600; }
         .pos { color: #a6e05a; }
         .neg { color: #ff8f7a; }
-        .bundle { margin-top: 4px; }
-        .bundle.neg { font-weight: 600; }
-        .xp-note { margin: 4px 0 0; }
-        .bettest-toggle { margin-top: 4px; }
-        tr.group td { text-align: left; padding-top: 6px; font-weight: 600; color: #e8f5c8; }
+        .bundle { margin-top: 6px; font-size: 11px; }
+        .bundle.neg { font-weight: 600; font-size: 12px; }
         tr.pick td { color: #d4ff6a; font-weight: 700; }
       </style>
       <div class="panel" role="region">
@@ -2151,13 +2154,14 @@
           <button type="button" class="hide"></button>
         </div>
         <div class="row">
-          <label class="muted" for="account"></label>
+          <label class="muted name" for="account"></label>
           <select id="account" class="grow"></select>
           <button type="button" class="add-account"></button>
         </div>
+        <div class="status" role="status" aria-live="polite"></div>
         <div class="row">
-          <label class="muted grow" for="type"></label>
-          <select id="type">
+          <label class="muted name" for="type"></label>
+          <select id="type" class="grow">
             <option value="alternate"></option>
             <option value="bughunt"></option>
             <option value="output"></option>
@@ -2167,66 +2171,67 @@
           <button type="button" class="work-toggle"></button>
         </div>
         <div class="row">
-          <label class="muted grow" for="game"></label>
-          <select id="game"></select>
+          <label class="muted name" for="game"></label>
+          <select id="game" class="grow"></select>
           <button type="button" class="games-toggle"></button>
         </div>
-        <div class="row">
-          <span class="muted grow screen-label"></span>
-          <button type="button" class="screen-toggle"></button>
-        </div>
-        <div class="row">
-          <label class="muted grow" for="hotfix-force"></label>
-          <input id="hotfix-force" type="text" autocomplete="off" spellcheck="false" />
-          <button type="button" class="force-toggle"></button>
-        </div>
-        <div class="auto-label muted"></div>
         <div class="auto-switches" role="group"></div>
-        <div class="status" role="status" aria-live="polite"></div>
-        <div class="stats muted"></div>
-        <div class="cost muted"></div>
-        <div class="bundle" role="status"></div>
-        <details class="profit">
+        <details data-section="profit" class="profit">
+          <summary></summary>
+          <table>
+            <thead><tr><th scope="col"></th><th scope="col"></th><th scope="col"></th></tr></thead>
+            <tbody></tbody>
+            <tfoot></tfoot>
+          </table>
+        </details>
+        <details data-section="xp" class="xp">
           <summary></summary>
           <table>
             <thead><tr><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th></tr></thead>
             <tbody></tbody>
           </table>
         </details>
-        <details class="xp">
+        <details data-section="bettest" class="bettest">
           <summary></summary>
-          <p class="muted xp-note"></p>
-          <table>
-            <thead><tr><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </details>
-        <details class="bettest">
-          <summary></summary>
-          <p class="muted xp-note bettest-note"></p>
-          <button type="button" class="bettest-toggle"></button>
-          <div class="row grind-bet-row">
+          <div class="row note">
             <label class="muted grow" for="grind-bet"></label>
             <select id="grind-bet"></select>
           </div>
-          <table>
-            <thead><tr><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </details>
-        <details class="hotfix">
-          <summary></summary>
-          <p class="muted xp-note hotfix-note"></p>
-          <button type="button" class="bettest-toggle hotfix-toggle"></button>
-        </details>
-        <details class="shop">
-          <summary></summary>
-          <p class="muted xp-note shop-goal"></p>
+          <p class="muted note bettest-note"></p>
           <table>
             <thead><tr><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th></tr></thead>
             <tbody></tbody>
           </table>
+          <button type="button" class="note bettest-toggle"></button>
         </details>
+        <details data-section="shop" class="shop">
+          <summary></summary>
+          <p class="note shop-goal"></p>
+          <table>
+            <thead><tr><th scope="col"></th><th scope="col"></th><th scope="col"></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </details>
+        <details data-section="more" class="more">
+          <summary></summary>
+          <div class="row note">
+            <span class="muted grow screen-label"></span>
+            <button type="button" class="screen-toggle"></button>
+          </div>
+          <div class="row">
+            <span class="muted grow hotfix-label"></span>
+            <button type="button" class="hotfix-toggle"></button>
+          </div>
+          <p class="muted note hotfix-note"></p>
+          <div class="row">
+            <label class="muted grow" for="hotfix-force"></label>
+            <input id="hotfix-force" type="text" autocomplete="off" spellcheck="false" />
+            <button type="button" class="force-toggle"></button>
+          </div>
+          <div class="stats muted"></div>
+          <div class="cost muted"></div>
+        </details>
+        <div class="bundle muted" role="status"></div>
       </div>
       <button type="button" class="show"></button>`;
     const $ = (sel) => shadow.querySelector(sel);
@@ -2250,7 +2255,6 @@
       forceLabel: $('label[for="hotfix-force"]'),
       forceValue: $('#hotfix-force'),
       forceToggle: $('.force-toggle'),
-      autoLabel: $('.auto-label'),
       autoSwitches: $('.auto-switches'),
       status: $('.status'),
       stats: $('.stats'),
@@ -2259,8 +2263,9 @@
       summary: $('.profit summary'),
       head: [...shadow.querySelectorAll('.profit th')],
       body: $('.profit tbody'),
+      foot: $('.profit tfoot'),
       xpSummary: $('.xp summary'),
-      xpNote: $('.xp-note'),
+      xpTable: $('.xp table'),
       xpHead: [...shadow.querySelectorAll('.xp th')],
       xpBody: $('.xp tbody'),
       betSummary: $('.bettest summary'),
@@ -2270,10 +2275,12 @@
       grindBet: $('#grind-bet'),
       betHead: [...shadow.querySelectorAll('.bettest th')],
       betBody: $('.bettest tbody'),
-      hotfixSummary: $('.hotfix summary'),
+      hotfixLabel: $('.hotfix-label'),
       hotfixNote: $('.hotfix-note'),
       hotfixToggle: $('.hotfix-toggle'),
       shop: $('.shop'),
+      moreSummary: $('.more summary'),
+      sections: [...shadow.querySelectorAll('details[data-section]')],
       shopSummary: $('.shop summary'),
       shopGoal: $('.shop-goal'),
       shopHead: [...shadow.querySelectorAll('.shop th')],
@@ -2294,7 +2301,6 @@
     ui.forceLabel.textContent = msg('panelHotfixForce');
     ui.forceValue.placeholder = 'true';
     ui.forceValue.title = msg('panelHotfixForceHint');
-    ui.autoLabel.textContent = msg('panelAutoParts');
     ui.autoSwitches.setAttribute('aria-label', msg('panelAutoParts'));
     for (const [name, key] of AUTO_SWITCHES) {
       const button = document.createElement('button');
@@ -2305,16 +2311,12 @@
       ui.autoSwitches.append(button);
     }
     ui.summary.textContent = msg('panelProfit');
-    ['colGame', 'colRounds', 'colNet', 'colRtp'].forEach((key, i) => (ui.head[i].textContent = msg(key)));
+    ['colGame', 'colNet', 'colRtp'].forEach((key, i) => (ui.head[i].textContent = msg(key)));
     ui.xpSummary.textContent = msg('panelXp');
-    ui.xpNote.textContent = msg('panelXpNote');
-    ['colGame', 'colEdge', 'colXpPerCredit', 'colCostPerXp', 'colState'].forEach(
-      (key, i) => (ui.xpHead[i].textContent = msg(key)),
-    );
+    ui.xpTable.title = msg('panelXpNote');
+    ['colGame', 'colEdge', 'colCostPerXp', 'colState'].forEach((key, i) => (ui.xpHead[i].textContent = msg(key)));
     ui.betSummary.textContent = msg('panelBetTest');
-    ['colBet', 'colRounds', 'colXpPerRound', 'colCostPerXp', 'colLevelIn', 'colLevelCost'].forEach(
-      (key, i) => (ui.betHead[i].textContent = msg(key)),
-    );
+    ['colBet', 'colXpPerRound', 'colCostPerXp', 'colLevelIn'].forEach((key, i) => (ui.betHead[i].textContent = msg(key)));
     ui.betToggle.addEventListener('click', toggleBetTest);
     ui.grindBetLabel.textContent = msg('panelGrindBet');
     ui.grindBet.add(new Option('', 'test'));
@@ -2323,10 +2325,19 @@
       const value = ui.grindBet.value;
       saveSettings(value === 'test' ? { grindBetFromTest: true } : { grindBetFromTest: false, grindBet: Number(value) });
     });
-    ui.hotfixSummary.textContent = msg('panelHotfixTest');
+    ui.hotfixLabel.textContent = msg('panelHotfixTest');
     ui.hotfixToggle.addEventListener('click', toggleHotfixTest);
     ui.shopSummary.textContent = msg('panelShop');
-    ['colUpgrade', 'colLevel', 'colPrice', 'colState'].forEach((key, i) => (ui.shopHead[i].textContent = msg(key)));
+    ['colUpgrade', 'colPrice', 'colState'].forEach((key, i) => (ui.shopHead[i].textContent = msg(key)));
+    ui.moreSummary.textContent = msg('panelMore');
+    // Open sections stay open across reloads.
+    for (const section of ui.sections) {
+      section.open = settings.panelOpen.includes(section.dataset.section);
+      section.addEventListener('toggle', () => {
+        const open = ui.sections.filter((d) => d.open).map((d) => d.dataset.section);
+        if (open.join() !== settings.panelOpen.join()) saveSettings({ panelOpen: open });
+      });
+    }
     for (const option of ui.type.options) option.textContent = msg(`type_${option.value}`);
     for (const game of G.GAME_KEYS) ui.game.add(new Option(msg(`game_${game}`), game));
     ui.autoToggle.addEventListener('click', () => {
@@ -2369,31 +2380,32 @@
 
   const tone = (n) => (n > 0 ? 'pos' : n < 0 ? 'neg' : '');
 
+  // Net per game, work and free income, with the rounds in each row's tooltip.
+  // Free income is one row; its parts are in the settings Profit tab.
   function renderProfit() {
-    const rows = G.profitRows(stats.games).map((row) => [
-      msg(`game_${row.game}`),
-      num.format(row.rounds),
-      { text: signed.format(row.net), tone: tone(row.net) },
-      row.rtp === null ? '-' : pct.format(row.rtp),
-    ]);
+    const rows = G.profitRows(stats.games).map((row) => ({
+      name: msg(`game_${row.game}`),
+      net: row.net,
+      rtp: row.rtp,
+      title: msg('panelRounds', [num.format(row.rounds)]),
+    }));
     if (stats.work.tickets > 0) {
-      rows.push([
-        msg('panelWork'),
-        num.format(stats.work.tickets),
-        { text: signed.format(stats.work.net), tone: tone(stats.work.net) },
-        '-',
-      ]);
+      rows.push({ name: msg('panelWork'), net: stats.work.net, rtp: null, title: msg('panelTickets', [num.format(stats.work.tickets)]) });
     }
-    for (const [kind, amount] of Object.entries(stats.free)) {
-      if (amount) rows.push([msg(`free_${kind}`), '-', { text: signed.format(amount), tone: tone(amount) }, '-']);
-    }
+    const free = Object.values(stats.free).reduce((sum, amount) => sum + amount, 0);
+    if (free) rows.push({ name: msg('panelFree'), net: free, rtp: null, title: '' });
     ui.body.replaceChildren(
-      ...rows.map((values) => {
+      ...rows.map((row) => {
         const tr = document.createElement('tr');
-        for (const value of values) tr.append(typeof value === 'object' ? cell(value.text, value.tone) : cell(value));
+        tr.title = row.title;
+        tr.append(cell(row.name), cell(signed.format(row.net), tone(row.net)), cell(row.rtp === null ? '' : pct.format(row.rtp)));
         return tr;
       }),
     );
+    const total = rows.reduce((sum, row) => sum + row.net, 0);
+    const foot = document.createElement('tr');
+    foot.append(cell(msg('colTotal')), cell(signed.format(total), tone(total)), cell(''));
+    ui.foot.replaceChildren(...(rows.length ? [foot] : []));
   }
 
   // XP grinding measurements per game, with the grinder's pick.
@@ -2404,8 +2416,10 @@
     }
     const { candidates, edges, plan } = grindChoice();
     const report = A.grindReport(candidates, player.level, stats.games, GRIND_UNLOCKS, edges, xpBonus());
+    // Locked games past the next unlock add nothing to decide on.
+    const next = Math.min(...report.filter((game) => game.locked).map((game) => game.unlock));
     ui.xpBody.replaceChildren(
-      ...report.map((game) => {
+      ...report.filter((game) => !game.locked || game.unlock === next).map((game) => {
         let state = '';
         if (game.locked) state = msg('xpLocked', [String(game.unlock)]);
         else if (plan?.game === game.game) state = msg('xpPick', [credits(plan.bet)]);
@@ -2414,7 +2428,6 @@
         tr.append(
           cell(msg(`game_${game.game}`)),
           cell(game.edge === null ? '-' : pct.format(game.edge)),
-          cell(game.rate === null ? '-' : decimal.format(game.rate * 100)),
           cell(game.cost === null ? '-' : decimal.format(game.cost)),
           cell(state, game.locked ? 'muted' : undefined),
         );
@@ -2431,10 +2444,10 @@
     ui.hotfixToggle.disabled = !player || player.level < G.GAMES.hotfix.unlock;
     const free = hotfixRounds.filter((round) => round.path === '/api/hotfix/free').length;
     const recorded = msg('hotfixRecorded', [num.format(hotfixRounds.length - free), num.format(free)]);
-    const state = running
-      ? msg('hotfixTestRunning', [num.format(test.spins), num.format(HOTFIX_TEST_SPINS)])
-      : msg('hotfixTestNote', [num.format(HOTFIX_TEST_SPINS), credits(G.BET_LEVELS[0])]);
-    ui.hotfixNote.textContent = `${state} ${recorded}`;
+    ui.hotfixNote.textContent = running
+      ? `${msg('hotfixTestRunning', [num.format(test.spins), num.format(HOTFIX_TEST_SPINS)])} ${recorded}`
+      : recorded;
+    ui.hotfixToggle.title = msg('hotfixTestNote', [num.format(HOTFIX_TEST_SPINS), credits(G.BET_LEVELS[0])]);
   }
 
   // XP per bet level of the tested game (the grind game before any test), the
@@ -2458,14 +2471,16 @@
     const report = A.betXpReport(stats.betXp[game], edge, { xpLeft, msPerRound, bonus: xpBonus() });
     const name = msg(`game_${game}`);
     const rounds = num.format(A.BET_TEST_ROUNDS);
-    let note;
-    if (running && hackathonOn()) note = msg('betTestHackathon', [name]);
-    else if (running) note = msg('betTestRunning', [name, rounds]);
-    else note = msg('betTestNote', [name, rounds]);
-    const paceNote = msPerRound
-      ? msg('betTestPace', [num.format(xpLeft), decimal.format(msPerRound / 1000)])
-      : msg('betTestNoPace', [num.format(xpLeft)]);
-    ui.betNote.textContent = `${note} ${paceNote}`;
+    // One line on screen, the long explanations in tooltips.
+    const paceLine = msPerRound
+      ? msg('betTestLine', [name, num.format(xpLeft), decimal.format(msPerRound / 1000)])
+      : msg('betTestLineNoPace', [name, num.format(xpLeft)]);
+    let state = '';
+    if (running && hackathonOn()) state = msg('betTestHackathon', [name]);
+    else if (running) state = msg('betTestRunning', [name, rounds]);
+    ui.betNote.textContent = state ? `${state} ${paceLine}` : paceLine;
+    ui.betNote.title = msPerRound ? msg('betTestPace', [num.format(xpLeft), decimal.format(msPerRound / 1000)]) : '';
+    ui.betToggle.title = msg('betTestNote', [name, rounds]);
     const best = report.reduce((a, b) => ((b.rate ?? 0) > (a?.rate ?? 0) ? b : a), null);
     const found = A.testBet(stats.betXp[game]);
     ui.grindBet.options[0].textContent = found ? msg('panelGrindBetTest', [credits(found)]) : msg('panelGrindBetNoTest');
@@ -2474,13 +2489,15 @@
       ...report.map((row) => {
         const tr = document.createElement('tr');
         if (row === best) tr.className = 'pick';
+        tr.title = msg('panelBetRow', [
+          num.format(row.rounds),
+          row.levelCost === null ? '-' : credits(Math.round(row.levelCost)),
+        ]);
         tr.append(
           cell(credits(row.bet)),
-          cell(num.format(row.rounds)),
           cell(row.xpPerRound === null ? '-' : decimal.format(row.xpPerRound)),
           cell(row.cost === null ? '-' : decimal.format(row.cost)),
           cell(row.levelMs === null ? '-' : duration(row.levelMs)),
-          cell(row.levelCost === null ? '-' : credits(Math.round(row.levelCost))),
         );
         return tr;
       }),
@@ -2509,10 +2526,16 @@
     const { goal, queue } = review;
     const next = nextBuy(review);
     const name = (offer) => `${offer.game}:${offer.key} ${offer.next}`;
+    ui.shopGoal.title = '';
     if (!next) ui.shopGoal.textContent = msg('shopNoGoal');
     else if (next.need === null) ui.shopGoal.textContent = msg('shopNextUnmeasured', [name(next.offer), credits(next.offer.price)]);
     else {
-      ui.shopGoal.textContent = msg('shopNext', [
+      ui.shopGoal.textContent = msg('shopNextShort', [
+        name(next.offer),
+        credits(next.offer.price),
+        credits(Math.max(0, next.need - player.credits)),
+      ]);
+      ui.shopGoal.title = msg('shopNext', [
         name(next.offer),
         credits(next.offer.price),
         credits(next.need),
@@ -2531,7 +2554,7 @@
         else if (offer === next?.offer) state = msg('shopState_spare');
         else if (offer.reason === 'level') state = msg('shopNeedsLevel', [String(offer.minLevel)]);
         else if (offer.reason) state = msg(`shopState_${offer.reason}`);
-        tr.append(cell(`${offer.game}:${offer.key}`), cell(String(offer.next)), cell(credits(offer.price)), cell(state));
+        tr.append(cell(`${offer.game}:${offer.key} ${offer.next}`), cell(credits(offer.price)), cell(state));
         return tr;
       }),
     );

@@ -121,7 +121,7 @@
     }
   },
   "panelBundleChanged": {
-    "message": "Casino app updated $P1$ (changelog $P2$). Every model table still matches.",
+    "message": "App updated $P1$ (changelog $P2$), models match.",
     "placeholders": {
       "p1": {
         "content": "$1"
@@ -1218,17 +1218,11 @@
   "colEdge": {
     "message": "Edge"
   },
-  "colXpPerCredit": {
-    "message": "XP/100"
-  },
   "colCostPerXp": {
     "message": "Loss/XP"
   },
   "colLevelIn": {
     "message": "To level"
-  },
-  "colLevelCost": {
-    "message": "Level loss"
   },
   "panelGrindBet": {
     "message": "Grind bet"
@@ -1252,14 +1246,6 @@
       },
       "p2": {
         "content": "$2"
-      }
-    }
-  },
-  "betTestNoPace": {
-    "message": "$P1$ XP left in this level; the time to level shows once rounds are played back to back.",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
       }
     }
   },
@@ -1686,5 +1672,77 @@
   },
   "colDrawErrors": {
     "message": "Draw errors"
+  },
+  "panelMore": {
+    "message": "More"
+  },
+  "panelRounds": {
+    "message": "$P1$ rounds",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "panelTickets": {
+    "message": "$P1$ tickets",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "panelFree": {
+    "message": "Bonuses"
+  },
+  "betTestLine": {
+    "message": "$P1$ · $P2$ XP to level · $P3$ s a round",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "betTestLineNoPace": {
+    "message": "$P1$ · $P2$ XP to level",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "panelBetRow": {
+    "message": "$P1$ rounds tested · expected loss to level: $P2$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "shopNextShort": {
+    "message": "Next: $P1$ for $P2$, $P3$ to go.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
   }
 }

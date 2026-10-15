@@ -121,7 +121,7 @@
     }
   },
   "panelBundleChanged": {
-    "message": "Kasino má novou verzi ($P1$, změny z $P2$). Všechny tabulky modelů sedí.",
+    "message": "Aplikace aktualizována $P1$ (changelog $P2$), modely sedí.",
     "placeholders": {
       "p1": {
         "content": "$1"
@@ -1218,17 +1218,11 @@
   "colEdge": {
     "message": "Výhoda"
   },
-  "colXpPerCredit": {
-    "message": "XP/100"
-  },
   "colCostPerXp": {
     "message": "Ztráta/XP"
   },
   "colLevelIn": {
     "message": "Do levelu"
-  },
-  "colLevelCost": {
-    "message": "Ztráta"
   },
   "panelGrindBet": {
     "message": "Sázka grindu"
@@ -1252,14 +1246,6 @@
       },
       "p2": {
         "content": "$2"
-      }
-    }
-  },
-  "betTestNoPace": {
-    "message": "V tomto levelu chybí $P1$ XP; čas do levelu se ukáže, až se odehrají kola za sebou.",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
       }
     }
   },
@@ -1686,5 +1672,77 @@
   },
   "colDrawErrors": {
     "message": "Chyby dobírání"
+  },
+  "panelMore": {
+    "message": "Další"
+  },
+  "panelRounds": {
+    "message": "$P1$ kol",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "panelTickets": {
+    "message": "$P1$ úkolů",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "panelFree": {
+    "message": "Bonusy"
+  },
+  "betTestLine": {
+    "message": "$P1$ · $P2$ XP do levelu · $P3$ s na kolo",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "betTestLineNoPace": {
+    "message": "$P1$ · $P2$ XP do levelu",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "panelBetRow": {
+    "message": "Otestováno $P1$ kol · očekávaná ztráta do levelu: $P2$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "shopNextShort": {
+    "message": "Další: $P1$ za $P2$, chybí $P3$.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
   }
 }

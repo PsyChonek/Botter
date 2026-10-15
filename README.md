@@ -324,7 +324,7 @@ progress shows at `chrome://on-device-internals`.
   wheel of modifiers and free spins on 4+ incidents. When free spins start, the bot
   plays them at once with Postupný rollout (`HOTFIX_CHOICE`). The grinder never picks
   it: it has no validated model yet. It is played by the game bot when picked there, and
-  by the **Forbes z Chánova test** in the panel, started by hand: 500 spins at the
+  by the **Forbes z Chánova test** (panel, More), started by hand: 500 spins at the
   smallest bet in auto mode with games on, keeping the reserve (`hotfixTestStep`).
   `scripts/hotfix-sim.mjs` simulates it from the client's tables, but the client does
   not show how the free-spin multiplier grows (per winning spin or per cascade step)
@@ -344,7 +344,7 @@ progress shows at `chrome://on-device-internals`.
   about 88 % at the client's 7 % wheel chance and about 104 % at the 9.4 % measured
   (46 of 491, 2 deviations above 7 %), so the wheel chance decides whether Forbes
   pays and needs a longer test.
-  **Forbes force** (panel, off by default) sends the server's test switch `force` on
+  **Forbes force** (panel, More, off by default) sends the server's test switch `force` on
   every Forbes spin the bot plays (the client has the field but never sets it). The
   value field is read as JSON (`4`, `true`, `"free"`), anything else is sent as text,
   and an empty field sends `true`. Forced spins are booked and recorded like any
@@ -375,9 +375,9 @@ progress shows at `chrome://on-device-internals`.
   the hidden cost, hands dealt against the drawing rules and payouts off the pays
   (which shows whether the cut is also taken from tie and pair wins). Baccarat has
   no screen play yet; with **Play on the game screen** on it still goes through the API.
-- **XP per game** (panel): for each game the house edge the grinder plans with, XP per
-  100 credits wagered, credits lost per XP point and its state (locked or playing at
-  the chosen bet). The row the grinder plays next is highlighted.
+- **XP per game** (panel): for each unlocked game and the next one to unlock, the house
+  edge the grinder plans with, credits lost per XP point and its state (locked or
+  playing at the chosen bet). The row the grinder plays next is highlighted.
 - **XP per bet** (panel): checks whether XP per round really grows in proportion to
   the bet, the assumption the grinder plans with. Every round played off a Hackathon
   weekend is booked by game and bet level (`stats.betXp`, `G.addBetXp`). **Test XP per
@@ -385,8 +385,9 @@ progress shows at `chrome://on-device-internals`.
   rounds at every bet level up to the max bet, the levels in turn so a level-up or
   upgrade during the test hits them all alike (`betTestNext` in `src/auto.js`). It
   keeps the reserve but not the grinding budget, and waits out Hackathon weekends.
-  The table shows XP per round, the loss per XP at the game's edge, and the time and
-  expected loss to finish the current level grinding at that bet, from the XP left in
+  The table shows XP per round, the loss per XP at the game's edge and the time to
+  finish the current level grinding at that bet (rounds tested and the expected loss to
+  the level in the row tooltip), from the XP left in
   the level and the measured pace (`stats.pace`, `G.addPace`: the mean time between
   rounds played back to back, gaps over 20 seconds left out, older rounds halving in
   weight every 100). The bet with the most XP per credit is highlighted. The server
@@ -394,9 +395,16 @@ progress shows at `chrome://on-device-internals`.
   per XP but the slowest. **Grind bet** under the test picks what the grinder bets:
   the test result or a fixed size (the same settings as on the Auto tab). The result
   is logged as `bet_test_done`.
-- A small panel in the bottom-left corner of the page has Start/Stop for work and
-  for games, the ticket type, the game, accuracy per answer source, AI cost and
-  the profit table. **Hide** collapses it to a small Botter button in the same corner
+- A small panel in the bottom-left corner of the page (300 px wide, no table wider
+  than four columns) has the auto switch, the account, the status line, Start/Stop
+  for work and for games with the ticket type and the game, and the auto mode parts
+  as chips. Below them are collapsible sections, which stay open or closed across
+  reloads (`panelOpen`): **Profit** (net and return per game, work, bonuses summed,
+  a total; rounds in the row tooltip), **XP per game** (unlocked games and the next
+  unlock only), **XP per bet**, **Upgrade queue** and **More** (play on the game
+  screen, the Forbes z Chánova test, Forbes force, answer accuracy and AI cost).
+  Longer explanations are tooltips. A bundle update shows as one small line at the
+  bottom. **Hide** collapses it to a small Botter button in the same corner
   (highlighted while a bot runs); click it to bring the panel back. The same switch is
   in the settings (Bot tab).
 - **Accounts**: stats, profit, achievement flags (clean loan, leaderboards) and the
