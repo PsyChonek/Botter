@@ -1594,7 +1594,7 @@
     }
   },
   "optionsEdgeBets": {
-    "message": "Sázet, když se kolo samo vyplatí (mzdový fond blízko stropu, víkend Konec kvartálu)"
+    "message": "Sázet, když se kolo samo vyplatí (mzdový fond, když se jeho naměřená šance vyplatí, víkend Konec kvartálu)"
   },
   "colWinsRtp": {
     "message": "Konec kvartálu"

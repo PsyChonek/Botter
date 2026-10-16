@@ -850,28 +850,62 @@
     return out.sort((a, b) => a - b);
   }
 
-  // Mzdový fond: 1 % of every bet goes into a shared fund, and the bet that
-  // takes it to its cap (12,000) drops it and takes it all. A bet whose 1 %
-  // covers the room left wins the fund outright. Short of that, the bot pushes:
-  // filling the room takes 100 times the room in bets, whatever their size,
-  // and the fund goes to whoever lands the last one, so each credit pushed is
-  // worth the fund over 100 times the room, times the share of pushes the bot
-  // expects to finish before another player does.
-  const PAYROLL_SHARE = 0.01;
-  const PAYROLL_PUSH_WON = 0.5;
-  // Fund credits a bet earns per credit staked.
-  function payrollWorth(payroll, bet) {
-    if (!(payroll?.amount > 0) || !(payroll.cap > 0)) return 0;
-    const room = payroll.cap - payroll.amount;
-    if (PAYROLL_SHARE * bet >= room) return payroll.amount / bet;
-    return (PAYROLL_PUSH_WON * PAYROLL_SHARE * payroll.amount) / room;
+  // Mzdový fond (since 2026-10-15): 0.5 % of every bet goes into a shared fund
+  // that grows up to its cap (12,000) and can drop on any bet, a bigger bet
+  // more likely. The client does not say how likely, so the bot measures it:
+  // the chance one credit staked drops the fund is the drops seen over the
+  // credits that went into it while the bot watched (watchPayroll). A credit
+  // staked is then worth that chance times the fund, whatever the bet size.
+  const PAYROLL_SHARE = 0.005;
+  // Drops seen before the measured chance is planned with.
+  const PAYROLL_MIN_DROPS = 5;
+  // Reads further apart than this may hide a drop, so the watch restarts.
+  const PAYROLL_WATCH_GAP_MS = 10 * 60_000;
+
+  // Shared tally { staked, drops, read } after a fund read ({ amount, seed,
+  // cap, last: { login, amount } } as the server sends it) at time `at`. Only
+  // a read that follows the last one within PAYROLL_WATCH_GAP_MS counts: the
+  // fund's growth is the credits staked (over PAYROLL_SHARE), and a new `last`
+  // is a drop, staked from the read before to the dropped amount and from the
+  // seed to the new one. While the fund sits at its cap the stakes do not show,
+  // so a read that follows one at the cap counts nothing. Returns `watch`
+  // itself when the read changes nothing.
+  function watchPayroll(watch, fund, at) {
+    if (!(fund?.amount >= 0) || !(fund.cap > 0)) return watch;
+    const tally = { staked: watch?.staked ?? 0, drops: watch?.drops ?? 0 };
+    const prev = watch?.read;
+    // A read without its last winner keeps the one seen before.
+    const last = fund.last ? `${fund.last.login}:${fund.last.amount}` : (prev?.last ?? null);
+    if (prev && prev.amount === fund.amount && prev.last === last) return watch;
+    const read = { amount: fund.amount, cap: fund.cap, last, at };
+    if (prev && at - prev.at <= PAYROLL_WATCH_GAP_MS && prev.amount < prev.cap) {
+      if (last === prev.last) {
+        if (fund.amount >= prev.amount) tally.staked += (fund.amount - prev.amount) / PAYROLL_SHARE;
+        // A drop whose winner did not come: the next read starts over.
+        else read.at = 0;
+      } else if (fund.last && fund.last.amount >= prev.amount && fund.seed >= 0) {
+        tally.drops += 1;
+        tally.staked += (fund.last.amount - prev.amount + Math.max(0, fund.amount - fund.seed)) / PAYROLL_SHARE;
+      }
+    }
+    return { ...tally, read };
+  }
+
+  // Chance one credit staked drops the fund, or null before PAYROLL_MIN_DROPS
+  // drops were seen.
+  const payrollHazard = (watch) => (watch?.drops >= PAYROLL_MIN_DROPS && watch.staked > 0 ? watch.drops / watch.staked : null);
+
+  // Fund credits a credit staked is expected to win.
+  function payrollWorth(payroll) {
+    if (!(payroll?.amount > 0) || !(payroll.hazard > 0)) return 0;
+    return payroll.hazard * payroll.amount;
   }
 
   // How often to read the fund while no bet brings it: every 10 seconds once
-  // pushing it pays on the cheapest game, else every minute.
+  // the fund pays on the cheapest game, else every minute.
   function payrollPollMs(payroll, edge) {
     if (!payroll || !Number.isFinite(edge)) return 60_000;
-    return payrollWorth(payroll, 0) > edge / 2 ? 10_000 : 60_000;
+    return payrollWorth(payroll) > edge / 2 ? 10_000 : 60_000;
   }
 
   // Konec kvartálu weekend: +50 % on the net profit of every round that ends
@@ -887,49 +921,37 @@
   }
 
   // A round worth playing for its own expected profit, or null: the payroll
-  // fund close to its cap, or the Konec kvartálu bonus on wins. Per credit a
-  // round returns -edge, plus winsBonus times gain (the mean net profit per
-  // credit staked of the rounds that end ahead), plus what the bet earns of the
-  // fund (payrollWorth). The bet is sized by fractional Kelly on that edge over
-  // the game's variance per round, the smallest level always allowed. The pick
-  // is the biggest expected profit per round, which near the cap is the
-  // smallest bet that drops the fund. ctx: level, unlocks, edges, gains and variances per game,
-  // levels (affordable bets, ascending), bankroll (credits above the reserve),
-  // kelly, winsBonus (0 off the weekend or past its limit), payroll
-  // ({ amount, cap } or null).
-  // Near the cap the bot races for the last bet: once the biggest affordable
-  // bet fills the room in PAYROLL_RACE_ROUNDS rounds or fewer, fewer and bigger
-  // pushes leave other players less time to land it first, so the bet is the
-  // biggest level up to 1 / PAYROLL_RACE_STAKES of the bankroll instead of the
-  // Kelly size. With ctx.pushBet set (what the XP grinder would bet now, 0 when
-  // it may not bet) a fund push bets the biggest level up to it instead of
-  // either: the push is worth more than the edge costs, the grinder takes that
-  // swing anyway, and its floor and budget stay kept. At 0 nothing is pushed.
-  // A bet that drops the fund outright is not a push: it is played whatever
-  // pushBet says, above the reserve alone.
-  const PAYROLL_RACE_ROUNDS = 100;
-  const PAYROLL_RACE_STAKES = 20;
-  const payrollRace = (payroll, levels) =>
-    payroll?.cap > 0 && levels.length > 0 && payroll.cap - payroll.amount <= PAYROLL_SHARE * levels.at(-1) * PAYROLL_RACE_ROUNDS;
-
+  // fund once its measured chance makes it pay, or the Konec kvartálu bonus on
+  // wins. Per credit a round returns -edge, plus winsBonus times gain (the mean
+  // net profit per credit staked of the rounds that end ahead), plus what the
+  // bet earns of the fund (payrollWorth). The bet is sized by fractional Kelly
+  // on that edge over the round's variance, the smallest level always allowed:
+  // the game's variance per round plus the fund's, which a bet of b wins with
+  // chance hazard * b, so hazard * amount^2 / b in units of the bet. The pick is
+  // the biggest expected profit per round. ctx: level, unlocks, edges, gains
+  // and variances per game, levels (affordable bets, ascending), bankroll
+  // (credits above the reserve), kelly, winsBonus (0 off the weekend or past
+  // its limit), payroll ({ amount, hazard } or null).
+  // With ctx.pushBet set (what the XP grinder would bet now, 0 when it may not
+  // bet) a fund bet is the biggest level up to it instead: the fund is worth
+  // more than the edge costs, the grinder takes that swing anyway, and its
+  // floor and budget stay kept. At 0 nothing is bet for the fund.
   function edgePlan(ctx) {
     const levels = ctx.levels ?? [];
-    const racing = payrollRace(ctx.payroll, levels);
+    const fund = payrollWorth(ctx.payroll);
     let best = null;
     for (const game of Object.keys(ctx.unlocks)) {
       const edge = ctx.edges[game];
       if (edge === undefined || ctx.level < ctx.unlocks[game]) continue;
       const base = -edge + (ctx.winsBonus ?? 0) * (ctx.gains?.[game] ?? 0);
       for (const bet of levels) {
-        const fund = payrollWorth(ctx.payroll, bet);
         const ev = base + fund;
         if (!(ev > 0)) continue;
-        const drops = PAYROLL_SHARE * bet >= ctx.payroll?.cap - ctx.payroll?.amount;
         if (fund > 0 && ctx.pushBet !== undefined) {
-          if (!drops && bet > ctx.pushBet) continue;
+          if (bet > ctx.pushBet) continue;
         } else {
-          const cap = fund > 0 && racing ? ctx.bankroll / PAYROLL_RACE_STAKES : (ev / (ctx.variances?.[game] ?? 1)) * ctx.kelly * ctx.bankroll;
-          if (bet !== levels[0] && bet > cap) continue;
+          const variance = (ctx.variances?.[game] ?? 1) + (fund > 0 ? (fund * ctx.payroll.amount) / bet : 0);
+          if (bet !== levels[0] && bet > (ev / variance) * ctx.kelly * ctx.bankroll) continue;
         }
         const value = ev * bet;
         if (!best || value > best.value) best = { game, bet, ev, value, payroll: fund > 0 };
@@ -1089,6 +1111,9 @@
     parseTicket,
     parseTickets,
     lotteryNumbers,
+    PAYROLL_MIN_DROPS,
+    watchPayroll,
+    payrollHazard,
     payrollWorth,
     payrollPollMs,
     WINS_BONUS,

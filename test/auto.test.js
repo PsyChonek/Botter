@@ -720,26 +720,52 @@ test('lotteryPlan buys one ticket per draw for the draws-played tiers only', () 
   assert.equal(A.lotteryPlan({ achievements: allDone }, { mine: 0, prices: [20] }), null);
 });
 
-test('payrollWorth pays the whole fund to a bet that reaches the cap, a share of it to a push', () => {
-  const fund = { amount: 11_500, cap: 12_000 };
-  // 500 left takes 50,000 in bets; half the pushes are expected to win 11,500.
-  assert.equal(A.payrollWorth(fund, 1000), (0.5 * 11_500) / 50_000);
-  assert.equal(A.payrollWorth(fund, 20), A.payrollWorth(fund, 1000));
-  // 1 % of 1,000 covers the last 10.
-  assert.equal(A.payrollWorth({ amount: 11_990, cap: 12_000 }, 1000), 11.99);
-  // A 400 bet only pushes the last 10: half the fund over 1,000 in bets.
-  assert.equal(A.payrollWorth({ amount: 11_990, cap: 12_000 }, 400), (0.5 * 11_990) / 1000);
-  assert.equal(A.payrollWorth(null, 1000), 0);
+test('watchPayroll counts the credits staked into the fund and its drops between close reads', () => {
+  const t0 = 1_000_000;
+  const last = { login: 'a', amount: 4200 };
+  let watch = A.watchPayroll(null, { amount: 3000, seed: 2000, cap: 12_000, last }, t0);
+  assert.deepEqual([watch.staked, watch.drops], [0, 0]);
+  // 50 more in the fund is 10,000 staked at 0.5 %.
+  watch = A.watchPayroll(watch, { amount: 3050, seed: 2000, cap: 12_000, last }, t0 + 60_000);
+  assert.deepEqual([watch.staked, watch.drops], [10_000, 0]);
+  // The same read changes nothing.
+  assert.equal(A.watchPayroll(watch, { amount: 3050, seed: 2000, cap: 12_000, last }, t0 + 70_000), watch);
+  // A new last is a drop: 50 up to the 3,100 that dropped, then 10 from the seed.
+  watch = A.watchPayroll(watch, { amount: 2010, seed: 2000, cap: 12_000, last: { login: 'b', amount: 3100 } }, t0 + 120_000);
+  assert.deepEqual([watch.staked, watch.drops], [22_000, 1]);
+  // Reads too far apart, or after the fund sat at its cap, count nothing.
+  const late = A.watchPayroll(watch, { amount: 2500, seed: 2000, cap: 12_000, last: { login: 'b', amount: 3100 } }, t0 + 3_600_000);
+  assert.deepEqual([late.staked, late.drops], [22_000, 1]);
+  const full = { staked: 0, drops: 0, read: { amount: 12_000, cap: 12_000, last: 'a:4200', at: t0 } };
+  const after = A.watchPayroll(full, { amount: 2100, seed: 2000, cap: 12_000, last: { login: 'c', amount: 12_000 } }, t0 + 60_000);
+  assert.deepEqual([after.staked, after.drops], [0, 0]);
+  assert.equal(A.watchPayroll(watch, null, t0), watch);
+  // A read without its last winner keeps the one before, and a fall it does not explain starts over.
+  const bare = A.watchPayroll(watch, { amount: 2030, seed: 2000, cap: 12_000 }, t0 + 180_000);
+  assert.deepEqual([bare.staked, bare.drops], [26_000, 1]);
+  const fell = A.watchPayroll(bare, { amount: 2005, seed: 2000, cap: 12_000 }, t0 + 240_000);
+  const next = A.watchPayroll(fell, { amount: 2015, seed: 2000, cap: 12_000, last: { login: 'c', amount: 2040 } }, t0 + 300_000);
+  assert.deepEqual([next.staked, next.drops], [26_000, 1]);
 });
 
-test('payrollPollMs reads the fund often once pushing it pays', () => {
-  assert.equal(A.payrollPollMs({ amount: 11_500, cap: 12_000 }, 0.027), 10_000);
-  assert.equal(A.payrollPollMs({ amount: 3000, cap: 12_000 }, 0.027), 60_000);
+test('payrollHazard waits for enough drops, then payrollWorth is that chance times the fund', () => {
+  assert.equal(A.payrollHazard({ staked: 1_000_000, drops: A.PAYROLL_MIN_DROPS - 1 }), null);
+  assert.equal(A.payrollHazard({ staked: 1_000_000, drops: 5 }), 5e-6);
+  assert.equal(A.payrollHazard(null), null);
+  assert.equal(A.payrollWorth({ amount: 10_000, hazard: 5e-6 }), 0.05);
+  assert.equal(A.payrollWorth({ amount: 10_000, hazard: null }), 0);
+  assert.equal(A.payrollWorth(null), 0);
+});
+
+test('payrollPollMs reads the fund often once it pays', () => {
+  assert.equal(A.payrollPollMs({ amount: 10_000, hazard: 4e-6 }, 0.027), 10_000);
+  assert.equal(A.payrollPollMs({ amount: 3000, hazard: 4e-6 }, 0.027), 60_000);
+  assert.equal(A.payrollPollMs({ amount: 10_000, hazard: null }, 0.027), 60_000);
   assert.equal(A.payrollPollMs(null, 0.027), 60_000);
-  assert.equal(A.payrollPollMs({ amount: 11_500, cap: 12_000 }, null), 60_000);
+  assert.equal(A.payrollPollMs({ amount: 10_000, hazard: 4e-6 }, null), 60_000);
 });
 
-test('edgePlan bets on the payroll fund only near its cap', () => {
+test('edgePlan bets on the payroll fund once its chance times its size beats the edge', () => {
   const ctx = {
     level: 20,
     unlocks: { blaze: 1, roulette: 15 },
@@ -750,24 +776,19 @@ test('edgePlan bets on the payroll fund only near its cap', () => {
     kelly: 0.5,
     winsBonus: 0,
   };
-  // Far from the cap a push adds 0.5 * 0.01 * 6000 / 6000 = 0.5 % per credit, less than the edge.
-  assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 6000, cap: 12_000 } }), null);
-  // At 10,500 it adds 3.5 %: the biggest bet half Kelly allows on roulette (0.008 * 0.5 * 20,000 = 80).
-  assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 10_500, cap: 12_000 } }).bet, 40);
-  // At 11,500 the 500 left takes 50 bets of 1000, so it races at the biggest bet
-  // up to a 20th of the bankroll.
-  const plan = A.edgePlan({ ...ctx, payroll: { amount: 11_500, cap: 12_000 } });
-  assert.deepEqual([plan.game, plan.bet, plan.payroll], ['roulette', 1000, true]);
-  // A small bankroll keeps the bet small.
-  assert.equal(A.edgePlan({ ...ctx, bankroll: 1000, payroll: { amount: 11_500, cap: 12_000 } }).bet, 40);
-  assert.equal(A.edgePlan({ ...ctx, bankroll: 10_000, payroll: { amount: 11_500, cap: 12_000 } }).bet, 400);
-  // With 30 left the smallest bet that reaches the cap takes the fund.
-  assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 11_970, cap: 12_000 } }).bet, 1000);
-  assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 11_997, cap: 12_000 } }).bet, 400);
+  // 4e-6 a credit on 5,000 is 2 %, less than the edge.
+  assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 5000, hazard: 4e-6 } }), null);
+  assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 10_000, hazard: null } }), null);
+  // On 10,000 it is 4 %, 1.3 % over the edge, but the fund's variance (400 / bet)
+  // keeps half Kelly under every bet but the smallest.
+  const plan = A.edgePlan({ ...ctx, payroll: { amount: 10_000, hazard: 4e-6 } });
+  assert.deepEqual([plan.game, plan.bet, plan.payroll], ['roulette', 20, true]);
+  // A bankroll of 200,000 allows 0.013 / (1 + 400 / 400) * 0.5 * 200,000 = 650.
+  assert.equal(A.edgePlan({ ...ctx, bankroll: 200_000, payroll: { amount: 10_000, hazard: 4e-6 } }).bet, 400);
   assert.equal(A.edgePlan({ ...ctx, payroll: null }), null);
 });
 
-test('edgePlan pushes the payroll fund at the biggest bet up to what the grinder would bet', () => {
+test('edgePlan bets for the payroll fund at the biggest bet up to what the grinder would bet', () => {
   const ctx = {
     level: 20,
     unlocks: { blaze: 1, roulette: 15 },
@@ -779,17 +800,14 @@ test('edgePlan pushes the payroll fund at the biggest bet up to what the grinder
     winsBonus: 0,
     pushBet: 1000,
   };
-  assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 10_500, cap: 12_000 } }).bet, 1000);
-  assert.equal(A.edgePlan({ ...ctx, pushBet: 200, payroll: { amount: 11_500, cap: 12_000 } }).bet, 200);
-  assert.equal(A.edgePlan({ ...ctx, levels: [20, 40, 100], payroll: { amount: 10_500, cap: 12_000 } }).bet, 100);
-  // Not pushing when the fund is worth less than the edge, and the smallest bet that drops it still wins near the cap.
-  assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 6000, cap: 12_000 } }), null);
-  assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 11_997, cap: 12_000 } }).bet, 400);
-  // Where the grinder may not bet (its floor or budget), nothing is pushed.
-  assert.equal(A.edgePlan({ ...ctx, pushBet: 0, payroll: { amount: 10_500, cap: 12_000 } }), null);
-  // A bet that drops the fund still goes, the smallest one that does.
-  assert.equal(A.edgePlan({ ...ctx, pushBet: 0, payroll: { amount: 11_997, cap: 12_000 } }).bet, 400);
-  assert.equal(A.edgePlan({ ...ctx, pushBet: 20, payroll: { amount: 10_500, cap: 12_000 } }).bet, 20);
+  const payroll = { amount: 10_000, hazard: 4e-6 };
+  assert.equal(A.edgePlan({ ...ctx, payroll }).bet, 1000);
+  assert.equal(A.edgePlan({ ...ctx, pushBet: 200, payroll }).bet, 200);
+  assert.equal(A.edgePlan({ ...ctx, levels: [20, 40, 100], payroll }).bet, 100);
+  assert.equal(A.edgePlan({ ...ctx, payroll: { amount: 5000, hazard: 4e-6 } }), null);
+  // Where the grinder may not bet (its floor or budget), nothing is bet for the fund.
+  assert.equal(A.edgePlan({ ...ctx, pushBet: 0, payroll }), null);
+  assert.equal(A.edgePlan({ ...ctx, pushBet: 20, payroll }).bet, 20);
 });
 
 test('edgePlan plays the Konec kvartálu bonus on the game with the best edge', () => {

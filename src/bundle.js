@@ -59,7 +59,7 @@
     ['baccarat', 'pair pays', '{key:`ppair`,label:`Pár hráče`,pays:`10:1`}'],
     ['baccarat', 'tie refund', 'remíza vrací polovinu sázky na Hráče a Bankéře'],
     ['baccarat', 'card points', 'e.rank===`A`?1:[`10`,`J`,`Q`,`K`].includes(e.rank)?0:Number(e.rank)'],
-    ['payroll', 'share', 'Mzdový fond · 1 % z každé sázky'],
+    ['payroll', 'share', 'Mzdový fond · 0,5 % z každé sázky'],
     ['xp', 'big wins', '[{key:`big`,x:10,xp:15},{key:`mega`,x:25,xp:40},{key:`super`,x:50,xp:100}]'],
     ['bets', 'max bet by level', 'e>=15?1000:e>=10?400:e>=6?200:e>=3?100:40'],
   ];
@@ -79,19 +79,21 @@
     const zeros = /\w+=\[((?:`\w+`,?)*)\],\w+=\[0,32,15,19,4,21,2,25,17,34/.exec(src);
     const rouletteZeros = zeros ? zeros[1].split(',').filter(Boolean).length : null;
     const bets = /\w+=\[([\d,]+)\],\w+=\w+\[0\],\w+=\[\{key:`big`/.exec(src);
-    // The shop catalog: game:[{key, ..., maxLevel, basePrice, growth}, ...].
+    // The shop catalog: game:[{key, ..., maxLevel, basePrice, growth, prices?}, ...].
     const shop = {};
     const start = src.indexOf('global:[{key:`bets`');
     const end = start < 0 ? -1 : src.indexOf('}]}', src.indexOf('roulette:[{key:', start));
     if (end > 0) {
       const region = src.slice(start, end + 2);
       const lists = [...region.matchAll(/(\w+):\[\{key:/g)];
-      for (const m of region.matchAll(/\{key:`(\w+)`[^{}]*?maxLevel:([^,]+),basePrice:([\d.]+),growth:([\d.]+)\}/g)) {
+      for (const m of region.matchAll(/\{key:`(\w+)`[^{}]*?maxLevel:([^,]+),basePrice:([\d.]+),growth:([\d.]+)(?:,prices:\[([\d.,]+)\])?\}/g)) {
         const game = lists.findLast((list) => list.index < m.index)?.[1];
         if (!game) continue;
         // Roulette's max level is the length of its zeros list.
         const max = /^\d+$/.test(m[2]) ? Number(m[2]) : m[2].endsWith('.length') ? rouletteZeros : null;
-        (shop[game] ??= {})[m[1]] = [max, Number(m[3]), Number(m[4])];
+        const item = [max, Number(m[3]), Number(m[4])];
+        if (m[5]) item.push(m[5].split(',').map(Number));
+        (shop[game] ??= {})[m[1]] = item;
       }
     }
     return {

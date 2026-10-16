@@ -1594,7 +1594,7 @@
     }
   },
   "optionsEdgeBets": {
-    "message": "Bet when a round pays by itself (payroll fund near its cap, Konec kvartálu weekend)"
+    "message": "Bet when a round pays by itself (payroll fund once its measured chance pays, Konec kvartálu weekend)"
   },
   "colWinsRtp": {
     "message": "Konec kvartálu"

@@ -73,6 +73,8 @@ test('upgradeOffer prices the next level like the shop does', () => {
   assert.equal(G.upgradeOffer({ crash: { sla: 2 } }, 'crash', 'sla').minLevel, 9);
   assert.equal(G.upgradeOffer({ crash: { sla: 3 } }, 'crash', 'sla'), null);
   assert.equal(G.upgradeOffer({}, 'crash', 'nope'), null);
+  // Listed prices win over the growth formula (Vyšší sázky: 1,000 / 3,000 / 8,000).
+  assert.equal(G.upgradeOffer({ global: { bets: 2 } }, 'global', 'bets').price, 8000);
 });
 
 const goal = (queue) => queue.find((offer) => !offer.reason) ?? null;

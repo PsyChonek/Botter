@@ -191,6 +191,7 @@
   let shopReview = null; // { at, key, queue, goal } of the last shop review
   let sprint = null; // { rank, score, endAt, at } of this account in the weekly sprint
   let payroll = null; // { amount, seed, cap, at } of the shared payroll fund
+  let payrollWatch = null; // drops and stakes seen, shared by every account (A.watchPayroll)
   let lottery = null; // last lottery state from /api/lottery, with the local time it came
   let rounds = {}; // crash and lottery rounds other accounts still owe (BotterAuto.roundsDue), shared
   let edgeAt = 0; // when edgeStep last found a round that pays by itself
@@ -251,6 +252,7 @@
     hotfixRounds = stored.hotfixRounds ?? [];
     capture = stored.capture ?? [];
     bundle = stored.bundle ?? null;
+    payrollWatch = stored.payrollWatch ?? null;
     settings = { ...DEFAULT_SETTINGS, ...stored.settings };
     bank = stored.bank ?? {};
     statsCache = byPrefix(stored, STATS_PREFIX);
@@ -283,6 +285,7 @@
     if (changes.hotfixRounds) hotfixRounds = changes.hotfixRounds.newValue ?? [];
     if (changes.capture) capture = changes.capture.newValue ?? [];
     if (changes.bundle) bundle = changes.bundle.newValue ?? null;
+    if (changes.payrollWatch) payrollWatch = changes.payrollWatch.newValue ?? null;
     if (changes.rounds) rounds = changes.rounds.newValue ?? {};
     render();
   });
@@ -386,7 +389,10 @@
       return;
     }
     bookRewards(data);
-    if (data?.payroll && typeof data.payroll.amount === 'number') payroll = { ...data.payroll, at: Date.now() };
+    if (data?.payroll && typeof data.payroll.amount === 'number') {
+      payroll = { ...data.payroll, at: Date.now() };
+      trackPayroll(payroll);
+    }
     if (data?.lottery) readLottery(data.lottery);
     if (data?.crash) bookCrash(data.crash);
     if (data?.by === 'sprint' && Array.isArray(data.entries)) readSprint(data);
@@ -446,6 +452,22 @@
         if (next !== levels) await chrome.storage.local.set({ levels: next });
       })
       .catch((err) => log.warn('levels_save_failed', { error: String(err) }));
+  }
+
+  // Payroll fund drops and the credits staked into it (A.watchPayroll), one
+  // read at a time against the stored tally, as with the level curve.
+  let payrollWrites = Promise.resolve();
+  function trackPayroll(fund) {
+    payrollWrites = payrollWrites
+      .then(async () => {
+        const { payrollWatch: stored = null } = await chrome.storage.local.get('payrollWatch');
+        const next = A.watchPayroll(stored, fund, fund.at);
+        if (next === stored) return;
+        payrollWatch = next;
+        await chrome.storage.local.set({ payrollWatch: next });
+        if (next.drops > (stored?.drops ?? 0)) log.info('payroll_drop', { drops: next.drops, staked: Math.round(next.staked), hazard: A.payrollHazard(next) });
+      })
+      .catch((err) => log.warn('payroll_save_failed', { error: String(err) }));
   }
 
   // "Začít úplně od nuly" wipes the whole profile on the server (credits, level,
@@ -1741,12 +1763,13 @@
   // Logged when what edgeStep bets on changes, not on every round.
   let edgeNote = '';
 
-  // Rounds that pay by themselves (BotterAuto.edgePlan): the payroll fund near
-  // its cap, or wins on a Konec kvartálu weekend until its limit. Sized by
-  // fractional Kelly; like the standup they keep the reserve but not the
-  // grinding budget. The fund is read from every response that carries it;
-  // a stale amount is read from the feed first, every 10 seconds once pushing
-  // the fund pays on the cheapest game (BotterAuto.payrollPollMs).
+  // Rounds that pay by themselves (BotterAuto.edgePlan): the payroll fund once
+  // its measured chance of dropping makes it pay, or wins on a Konec kvartálu
+  // weekend until its limit. Sized by fractional Kelly; like the standup they
+  // keep the reserve but not the grinding budget. The fund is read from every
+  // response that carries it; a stale amount is read from the feed first,
+  // every 10 seconds once the fund pays on the cheapest game
+  // (BotterAuto.payrollPollMs).
   // Whether a round that ends ahead earns the Konec kvartálu bonus now.
   function winsBonusOn(now = Date.now()) {
     const event = A.weekendEvent(now);
@@ -1759,7 +1782,8 @@
     const mode = blazeMode();
     const edges = O.edges(G.GAME_KEYS, player.upgrades, mode);
     const cheapest = A.cheapestGame(G.GAME_KEYS, player.level, GRIND_UNLOCKS, edges);
-    const pollMs = A.payrollPollMs(payroll, cheapest ? edges[cheapest] : null);
+    const fund = payroll && { amount: payroll.amount, hazard: A.payrollHazard(payrollWatch) };
+    const pollMs = A.payrollPollMs(fund, cheapest ? edges[cheapest] : null);
     if (settings.payrollFund && (!payroll || now - payroll.at > pollMs) && now - (claimTried.payroll ?? 0) > pollMs) {
       claimTried.payroll = now;
       await api('/api/feed');
@@ -1779,13 +1803,13 @@
       bankroll: Math.max(0, player.credits - reserve),
       kelly: EDGE_KELLY,
       winsBonus: winsOn ? A.WINS_BONUS : 0,
-      payroll: settings.payrollFund && payroll && now - payroll.at <= pollMs ? payroll : null,
+      payroll: settings.payrollFund && payroll && now - payroll.at <= pollMs ? fund : null,
       pushBet: grindChoice().plan?.bet ?? 0,
     });
     const note = plan ? `${plan.game} ${plan.bet} ${plan.payroll}` : '';
     if (note !== edgeNote) {
       edgeNote = note;
-      if (plan) log.info('edge_plan', { ...plan, fund: payroll?.amount, cap: payroll?.cap, wins: winsOn });
+      if (plan) log.info('edge_plan', { ...plan, fund: payroll?.amount, cap: payroll?.cap, hazard: fund?.hazard, wins: winsOn });
     }
     if (!plan) return false;
     edgeAt = now;
@@ -2546,13 +2570,16 @@
   // The casino ships as one bundle whose file name changes with every deploy.
   // A name not seen before is fetched once and checked against the client
   // tables the models copy (BotterBundle.check), so a change to the game math
-  // shows before the grinder plans with stale odds. Stored for every account:
-  // { name, at, from, changelog, problems }, from being the name it replaced.
+  // shows before the grinder plans with stale odds. A bundle found stale is
+  // checked again on every load, so updated models clear it. Stored for every
+  // account: { name, at, from, changelog, problems }, from being the name it
+  // replaced.
   const BUNDLE_NEWS_MS = 24 * 3600_000;
   async function trackBundle() {
     const src = document.querySelector('script[src*="/assets/index-"]')?.src;
     const name = B.bundleName(src);
-    if (!name || name === bundle?.name) return;
+    const recheck = name === bundle?.name;
+    if (!name || (recheck && !bundle.problems?.length)) return;
     let result;
     try {
       const res = await fetch(src);
@@ -2562,8 +2589,8 @@
       log.warn('bundle_check_failed', { name, error: String(err) });
       return;
     }
-    const from = bundle?.name ?? null;
-    bundle = { name, at: Date.now(), from, changelog: result.facts.changelog, problems: result.problems };
+    const from = recheck ? bundle.from : bundle?.name ?? null;
+    bundle = { name, at: recheck ? bundle.at : Date.now(), from, changelog: result.facts.changelog, problems: result.problems };
     chrome.storage.local.set({ bundle });
     const fields = { name, from, changelog: bundle.changelog, problems: result.problems };
     if (result.problems.length) log.warn('bundle_models_stale', fields);

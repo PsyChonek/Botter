@@ -37,9 +37,10 @@
     '/api/lottery/buy': 'lottery',
   };
 
-  // Shop catalog copied from the client: [max level, base price, price growth].
+  // Shop catalog copied from the client: [max level, base price, price growth],
+  // plus the price of each level where the client lists them.
   const SHOP = {
-    global: { bets: [3, 5000, 2.5] },
+    global: { bets: [3, 1000, 3, [1000, 3000, 8000]] },
     blaze: { lucky: [5, 3000, 1.8], wild: [5, 4000, 1.8], star: [5, 2000, 1.8] },
     crash: { sla: [3, 4000, 2.2] },
     skeleton: { team: [4, 4000, 1.8], wild: [4, 5000, 1.8], deploy: [3, 6000, 2] },
@@ -55,7 +56,7 @@
   function upgradeOffer(upgrades, game, key) {
     const item = SHOP[game]?.[key];
     if (!item) return null;
-    const [max, base, growth] = item;
+    const [max, base, growth, prices] = item;
     const have = upgrades?.[game]?.[key] ?? 0;
     if (have >= max) return null;
     const next = have + 1;
@@ -63,7 +64,7 @@
       game,
       key,
       next,
-      price: Math.round((base * growth ** (next - 1)) / 100) * 100,
+      price: prices?.[next - 1] ?? Math.round((base * growth ** (next - 1)) / 100) * 100,
       minLevel: SHOP_UNLOCK[game] + (next - 1) * 3,
     };
   }
@@ -265,7 +266,7 @@
   // paid, net, greens, checked, mismatches, expected, variance } }. paid is the
   // server's payout, net the profit booked from the credits (gameDelta), so
   // paid - wagered - net is a cost the response does not show (such as the
-  // payroll fund's 1 %). greens counts zero pockets, mismatches payouts that
+  // payroll fund's 0.5 %). greens counts zero pockets, mismatches payouts that
   // differ from the rules; expected and variance are the payout's mean and
   // variance by the rules, summed over the checked spins.
   function addRouletteSpin(check, zeros, request, data, net) {

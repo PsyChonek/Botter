@@ -9,7 +9,7 @@ const O = require('../src/odds.js');
 const minify = (text) => text.replace(/\b1000\b/g, '1e3').replace(/(?<![\d.])0\.(\d)/g, '.$1');
 function fakeBundle({ shop = G.SHOP, zeros = '`S`,`00`', needles = B.NEEDLES.map(([, , needle]) => needle) } = {}) {
   const items = Object.entries(shop)
-    .map(([game, keys]) => `${game}:[${Object.entries(keys).map(([key, [max, base, growth]]) => `{key:\`${key}\`,icon:\`x\`,name:\`n\`,description:\`d\`,maxLevel:${game === 'roulette' ? 'bl.length' : max},basePrice:${base},growth:${growth}}`).join(',')}]`)
+    .map(([game, keys]) => `${game}:[${Object.entries(keys).map(([key, [max, base, growth, prices]]) => `{key:\`${key}\`,icon:\`x\`,name:\`n\`,description:\`d\`,maxLevel:${game === 'roulette' ? 'bl.length' : max},basePrice:${base},growth:${growth}${prices ? `,prices:[${prices}]` : ''}}`).join(',')}]`)
     .join(',');
   const games = Object.entries(G.GAMES).map(([key, { unlock }]) => `{key:\`${key}\`,name:\`n\`,icon:\`i\`,blurb:\`b\`,unlock:${unlock}}`).join(',');
   return minify(
@@ -30,6 +30,7 @@ test('a bundle with every model table and fact matches', () => {
   assert.equal(facts.changelog, '2026-10-10');
   assert.equal(facts.rouletteZeros, 2);
   assert.deepEqual(facts.shop.roulette.zeros, [2, 15000, 2.5]);
+  assert.deepEqual(facts.shop.global.bets, [3, 1000, 3, [1000, 3000, 8000]]);
   assert.deepEqual(facts.betLevels, G.BET_LEVELS);
 });
 

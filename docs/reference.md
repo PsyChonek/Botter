@@ -192,25 +192,28 @@ progress shows at `chrome://on-device-internals`.
 - **Auto mode switches** (panel, all on by default): Games (crash, lottery, standup,
   payroll and wins-bonus bets, achievement hunt and XP grinding), Work, Wheel (the free
   hourly spin; the daily bonus and bailout stay), Achievements (the hunt), Payroll fund
-  (no fund reads or pushes when off) and Sprint (when off, bankruptcy and the loan cycle
+  (no fund reads or fund bets when off) and Sprint (when off, bankruptcy and the loan cycle
   no longer wait to protect a sprint podium). With Games and Work off the bot still
   claims, repays, buys and rotates accounts.
-- **Payroll fund** (Mzdový fond, settings Auto tab, on by default; `payrollWorth` and
-  `edgePlan` in `src/auto.js`): 1 % of every bet goes into a shared fund, and the bet
-  that takes it to its cap (12,000) drops it and takes it all. A bet whose 1 % covers
-  the room left wins it outright, so near the cap the bot plays the smallest such bet.
-  Short of that it pushes: filling the room takes 100 times the room in bets whatever
-  their size, so each credit pushed is worth the fund over 100 times the room, counted
-  at half for the pushes another player finishes first. That beats roulette's edge from
-  about 10,100 of 12,000 (blackjack unupgraded from about 11,500), and the bot then bets
-  on the lowest-edge game at the bet the XP grinder would play right now (the push is
-  worth more than the edge costs and the grinder takes that swing anyway); pushes keep
-  the grinder's floor, daily budget and upgrade savings, and stop when it may not bet
-  (a bet that drops the fund outright still goes, above the reserve alone),
-  since bigger bets finish the push in fewer rounds. The fund is read from every
-  response that carries it and from the feed, every 10 seconds once pushing pays and
-  every minute otherwise. The client shows no sign that the player pays the 1 %, so the
-  house most likely funds it. A fund win is booked as free income.
+- **Payroll fund** (Mzdový fond, settings Auto tab, on by default; `watchPayroll`,
+  `payrollWorth` and `edgePlan` in `src/auto.js`): since 2026-10-15, 0.5 % of every bet
+  goes into a shared fund that grows up to its cap (12,000) and can drop on any bet, a
+  bigger bet more likely. The client does not say how likely, so the bot measures it:
+  every fund read is compared with the one before (shared by every account in
+  `payrollWatch`), the growth is the credits staked over 0.5 %, and a new "last winner"
+  is a drop. The chance one credit drops the fund is the drops seen over the credits
+  staked; reads more than 10 minutes apart, or after the fund sat at its cap where the
+  stakes do not show, count nothing. Until 5 drops are seen the bot bets nothing for
+  the fund. After that each credit staked is worth that chance times the fund, whatever
+  the bet size, and once that beats the edge of the lowest-edge game the bot bets
+  there at the bet the XP grinder would play right now (the fund is worth more than the
+  edge costs and the grinder takes that swing anyway); fund bets keep the grinder's
+  floor, daily budget and upgrade savings, and stop when it may not bet. Without a
+  grinder bet the size is half Kelly on the game's variance plus the fund's, which
+  keeps those bets small. The log gets `payroll_drop` with the tally on every drop
+  seen. The fund is read from every response that carries it and from the feed, every
+  10 seconds once it pays and every minute otherwise. A fund win is booked as free
+  income.
 - **Weekend events** (`weekendEvent` in `src/auto.js`, same rotation as the client):
   Friday 17:00 to Monday 9:00, Prague time, one per weekend from the week of
   2026-10-05: Hackathon (+50 % XP), Konec kvartálu (+50 % on the net profit of every
@@ -306,7 +309,7 @@ progress shows at `chrome://on-device-internals`.
   against the wheel's share, what the server paid against what the client's rules pay
   on that wheel (with how many standard deviations apart, so luck and a changed wheel
   can be told apart), the hidden cost (credits lost beyond the payout the response
-  reports, as a share of the stakes; this is where a player-paid 1 % payroll fund
+  reports, as a share of the stakes; this is where a player-paid 0.5 % payroll fund
   would show) and payouts that break the rules for the pocket that came up.
   A profile reset (Začít úplně od nuly, `/api/profile/reset`) wipes the account on the
   server, so its stats start over too: profit, XP per game, free income and the
