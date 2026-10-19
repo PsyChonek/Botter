@@ -30,10 +30,10 @@ math says it pays, using exact odds models of each game at your account's upgrad
 | --- | --- |
 | **Work** | Solves all four ticket types: bug hunt, "Co to vypíše?", "Založ task" and "Přepiš kód". Every submit response carries the right answer, so the bank learns each ticket the first time it sees it. |
 | **AI fallback** | Unknown tickets go to on-device Gemini Nano (free, offline), the Claude API or any OpenRouter model. |
-| **Games** | Blaze 20 Wild, Skeleton Slots, Slotingi, Forbes z Chánova, roulette, blackjack and baccarat, through the API or by pressing the real game screen's buttons. |
+| **Games** | Blaze 20 Wild, Skeleton Slots, Slotingi, Forbes z Chánova, roulette, blackjack, baccarat, Kostky and Case opening, through the API or (for the older games) by pressing the real game screen's buttons. |
 | **Auto mode** | One switch. Claims the daily bonus, wheel and bailout, repays debt or declares bankruptcy when that is cheaper, runs the daily standup quests, hunts achievements, plays the lottery and the payroll fund when they pay, and grinds XP on the lowest-edge game within a loss budget. |
 | **Upgrades** | Buys shop upgrades only when the XP still to grind earns the price back. |
-| **Books** | Profit, return and XP per credit for every game, upgrade level and account. Roulette and baccarat results are checked against the model. |
+| **Books** | Profit, return and XP per credit for every game, upgrade level and account. Roulette, baccarat, Kostky and Case opening results are checked against the model. |
 | **Accounts** | Saves logins, switches without logging out and rotates so every account's energy gets used, every account bets on a Produkce padá round that pays and buys its lottery tickets on random, weighted or your own numbers. |
 | **Bundle watch** | Spots a new casino deploy and flags any game table the models copied that changed. |
 
@@ -66,14 +66,17 @@ simulated in `scripts/odds.mjs`, not the noisy measured one:
 
 | Game | Unupgraded | Fully upgraded |
 | --- | ---: | ---: |
+| Forbes z Chánova (modelled) | ~94 % | ~123 % |
+| Kostky (Malá) | 92.4 % | 97.9 % |
 | Roulette | 92.3 % | 97.3 % |
 | Baccarat (Bankéř) | 90.5 % | 97.8 % |
 | Blackjack | 87.6 % | 97.1 % |
+| Case opening | 86.9 % | 96.2 % |
 | Slotingi | ~74 % | ~93 % |
 | Skeleton Slots | ~71 % | ~94 % |
 | Blaze 20 Wild | ~63 % | ~95 % |
 
-Forbes z Chánova has no validated model yet, so the grinder never picks it.
+Forbes z Chánova is modelled from the client's tables (retuned 2026-10-17). It pays over 100 % once a level of each upgrade is bought, so it is the grind game from level 13, as long as the server matches the client. Run the Forbes test to check that.
 
 Every strategy, formula and setting is described in the [full reference](docs/reference.md).
 

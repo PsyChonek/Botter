@@ -50,7 +50,7 @@ test('blazeMode needs enough spins before trusting the richer scatter rule', () 
 });
 
 test('chances cover every game and upgrade combination', () => {
-  const sizes = { blaze: 216, skeleton: 100, slotingi: 80, blackjack: 60, roulette: 3 };
+  const sizes = { blaze: 216, skeleton: 100, slotingi: 80, blackjack: 60, roulette: 3, baccarat: 8, dice: 8, cases: 12, hotfix: 80 };
   for (const [game, size] of Object.entries(sizes)) {
     const rows = O.table(game);
     assert.equal(rows.length, size, game);
