@@ -137,6 +137,11 @@
   const SHOP_REVIEW_MS = 10 * 60_000;
   const TICK_MS = 700;
   const API_TIMEOUT_MS = 30_000;
+  // Paths the server answers slowly: Forbes z Chánova free spins come back only
+  // after their animation time (about 30 s for ten spins), so 30 s cut them off
+  // and the pick looked failed while it went through.
+  const SLOW_TIMEOUT_MS = { '/api/hotfix/free': 180_000 };
+  const timeoutFor = (path) => SLOW_TIMEOUT_MS[path] ?? API_TIMEOUT_MS;
   const STATS_PREFIX = 'stats:';
   const ACCOUNT_PREFIX = 'account:';
   const SWITCH_KEY = 'botter-switch'; // sessionStorage: { from, to } of a switch in progress
@@ -413,7 +418,7 @@
       window.postMessage({ source: 'botter-content', kind: 'api', id, path, body }, location.origin);
       setTimeout(() => {
         if (apiWaiters.delete(id)) resolve({ ok: false, status: 0, data: { error: 'timeout' } });
-      }, API_TIMEOUT_MS);
+      }, timeoutFor(path));
     });
   }
 
@@ -426,7 +431,7 @@
       screenWaiters.add(waiter);
       setTimeout(() => {
         if (screenWaiters.delete(waiter)) resolve({ ok: false, status: 0, data: { error: 'timeout' } });
-      }, API_TIMEOUT_MS);
+      }, timeoutFor(path));
     });
   }
 
