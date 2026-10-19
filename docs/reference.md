@@ -369,6 +369,12 @@ progress shows at `chrome://on-device-internals`.
   holds only if the server matches the client's tables, so run the Forbes test after
   an update and check it (below). A round's return has a standard deviation of 10 to
   14 bets, so the measured profit swings far more than on any other game.
+  The 2026-10-19 check (655 spins after the retune, Pohotovost / Rychlé hotfixy / Code
+  review 1, `--since 2026-10-17`) matched every one of 997 cascade steps, the row
+  heights and the symbol weights, the wheel turned 6.4 % against 5.4 % (1.1
+  deviations), and the modifier sizes stayed inside the client's ranges. The
+  measured return, 74.3 %, is 0.6 deviations below the model's 100.7 %: luck at that
+  sample size, not a mismatch.
   Every spin and free-spin response, from the bot or played by hand, is
   recorded (`hotfixRounds`, up to 800, free-spin games kept first) and can be exported
   from the settings (Data tab) to settle those against the server.
