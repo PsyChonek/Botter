@@ -297,9 +297,6 @@
   "panelAutoHunt": {
     "message": "Achievementy"
   },
-  "panelAutoPayroll": {
-    "message": "Mzdový fond"
-  },
   "panelAutoSprint": {
     "message": "Sprint"
   },
@@ -1562,23 +1559,6 @@
       }
     }
   },
-  "statusPayrollBet": {
-    "message": "Mzdový fond na $P1$ z $P2$: sázím na $P3$ po $P4$",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      },
-      "p3": {
-        "content": "$3"
-      },
-      "p4": {
-        "content": "$4"
-      }
-    }
-  },
   "statusWinsBet": {
     "message": "Bonus Konec kvartálu: $P1$ po $P2$, čekaný zisk $P3$ na kredit",
     "placeholders": {
@@ -1594,7 +1574,7 @@
     }
   },
   "optionsEdgeBets": {
-    "message": "Sázet, když se kolo samo vyplatí (mzdový fond, když se jeho naměřená šance vyplatí, víkend Konec kvartálu)"
+    "message": "Sázet, když se kolo samo vyplatí (víkend Konec kvartálu, hra, jejíž model vrací přes 100 %)"
   },
   "colWinsRtp": {
     "message": "Konec kvartálu"

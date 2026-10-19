@@ -83,9 +83,7 @@ progress shows at `chrome://on-device-internals`.
   `net`, saves them every 5 seconds while they change, and **Reset** starts over.
 - **Fewer reads**: Produkce padá is read once a minute only while a round runs and the
   bot has no bet in it; with a bet every 10 minutes, and after the round has crashed
-  not again until the next 9:00 deploy. The payroll fund is read from the feed every 5
-  minutes while it is not worth betting on (every 10 seconds once it is), and not at
-  all while game responses bring it anyway. The profile (`/api/me`) is read only when
+  not again until the next 9:00 deploy. The profile (`/api/me`) is read only when
   no response has given the player yet.
 - **Play on the game screen** (panel toggle, also in the settings Games tab, off by
   default; `src/screen.js`): every round the bot plays (game bot, grinder, standup)
@@ -221,29 +219,13 @@ progress shows at `chrome://on-device-internals`.
     the recent draws the lottery screen lists. Every ticket has the same odds, so this
     only chooses which numbers are held.
 - **Auto mode switches** (panel, all on by default): Games (crash, lottery, standup,
-  payroll and wins-bonus bets, achievement hunt and XP grinding), Work, Wheel (the free
-  hourly spin; the daily bonus and bailout stay), Achievements (the hunt), Payroll fund
-  (no fund reads or fund bets when off) and Sprint (when off, bankruptcy and the loan cycle
+  wins-bonus bets, achievement hunt and XP grinding), Work, Wheel (the free
+  hourly spin; the daily bonus and bailout stay), Achievements (the hunt) and Sprint (when off, bankruptcy and the loan cycle
   no longer wait to protect a sprint podium). With Games and Work off the bot still
   claims, repays, buys and rotates accounts.
-- **Payroll fund** (Mzdový fond, settings Auto tab, on by default; `watchPayroll`,
-  `payrollWorth` and `edgePlan` in `src/auto.js`): since 2026-10-15, 0.5 % of every bet
-  goes into a shared fund that grows up to its cap (12,000) and can drop on any bet, a
-  bigger bet more likely. The client does not say how likely, so the bot measures it:
-  every fund read is compared with the one before (shared by every account in
-  `payrollWatch`), the growth is the credits staked over 0.5 %, and a new "last winner"
-  is a drop. The chance one credit drops the fund is the drops seen over the credits
-  staked; reads more than 10 minutes apart, or after the fund sat at its cap where the
-  stakes do not show, count nothing. Until 5 drops are seen the bot bets nothing for
-  the fund. After that each credit staked is worth that chance times the fund, whatever
-  the bet size, and once that beats the edge of the lowest-edge game the bot bets
-  there at the bet the XP grinder would play right now (the fund is worth more than the
-  edge costs and the grinder takes that swing anyway); fund bets keep the grinder's
-  floor, daily budget and upgrade savings, and stop when it may not bet. Without a
-  grinder bet the size is half Kelly on the game's variance plus the fund's, which
-  keeps those bets small. The log gets `payroll_drop` with the tally on every drop
-  seen. The fund is read from every response that carries it and from the feed, every
-  10 seconds once it pays and every minute otherwise. A fund win is booked as free
+- **Payroll fund** (Mzdový fond, since 2026-10-15): 0.5 % of every bet goes into a
+  shared fund that can drop on any bet. Every bet the bot places takes part anyway, so
+  there is no separate fund mode (removed 2026-10-19); a fund win is booked as free
   income.
 - **Weekend events** (`weekendEvent` in `src/auto.js`, same rotation as the client):
   Friday 17:00 to Monday 9:00, Prague time, one per weekend from the week of
@@ -251,7 +233,7 @@ progress shows at `chrome://on-device-internals`.
   round that ends ahead, up to a weekend limit the client does not show), Teambuilding
   (the wheel pays double) and Placené přesčasy (work pays double credits and XP).
   - Konec kvartálu turns the games positive: an even-money roulette bet returns
-    about +21.6 % a credit unupgraded. With the payroll setting on, the bot bets on the
+    about +21.6 % a credit unupgraded. With **Bet when a round pays by itself** on, the bot bets on the
     game where `rtp + 0.5 * gain` is best (gain is the simulated mean net profit per
     credit of the rounds that end ahead), half Kelly on its simulated variance, until a
     winning round comes back without the bonus, which means the limit is reached. The

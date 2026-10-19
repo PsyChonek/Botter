@@ -6,19 +6,22 @@
 // left out. Then the model is simulated with the measured wheel chance.
 // The extension keeps the last 800 rounds, so exports of several tests can be
 // given together; a round in more than one of them counts once.
-// Usage: node scripts/hotfix-check.mjs <export.json>... [--spins N]
+// --since YYYY-MM-DD drops older rounds (the tables changed on 2026-10-17).
+// Usage: node scripts/hotfix-check.mjs <export.json>... [--spins N] [--since YYYY-MM-DD]
 import { readFileSync } from 'node:fs';
 import { BASE, OPTIONS, SCATTER, WILD, config, evaluate, optionFor, simulate } from './hotfix-sim.mjs';
 
 const args = process.argv.slice(2);
 const flag = args.indexOf('--spins');
 const simSpins = flag >= 0 ? Number(args.splice(flag, 2)[1]) : 200_000;
-if (!args.length) throw new Error('usage: node scripts/hotfix-check.mjs <export.json>... [--spins N]');
+const sinceFlag = args.indexOf('--since');
+const since = sinceFlag >= 0 ? Date.parse(args.splice(sinceFlag, 2)[1]) : 0;
+if (!args.length) throw new Error('usage: node scripts/hotfix-check.mjs <export.json>... [--spins N] [--since YYYY-MM-DD]');
 const unique = new Map();
 for (const file of args) {
   for (const round of JSON.parse(readFileSync(file, 'utf8'))) unique.set(`${round.at} ${round.path}`, round);
 }
-const recorded = [...unique.values()].sort((a, b) => a.at - b.at).filter((r) => r.request?.force === undefined);
+const recorded = [...unique.values()].sort((a, b) => a.at - b.at).filter((r) => r.request?.force === undefined && r.at >= since);
 const spins = recorded.filter((r) => r.path === '/api/hotfix/spin');
 const frees = recorded.filter((r) => r.path === '/api/hotfix/free');
 const combos = new Set(recorded.map((r) => JSON.stringify(r.upgrades ?? {})));

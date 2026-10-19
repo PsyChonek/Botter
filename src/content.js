@@ -47,7 +47,6 @@
     autoGames: true,
     autoWork: true,
     autoWheel: true,
-    payrollFund: true,
     sprintProtect: true,
     edgeBets: true,
     crashEnabled: true,
@@ -195,11 +194,9 @@
   let crashNextPoll = 0; // when Produkce padá is read again (crashStep)
   let shopReview = null; // { at, key, queue, goal } of the last shop review
   let sprint = null; // { rank, score, endAt, at } of this account in the weekly sprint
-  let payroll = null; // { amount, seed, cap, at } of the shared payroll fund
-  let payrollWatch = null; // drops and stakes seen, shared by every account (A.watchPayroll)
   let lottery = null; // last lottery state from /api/lottery, with the local time it came
   let rounds = {}; // crash and lottery rounds other accounts still owe (BotterAuto.roundsDue), shared
-  let edgeAt = 0; // when edgeStep last found a round that pays only for a while (payroll fund, Konec kvartálu)
+  let edgeAt = 0; // when edgeStep last found a round that pays only for a while (Konec kvartálu)
   let spins = []; // recorded Blaze spins for the model check
   let hotfixRounds = []; // recorded Forbes z Chánova responses for its model check
   let unsavedHotfix = 0;
@@ -257,7 +254,6 @@
     hotfixRounds = stored.hotfixRounds ?? [];
     capture = stored.capture ?? [];
     bundle = stored.bundle ?? null;
-    payrollWatch = stored.payrollWatch ?? null;
     settings = { ...DEFAULT_SETTINGS, ...stored.settings };
     bank = stored.bank ?? {};
     statsCache = byPrefix(stored, STATS_PREFIX);
@@ -290,7 +286,6 @@
     if (changes.hotfixRounds) hotfixRounds = changes.hotfixRounds.newValue ?? [];
     if (changes.capture) capture = changes.capture.newValue ?? [];
     if (changes.bundle) bundle = changes.bundle.newValue ?? null;
-    if (changes.payrollWatch) payrollWatch = changes.payrollWatch.newValue ?? null;
     if (changes.rounds) rounds = changes.rounds.newValue ?? {};
     if (changes.netReset) {
       net = emptyNet();
@@ -498,10 +493,6 @@
       return;
     }
     bookRewards(data);
-    if (data?.payroll && typeof data.payroll.amount === 'number') {
-      payroll = { ...data.payroll, at: Date.now() };
-      trackPayroll(payroll);
-    }
     if (data?.lottery) readLottery(data.lottery);
     if (data?.crash) bookCrash(data.crash);
     if (data?.by === 'sprint' && Array.isArray(data.entries)) readSprint(data);
@@ -571,22 +562,6 @@
         if (next !== levels) await chrome.storage.local.set({ levels: next });
       })
       .catch((err) => log.warn('levels_save_failed', { error: String(err) }));
-  }
-
-  // Payroll fund drops and the credits staked into it (A.watchPayroll), one
-  // read at a time against the stored tally, as with the level curve.
-  let payrollWrites = Promise.resolve();
-  function trackPayroll(fund) {
-    payrollWrites = payrollWrites
-      .then(async () => {
-        const { payrollWatch: stored = null } = await chrome.storage.local.get('payrollWatch');
-        const next = A.watchPayroll(stored, fund, fund.at);
-        if (next === stored) return;
-        payrollWatch = next;
-        await chrome.storage.local.set({ payrollWatch: next });
-        if (next.drops > (stored?.drops ?? 0)) log.info('payroll_drop', { drops: next.drops, staked: Math.round(next.staked), hazard: A.payrollHazard(next) });
-      })
-      .catch((err) => log.warn('payroll_save_failed', { error: String(err) }));
   }
 
   // "Začít úplně od nuly" wipes the whole profile on the server (credits, level,
@@ -1901,13 +1876,10 @@
   // Logged when what edgeStep bets on changes, not on every round.
   let edgeNote = '';
 
-  // Rounds that pay by themselves (BotterAuto.edgePlan): the payroll fund once
-  // its measured chance of dropping makes it pay, or wins on a Konec kvartálu
-  // weekend until its limit. Sized by fractional Kelly; like the standup they
-  // keep the reserve but not the grinding budget. The fund is read from every
-  // response that carries it; a stale amount is read from the feed first,
-  // every 10 seconds once the fund pays on the cheapest game
-  // (BotterAuto.payrollPollMs).
+  // Rounds that pay by themselves (BotterAuto.edgePlan): wins on a Konec
+  // kvartálu weekend until its limit, or a game whose model pays over 100 %.
+  // Sized by fractional Kelly; like the standup they keep the reserve but not
+  // the grinding budget.
   // Whether a round that ends ahead earns the Konec kvartálu bonus now.
   function winsBonusOn(now = Date.now()) {
     const event = A.weekendEvent(now);
@@ -1919,15 +1891,6 @@
     const now = Date.now();
     const mode = blazeMode();
     const edges = O.edges(G.GAME_KEYS, player.upgrades, mode);
-    const cheapest = A.cheapestGame(G.GAME_KEYS, player.level, GRIND_UNLOCKS, edges);
-    const fund = payroll && { amount: payroll.amount, hazard: A.payrollHazard(payrollWatch) };
-    const pollMs = A.payrollPollMs(fund, cheapest ? edges[cheapest] : null);
-    if (settings.payrollFund && (!payroll || now - payroll.at > pollMs) && now - (claimTried.payroll ?? 0) > pollMs) {
-      claimTried.payroll = now;
-      await api('/api/feed');
-      if (!payroll) log.info('payroll_unknown');
-      return true;
-    }
     if (now - (claimTried.edge ?? 0) < CLAIM_RETRY_MS) return false;
     const winsOn = winsBonusOn(now);
     const reserve = limits().reserve;
@@ -1941,23 +1904,20 @@
       bankroll: Math.max(0, player.credits - reserve),
       kelly: EDGE_KELLY,
       winsBonus: winsOn ? A.WINS_BONUS : 0,
-      payroll: settings.payrollFund && payroll && now - payroll.at <= pollMs ? fund : null,
-      pushBet: grindChoice().plan?.bet ?? 0,
     });
-    const note = plan ? `${plan.game} ${plan.bet} ${plan.payroll}` : '';
+    const note = plan ? `${plan.game} ${plan.bet}` : '';
     if (note !== edgeNote) {
       edgeNote = note;
-      if (plan) log.info('edge_plan', { ...plan, fund: payroll?.amount, cap: payroll?.cap, hazard: fund?.hazard, wins: winsOn });
+      if (plan) log.info('edge_plan', { ...plan, wins: winsOn });
     }
     if (!plan) return false;
-    // The fund and the weekend bonus pay only while they last, so they hold work
-    // back like the grinder does. A game that pays by its model alone (Forbes z
-    // Chánova upgraded) pays the same later, so work goes first and its rounds
-    // fill the time while energy refills.
-    if (plan.payroll || winsOn) edgeAt = now;
+    // The weekend bonus pays only while it lasts, so it holds work back like the
+    // grinder does. A game that pays by its model alone (Forbes z Chánova
+    // upgraded) pays the same later, so work goes first and its rounds fill the
+    // time while energy refills.
+    if (winsOn) edgeAt = now;
     const { game, bet } = plan;
-    if (plan.payroll) setStatus('statusPayrollBet', [credits(payroll.amount), credits(payroll.cap), msg(`game_${game}`), credits(bet)]);
-    else if (winsOn) setStatus('statusWinsBet', [msg(`game_${game}`), credits(bet), signedPct.format(plan.ev)]);
+    if (winsOn) setStatus('statusWinsBet', [msg(`game_${game}`), credits(bet), signedPct.format(plan.ev)]);
     else setStatus('statusEdgeBet', [msg(`game_${game}`), credits(bet), signedPct.format(plan.ev)]);
     const res = await playRound(game, bet);
     if (!res.ok) {
@@ -2649,7 +2609,6 @@
     ['autoWork', 'panelAutoWork'],
     ['autoWheel', 'panelAutoWheel'],
     ['achievementHunt', 'panelAutoHunt'],
-    ['payrollFund', 'panelAutoPayroll'],
     ['sprintProtect', 'panelAutoSprint'],
   ];
 
