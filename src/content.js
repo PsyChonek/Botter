@@ -117,6 +117,12 @@
   // 180 spins) to show how the server grows their multiplier and sizes the
   // Hotfix modifiers. Spins played by hand during the test count too.
   const HOTFIX_TEST_SPINS = 500;
+  // After a Forbes z Chánova spin that triggers free spins, and again after the
+  // free spins, the server turns game requests away for about 30 s ("počkej na
+  // animaci", 429 with a 30 s wait), so game requests hold that long instead.
+  const HOTFIX_LOCK_MS = 32_000;
+  const hotfixLocks = (path, data) =>
+    (path === '/api/hotfix/spin' && !!data?.outcome?.trigger) || path === '/api/hotfix/free';
   const MAX_CAPTURE = 40;
   const SPIN_FLUSH_EVERY = 10;
   const CAPTURE_PATHS = /^\/api\/(loan|crash|shop|leaderboard|bonus|wheel)/;
@@ -341,6 +347,16 @@
     }
   }
 
+  // Holds the next game request of every tab until ms from now.
+  function holdGames(ms) {
+    lastGameRequest = Math.max(lastGameRequest, Date.now() + ms - settings.gameDelayMs);
+    try {
+      localStorage.setItem(PACE_KEY, String(lastGameRequest));
+    } catch {
+      // See pace.
+    }
+  }
+
   // ---------- network: speed, server responses, rate limits ----------
 
   // Every /api/ response the page sees (the app's and the bot's) counted per
@@ -396,18 +412,11 @@
         return res;
       }
       row.retries += 1;
-      log.info('rate_limit_retry', { path, status: res.status, error: res.data?.error, wait, attempt: attempt + 1 });
-      if (game) {
-        // The next game request of any tab waits too.
-        lastGameRequest = Date.now() + wait - settings.gameDelayMs;
-        try {
-          localStorage.setItem(PACE_KEY, String(lastGameRequest));
-        } catch {
-          // See pace.
-        }
-      } else {
-        await sleep(wait);
-      }
+      const hint = res.retryAfter ?? res.data?.retryAfterMs ?? res.data?.retryAfter;
+      log.info('rate_limit_retry', { path, status: res.status, error: res.data?.error, hint, wait, attempt: attempt + 1 });
+      // A game request's wait holds the next game request of every tab too.
+      if (game) holdGames(wait);
+      else await sleep(wait);
     }
   }
 
@@ -492,6 +501,7 @@
       if (path === '/api/work/submit') onSubmitRejected(request?.id, data);
       return;
     }
+    if (hotfixLocks(path, data)) holdGames(HOTFIX_LOCK_MS);
     if (path === '/api/profile/reset') {
       resetStats();
       render();
