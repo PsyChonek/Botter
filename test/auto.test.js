@@ -740,6 +740,24 @@ test('edgePlan plays the Konec kvartálu bonus on the game with the best edge', 
   assert.equal(A.edgePlan({ ...ctx, winsBonus: 0 }), null);
 });
 
+test('edgePlan plays a paying game at the grinder bet when Kelly allows less', () => {
+  const ctx = {
+    level: 20,
+    unlocks: { hotfix: 13, roulette: 15 },
+    edges: { hotfix: -0.007, roulette: 0.027 },
+    variances: { hotfix: 144, roulette: 1 },
+    levels: [20, 40, 100, 200, 400, 1000],
+    bankroll: 200000,
+    kelly: 0.5,
+    winsBonus: 0,
+  };
+  // Half Kelly on 200,000 allows under 5 credits, so only the smallest level.
+  assert.equal(A.edgePlan(ctx).bet, 20);
+  assert.equal(A.edgePlan({ ...ctx, floors: { hotfix: 100 } }).bet, 100);
+  // A floor on another game does not raise this one.
+  assert.equal(A.edgePlan({ ...ctx, floors: { roulette: 100 } }).bet, 20);
+});
+
 test('weekendEvent follows the client rotation from Friday 17:00 to Monday 9:00 Prague time', () => {
   const at = (iso) => A.weekendEvent(Date.parse(iso));
   const first = at('2026-10-09T16:00:00Z');

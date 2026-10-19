@@ -247,6 +247,11 @@ progress shows at `chrome://on-device-internals`.
     status "Paying game". Unlike the fund and the weekend bonus, that edge does not
     run out, so these bets never hold work back: tickets go first and the bets fill
     the time while energy refills.
+  - Half Kelly on Forbes (+0.7 %, a swing of 10 to 14 bets a round) allows only the
+    smallest bet below a few million credits, which levels five times slower than a
+    grind bet of 100. So on the game the grinder would play, these bets go up to the
+    XP grinding bet whenever the grinder's limits allow it (`floors` in `edgePlan`,
+    since 2026-10-19); held for a Hackathon or out of budget, they fall back to Kelly.
   - Before Placené přesčasy and Hackathon, work waits while the energy refilling until
     Friday 17:00 still fits under the cap, so the event starts with a full bar. During
     Placené přesčasy work drains energy at once instead of keeping it for the grinder.

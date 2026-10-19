@@ -1908,7 +1908,8 @@
   // Rounds that pay by themselves (BotterAuto.edgePlan): wins on a Konec
   // kvartálu weekend until its limit, or a game whose model pays over 100 %.
   // Sized by fractional Kelly; like the standup they keep the reserve but not
-  // the grinding budget.
+  // the grinding budget. On the game the grinder would play they go up to the
+  // grinder's bet, which its limits already allow.
   // Whether a round that ends ahead earns the Konec kvartálu bonus now.
   function winsBonusOn(now = Date.now()) {
     const event = A.weekendEvent(now);
@@ -1923,6 +1924,7 @@
     if (now - (claimTried.edge ?? 0) < CLAIM_RETRY_MS) return false;
     const winsOn = winsBonusOn(now);
     const reserve = limits().reserve;
+    const grind = grindChoice().plan;
     const plan = A.edgePlan({
       level: player.level,
       unlocks: GRIND_UNLOCKS,
@@ -1933,6 +1935,7 @@
       bankroll: Math.max(0, player.credits - reserve),
       kelly: EDGE_KELLY,
       winsBonus: winsOn ? A.WINS_BONUS : 0,
+      floors: grind ? { [grind.game]: grind.bet } : {},
     });
     const note = plan ? `${plan.game} ${plan.bet}` : '';
     if (note !== edgeNote) {

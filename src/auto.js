@@ -905,10 +905,13 @@
   // Per credit a round returns -edge plus winsBonus times gain (the mean net
   // profit per credit staked of the rounds that end ahead). The bet is sized
   // by fractional Kelly on that edge over the round's variance, the smallest
-  // level always allowed. The pick is the biggest expected profit per round.
+  // level always allowed, and a game's floor (the grinder's bet on the game it
+  // would grind, already within its limits) too: XP per round grows with the
+  // bet, so a paying game is never played slower than the grinder would play
+  // it. The pick is the biggest expected profit per round.
   // ctx: level, unlocks, edges, gains and variances per game, levels
   // (affordable bets, ascending), bankroll (credits above the reserve), kelly,
-  // winsBonus (0 off the weekend or past its limit).
+  // winsBonus (0 off the weekend or past its limit), floors (bet per game).
   function edgePlan(ctx) {
     const levels = ctx.levels ?? [];
     let best = null;
@@ -918,8 +921,9 @@
       const ev = -edge + (ctx.winsBonus ?? 0) * (ctx.gains?.[game] ?? 0);
       if (!(ev > 0)) continue;
       const variance = ctx.variances?.[game] ?? 1;
+      const floor = ctx.floors?.[game] ?? 0;
       for (const bet of levels) {
-        if (bet !== levels[0] && bet > (ev / variance) * ctx.kelly * ctx.bankroll) continue;
+        if (bet !== levels[0] && bet > floor && bet > (ev / variance) * ctx.kelly * ctx.bankroll) continue;
         const value = ev * bet;
         if (!best || value > best.value) best = { game, bet, ev, value };
       }
