@@ -280,7 +280,7 @@
     "message": "Rezerva: kredity, které se nikdy nevsadí ani neutratí"
   },
   "optionsGameDelay": {
-    "message": "Prodleva mezi koly (ms)"
+    "message": "Minimální odstup her (ms)"
   },
   "panelAutoParts": {
     "message": "V automatickém režimu"
@@ -1714,5 +1714,8 @@
         "content": "$3"
       }
     }
+  },
+  "optionsGameDelayHint": {
+    "message": "Nejkratší doba od začátku jednoho herního požadavku (kolo, tah v blackjacku, free spiny, tiket) do dalšího, společná pro všechny otevřené karty kasina. Pod 700 ms ji zdržuje takt bota."
   }
 }

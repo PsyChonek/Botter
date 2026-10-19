@@ -92,7 +92,7 @@ const DEFAULTS = {
   stopLoss: 1000,
   takeProfit: 0,
   reserve: 0,
-  gameDelayMs: 800,
+  gameDelayMs: 1500,
 };
 
 const G = globalThis.BotterGames;

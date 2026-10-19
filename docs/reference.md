@@ -61,6 +61,13 @@ progress shows at `chrome://on-device-internals`.
   credits, XP bar and level in the top bar update live. Guardrails: stop-loss and take-profit per
   session, a credit reserve, and the game's unlock level. With both bots on, work
   goes first and games fill the time while energy refills.
+- **Minimum time between game requests** (settings Games tab, 1,500 ms by default,
+  `gameDelayMs`): every game request (a round, a blackjack move, Forbes free spins, a
+  lottery ticket, a round on the game screen) starts at least this long after the last
+  one. It is enforced in one place (`pace` in `src/content.js`) and the last start is
+  kept in the page's localStorage, which every casino tab shares, so a second tab
+  cannot double the speed. The bot ticks every 700 ms, which is the floor below that.
+  Since 2026-10-17 the server does not let any game play faster than its animations.
 - **Play on the game screen** (panel toggle, also in the settings Games tab, off by
   default; `src/screen.js`): every round the bot plays (game bot, grinder, standup)
   goes through the app's own game screen instead of the API. It opens the game from

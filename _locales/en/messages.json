@@ -280,7 +280,7 @@
     "message": "Reserve: credits never bet or spent"
   },
   "optionsGameDelay": {
-    "message": "Delay between rounds (ms)"
+    "message": "Minimum time between game requests (ms)"
   },
   "panelAutoParts": {
     "message": "In auto mode"
@@ -1714,5 +1714,8 @@
         "content": "$3"
       }
     }
+  },
+  "optionsGameDelayHint": {
+    "message": "The shortest time from the start of one game request (a round, a blackjack move, free spins, a ticket) to the next, shared by every open casino tab. Below 700 ms the bot's tick holds it back."
   }
 }

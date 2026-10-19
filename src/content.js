@@ -31,7 +31,7 @@
     stopLoss: 1000,
     takeProfit: 0,
     reserve: 0,
-    gameDelayMs: 800,
+    gameDelayMs: 1500,
     playOnScreen: false,
     hotfixForce: false, // test switch: send hotfixForceValue as force on every Forbes z Chánova spin
     hotfixForceValue: '',
@@ -308,8 +308,37 @@
   const apiWaiters = new Map();
   let apiSeq = 0;
 
+  // Game requests (every path in G.PATH_GAME: rounds, blackjack actions,
+  // Forbes free spins, lottery tickets, rounds on the game screen) start at
+  // least settings.gameDelayMs apart. The last start is kept in the page's
+  // localStorage, which every casino tab shares, so a second tab or another
+  // code path never plays faster than the setting. The tick (TICK_MS) is the
+  // floor below that.
+  const PACE_KEY = 'botter:lastGameRequest';
+  let lastGameRequest = 0;
+  async function pace() {
+    for (;;) {
+      let last = lastGameRequest;
+      try {
+        last = Math.max(last, Number(localStorage.getItem(PACE_KEY)) || 0);
+      } catch {
+        // Storage blocked: this tab's own clock still paces it.
+      }
+      const wait = last + settings.gameDelayMs - Date.now();
+      if (wait <= 0) break;
+      await sleep(wait);
+    }
+    lastGameRequest = Date.now();
+    try {
+      localStorage.setItem(PACE_KEY, String(lastGameRequest));
+    } catch {
+      // See above.
+    }
+  }
+
   // Calls the casino API through the page hook, which adds the session token.
-  function api(path, body) {
+  async function api(path, body) {
+    if (G.PATH_GAME[path]) await pace();
     const id = ++apiSeq;
     return new Promise((resolve) => {
       apiWaiters.set(id, resolve);
@@ -1162,7 +1191,6 @@
     if (open) bjStake = open.stake ?? bjStake;
     let res = open ? { ok: true, data: { hand: open, player } } : await api('/api/blackjack/deal', { bet });
     while (res.ok && res.data.hand && !res.data.hand.done && gamesOn()) {
-      await sleep(settings.gameDelayMs / 2);
       const rules = BJ.rulesFromUpgrades(player.upgrades?.blackjack);
       const action = BJ.decide(res.data.hand, rules, res.data.player?.credits ?? player.credits);
       res = await api('/api/blackjack/action', { action });
@@ -1197,6 +1225,7 @@
   // another spot is asked for.
   async function playRound(game, bet, spot = settings.rouletteBet) {
     if (settings.playOnScreen && !NO_SCREEN_GAMES.includes(game) && (game !== 'roulette' || G.ROULETTE_BETS.includes(spot))) {
+      await pace();
       const res = await playOnScreen(game, bet, spot);
       if (res.ok || res.status !== 0) return res;
       log.warn('screen_play_failed', { game, bet, error: res.data?.error });
@@ -1226,7 +1255,6 @@
     }
     const res = await api(G.GAMES.hotfix.path, body);
     if (!res.ok || !res.data.player?.hotfixFree) return res;
-    await sleep(settings.gameDelayMs);
     const paid = await free();
     if (!paid.ok) log.warn('hotfix_free_failed', { status: paid.status, error: paid.data?.error });
     return paid.ok ? paid : res;
@@ -1270,7 +1298,6 @@
       log.warn('game_failed', { game, status: res.status, error: res.data?.error });
       return stopGames('statusGameError', [res.data?.error ?? String(res.status)]);
     }
-    await sleep(settings.gameDelayMs);
   }
 
   // ---------- loop ----------
@@ -1734,7 +1761,6 @@
       log.warn('hunt_failed', { game, bet, spot, status: res.status, error: res.data?.error });
       claimTried.hunt = Date.now();
     }
-    await sleep(settings.gameDelayMs);
     return true;
   }
 
@@ -1845,7 +1871,6 @@
       log.warn('edge_failed', { game, bet, status: res.status, error: res.data?.error });
       claimTried.edge = Date.now();
     }
-    await sleep(settings.gameDelayMs);
     return true;
   }
 
@@ -1885,7 +1910,6 @@
       log.warn('standup_failed', { quest: quest.key, game, bet, status: res.status, error: res.data?.error });
       claimTried.standup = Date.now();
     }
-    await sleep(settings.gameDelayMs);
     return true;
   }
 
@@ -2002,7 +2026,6 @@
       grindError = res.data?.error ?? String(res.status);
       grindPausedUntil = Date.now() + CLAIM_RETRY_MS;
     }
-    await sleep(settings.gameDelayMs);
     return true;
   }
 
@@ -2040,7 +2063,6 @@
       grindError = res.data?.error ?? String(res.status);
       grindPausedUntil = Date.now() + CLAIM_RETRY_MS;
     }
-    await sleep(settings.gameDelayMs);
     return true;
   }
 
