@@ -307,6 +307,10 @@ progress shows at `chrome://on-device-internals`.
   only when the credits left after it still reach the next level: the reserve, the
   price and the expected loss on the XP left in the level plus two standard deviations
   of the swing at the grind bet (`levelUpCushion`; 0 before the XP rate is measured).
+  An upgrade of the game the grinder plays needs no cushion: it makes every later
+  round cheaper, and the credits held back would not be ground meanwhile either. On
+  Forbes z Chánova, whose rounds swing about 10 bets, the cushion runs to hundreds of
+  thousands and would stop both buying and grinding until work paid it.
   Saving for the goal holds the same amount back from the grinder. `crash:sla` is never bought:
   Produkce padá's daily payout is too small to earn it back. `global:bets` (higher max bet) is not in the plan: XP per round
   is proportional to the bet, so a bigger bet never buys XP cheaper. The whole plan is judged again every 10 minutes and as soon as the level, the

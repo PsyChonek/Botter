@@ -1655,9 +1655,14 @@
 
   // Credits an upgrade purchase must leave: where the grinder stops betting
   // (grindFloor), the goal's price (none for no goal) and what grinding needs to
-  // keep levelling from there (levelMargin).
+  // keep levelling from there (levelMargin). An upgrade of the game the grinder
+  // plays needs no margin: it makes every later round cheaper, and credits held
+  // back for the margin would not be ground meanwhile either. On a game that
+  // swings as much as Forbes z Chánova the margin runs to hundreds of thousands,
+  // so asking for it would stop both buying and grinding until work paid it.
   function goalNeed(goal) {
-    return grindFloor() + (goal?.price ?? 0) + (levelMargin() ?? 0);
+    const margin = goal && goal.game === marginGame() ? 0 : (levelMargin() ?? 0);
+    return grindFloor() + (goal?.price ?? 0) + margin;
   }
 
   // Balance the grinder stops at: the reserve, or the minimum balance when that
@@ -1688,14 +1693,22 @@
   function levelMargin() {
     const rate = planXpRate();
     if (!(rate > 0)) return null;
-    const { candidates, edges } = grindModel();
+    const { edges } = grindModel();
     const learning = learningBlaze();
-    const game = learning ? 'blaze' : A.cheapestGame(candidates, player.level, GRIND_UNLOCKS, edges);
+    const game = marginGame();
     if (!game) return 0;
     const edge = learning ? O.edges([game], player.upgrades, blazeMode())[game] : edges[game];
     const variance = O.variances([game], player.upgrades, blazeMode())[game];
     const bet = learning ? G.BET_LEVELS[0] : wantedGrindBet();
     return A.levelUpCushion(G.xpAhead(player, A.MARGIN_LEVELS), rate, edge, bet, variance, A.MARGIN_SIGMAS);
+  }
+
+  // Game the leveling margin is planned on: Blaze while it learns the star rule,
+  // else the cheapest game by its modelled edge.
+  function marginGame() {
+    if (learningBlaze()) return 'blaze';
+    const { candidates, edges } = grindModel();
+    return A.cheapestGame(candidates, player.level, GRIND_UNLOCKS, edges);
   }
 
   // The bet the grinder wants before its limits: the one picked in the settings.
