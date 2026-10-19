@@ -31,3 +31,13 @@ test('isIdle sees a game busy while its controls are disabled', () => {
   assert.equal(S.isIdle('roulette', screen([button(false)])), true);
   assert.equal(S.isIdle('roulette', screen([button(true)])), false);
 });
+
+test('every game has a screen, and Skeleton Slots never matches Forbes z Chánova', () => {
+  for (const game of G.GAME_KEYS) assert.ok(S.SCREENS[game], game);
+  assert.match(S.SCREENS.skeleton, /:not\(\.hotfix\)/);
+  const button = (disabled) => ({ disabled });
+  for (const game of ['baccarat', 'dice']) {
+    assert.equal(S.isIdle(game, { querySelector: () => button(false) }), true);
+    assert.equal(S.isIdle(game, { querySelector: () => button(true) }), false);
+  }
+});

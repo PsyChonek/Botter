@@ -12,17 +12,35 @@
   // Longest a round may animate: free spins, respins and big-win banners included.
   const ROUND_MS = 90_000;
 
-  // Selectors of each game's screen, from the app bundle.
+  // Selectors of each game's screen, from the app bundle. Forbes z Chánova
+  // reuses Skeleton Slots' screen class with its own on top.
   const SCREENS = {
     blaze: '#hud.blaze',
-    skeleton: 'main.table-screen.skeleton',
+    skeleton: 'main.table-screen.skeleton:not(.hotfix)',
     slotingi: 'main.table-screen.slotingi',
+    hotfix: 'main.table-screen.skeleton.hotfix',
+    cases: 'main.table-screen.cases',
     blackjack: 'main.table-screen.blackjack',
     roulette: 'main.table-screen.roulette',
+    baccarat: 'main.table-screen.baccarat',
+    dice: 'main.table-screen.dice',
   };
-  const SPIN_PATHS = { blaze: '/api/slot/spin', skeleton: '/api/skeleton/spin', slotingi: '/api/slotingi/spin' };
+  // Games played with the bet +/- and one button: its selector and the path it sends.
+  const SPIN_PATHS = {
+    blaze: '/api/slot/spin',
+    skeleton: '/api/skeleton/spin',
+    slotingi: '/api/slotingi/spin',
+    hotfix: '/api/hotfix/spin',
+    cases: '/api/cases/open',
+  };
+  const SPIN_BUTTONS = { cases: 'button.cs-open' };
+  // Chip tables: their main button is idle when it is enabled.
+  const CHIP_TABLES = ['roulette', 'baccarat', 'dice'];
   // The even-money spots are the last six on the roulette table, in this order.
   const ROULETTE_SPOTS = ['low', 'even', 'red', 'black', 'odd', 'high'];
+  // Kostky's main row, in this order; the sums (4 to 17) sit under "Další sázky".
+  const DICE_MAIN = ['small', 'odd', 'anytriple', 'even', 'big'];
+  const DICE_FIRST_SUM = 4;
   const CHIPS = [500, 100, 50, 10];
   const BJ_BUTTONS = ['hit', 'stand', 'double'];
 
@@ -52,7 +70,7 @@
   // Whether a game screen is waiting for input. Every control is disabled while
   // a round runs, its animation included.
   function isIdle(game, screen) {
-    if (game === 'roulette') return screen.querySelector('.roulette-buttons .btn-primary')?.disabled === false;
+    if (CHIP_TABLES.includes(game)) return screen.querySelector('.roulette-buttons .btn-primary')?.disabled === false;
     const controls = game === 'blackjack' ? '.bj-actions button' : '.betctl button';
     return [...screen.querySelectorAll(controls)].some((button) => !button.disabled);
   }
@@ -146,16 +164,44 @@
       const screen = await open(game);
       if (!screen) return failed('screen_missing');
       if (!(await setBet(screen, bet))) return failed('bet_unavailable');
-      return finish(game, await press(screen.querySelector('button.spin'), SPIN_PATHS[game]));
+      return finish(game, await press(screen.querySelector(SPIN_BUTTONS[game] ?? 'button.spin'), SPIN_PATHS[game]));
     }
 
-    async function roulette(spot, bet) {
-      const screen = await open('roulette');
+    // Forbes z Chánova: a spin, and when it leaves free spins pending
+    // (player.hotfixFree) the option `choice` from the pick the app shows once
+    // the spin has animated. pending: free spins are already waiting, so only
+    // the pick is made. Returns the free spins' response, or the spin's when
+    // the pick failed (the free spins then wait for the next round).
+    async function hotfix(bet, choice, pending) {
+      const screen = await open('hotfix');
+      if (!screen) return failed('screen_missing');
+      let res = null;
+      if (!pending) {
+        if (!(await setBet(screen, bet))) return failed('bet_unavailable');
+        res = await press(screen.querySelector('button.spin'), SPIN_PATHS.hotfix);
+        if (!res.ok || !res.data.player?.hotfixFree) return finish('hotfix', res);
+      }
+      const option = await until(() => {
+        ctx.dismissModal();
+        const button = document.querySelectorAll('.hf-choice .hf-options button')[choice];
+        return button && !button.disabled ? button : null;
+      }, ROUND_MS);
+      if (!option) return res ?? failed('choice_missing');
+      await sleep(CLICK_PAUSE_MS);
+      const paid = await press(option, '/api/hotfix/free');
+      return finish('hotfix', paid.ok || !res ? paid : res);
+    }
+
+    // Chip tables: clears the table, lays the stake in chips on the spot
+    // (spotOf(screen), null when the screen has no such spot) and presses the
+    // main button, which sends `path`. clearAt is the Smazat pill's place.
+    async function table(game, bet, spotOf, clearAt, path) {
+      const screen = await open(game);
       if (!screen) return failed('screen_missing');
       const chips = chipsFor(bet);
-      const target = [...screen.querySelectorAll('.rtable .spot')].slice(-ROULETTE_SPOTS.length)[ROULETTE_SPOTS.indexOf(spot)];
+      const target = await spotOf(screen);
       if (!chips || !target) return failed('spot_missing');
-      const clear = screen.querySelectorAll('.roulette-buttons .pill')[1];
+      const clear = screen.querySelectorAll('.roulette-buttons .pill')[clearAt];
       if (clear && !clear.disabled) {
         clear.click();
         await sleep(CLICK_PAUSE_MS);
@@ -170,8 +216,29 @@
         target.click();
         await sleep(CLICK_PAUSE_MS);
       }
-      return finish('roulette', await press(screen.querySelector('.roulette-buttons .btn-primary'), '/api/roulette/spin'));
+      return finish(game, await press(screen.querySelector('.roulette-buttons .btn-primary'), path));
     }
+
+    const roulette = (spot, bet) =>
+      table('roulette', bet, (screen) => [...screen.querySelectorAll('.rtable .spot')].slice(-ROULETTE_SPOTS.length)[ROULETTE_SPOTS.indexOf(spot)], 1, '/api/roulette/spin');
+
+    // spot is one of BotterBaccarat.SPOTS, which the spots carry as a class.
+    const baccarat = (spot, bet) =>
+      table('baccarat', bet, (screen) => screen.querySelector(`.bac-spot.${spot}`), 1, '/api/baccarat/deal');
+
+    // The main row and the sums; other Kostky spots are not laid on the screen.
+    async function diceSpot(screen, spot) {
+      if (DICE_MAIN.includes(spot)) return screen.querySelectorAll('.sb-main .sb-spot')[DICE_MAIN.indexOf(spot)] ?? null;
+      const sum = /^sum(\d+)$/.exec(spot);
+      if (!sum) return null;
+      const more = screen.querySelector('.sb-more[aria-expanded="false"]');
+      if (more) {
+        more.click();
+        await until(() => screen.querySelector('.sb-sums .sb-spot'), NAV_MS);
+      }
+      return screen.querySelectorAll('.sb-sums .sb-spot')[Number(sum[1]) - DICE_FIRST_SUM] ?? null;
+    }
+    const dice = (spot, bet) => table('dice', bet, (screen) => diceSpot(screen, spot), 2, '/api/dice/roll');
 
     // An open hand is restored by the app on its own, so it is played on from
     // where it stands.
@@ -193,10 +260,10 @@
       return finish('blackjack', res);
     }
 
-    return { slot, roulette, blackjack };
+    return { slot, hotfix, roulette, baccarat, dice, blackjack };
   }
 
-  const api = { SCREENS, ROULETTE_SPOTS, parseCredits, chipsFor, isIdle, create };
+  const api = { SCREENS, ROULETTE_SPOTS, DICE_MAIN, parseCredits, chipsFor, isIdle, create };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BotterScreen = api;

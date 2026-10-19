@@ -1256,6 +1256,9 @@
       return screenPlay.blackjack(bet, open);
     }
     if (game === 'roulette') return screenPlay.roulette(spot, bet);
+    if (game === 'baccarat') return screenPlay.baccarat(BAC.SPOTS.includes(spot) ? spot : BAC.bestSpot(player.upgrades?.baccarat), bet);
+    if (game === 'dice') return screenPlay.dice(DICE.SPOTS.includes(spot) ? spot : DICE.BEST_SPOT, bet);
+    if (game === 'hotfix') return screenPlay.hotfix(bet, HOTFIX_CHOICE, !!player.hotfixFree);
     return screenPlay.slot(game, bet);
   }
 
@@ -1266,16 +1269,20 @@
   const screenUnsent = (game, error) =>
     SCREEN_UNSENT.includes(error) || (error === 'button_missing' && game !== 'blackjack');
 
-  // Games the screen cannot play: Forbes z Chánova's free-spin pick needs its
-  // own clicks, and baccarat, Kostky and Case opening have no screen play yet.
-  const NO_SCREEN_GAMES = ['hotfix', 'baccarat', 'dice', 'cases'];
+  // Whether a round goes to the game screen: with the setting on, except bets
+  // the screen has no spot for (roulette's straight numbers) and Forbes spins
+  // with the test switch, which only the API sends.
+  const onScreen = (game, spot) =>
+    settings.playOnScreen &&
+    (game !== 'roulette' || G.ROULETTE_BETS.includes(spot)) &&
+    (game !== 'hotfix' || !settings.hotfixForce);
 
   // spot is the roulette, baccarat or Kostky bet; the screen can only lay chips
   // on the even-money roulette spots, so other bets always go through the API.
   // Baccarat bets the better of Hráč and Bankéř and Kostky bets Malá unless
   // another spot is asked for.
   async function playRound(game, bet, spot = settings.rouletteBet) {
-    if (settings.playOnScreen && !NO_SCREEN_GAMES.includes(game) && (game !== 'roulette' || G.ROULETTE_BETS.includes(spot))) {
+    if (onScreen(game, spot)) {
       await pace();
       const res = await playOnScreen(game, bet, spot);
       if (res.ok || res.status !== 0) return res;
@@ -1322,6 +1329,23 @@
     } catch {
       return value;
     }
+  }
+
+  // Forbes z Chánova free spins left pending (player.hotfixFree: a spin whose
+  // pick was not made, by the bot or by hand) cost nothing and block every
+  // Forbes spin, so they are played as soon as they are seen, whatever the
+  // grinder plans, with HOTFIX_CHOICE. A failed pick is tried again after
+  // HOTFIX_FREE_RETRY_MS.
+  const HOTFIX_FREE_RETRY_MS = 30_000;
+  async function hotfixFreeStep() {
+    if (!player?.hotfixFree || Date.now() - (claimTried.hotfixFree ?? 0) < HOTFIX_FREE_RETRY_MS) return false;
+    setStatus('statusHotfixFree');
+    const res = await playRound('hotfix', G.BET_LEVELS[0]);
+    if (!res.ok || res.data?.player?.hotfixFree) {
+      claimTried.hotfixFree = Date.now();
+      log.warn('hotfix_free_failed', { status: res.status, error: res.data?.error });
+    }
+    return true;
   }
 
   async function gameStep() {
@@ -2123,6 +2147,7 @@
     if (!player) return loadPlayer();
     if (await bankruptStep()) return;
     if (await claimFreebies()) return;
+    if (settings.autoGames && (await hotfixFreeStep())) return;
     if (await rotateStep(true)) return;
     if (await repayStep()) return;
     if (await loanTrickStep()) return;
@@ -2146,6 +2171,7 @@
   async function step() {
     if (settings.autoMode) return autoStep();
     if (await claimFreebies()) return;
+    if (settings.gamesEnabled && (await hotfixFreeStep())) return;
     // The game bot would gamble the other account's credits, so only the work bot leaves.
     if (settings.enabled && !settings.gamesEnabled && (await rotateStep(true))) return;
     if (settings.enabled && workAvailable()) return workStep();

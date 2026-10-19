@@ -88,11 +88,15 @@ progress shows at `chrome://on-device-internals`.
 - **Play on the game screen** (panel toggle, also in the settings Games tab, off by
   default; `src/screen.js`): every round the bot plays (game bot, grinder, standup)
   goes through the app's own game screen instead of the API. It opens the game from
-  the lobby, sets the bet with the +/- buttons (roulette: clears the table and lays
-  chips on the even-money spot), presses spin, deal or hit/stand/double, and waits
-  until the screen is idle again, so reels, cards and the wheel animate as if you
-  played. The result is the app's own response, booked like a manual round. It is
-  several times slower per round than the API, so leave it off for grinding.
+  the lobby, sets the bet with the +/- buttons (roulette, baccarat and Kostky: clears
+  the table and lays chips on the spot), presses spin, open, deal, roll or
+  hit/stand/double (Forbes: also the free-spin pick), and waits until the screen is
+  idle again, so reels, cards, cases and dice animate as if you played. The result is
+  the app's own response, booked like a manual round. Every game has screen play since
+  2026-10-19; bets the screen has no spot for (a straight roulette number, Kostky
+  spots other than the main row and the sums) and Forbes spins with **Forbes force**
+  go through the API. It is several times slower per round than the API, so leave it
+  off for grinding.
 - **Auto mode** (`src/auto.js`, one toggle in the panel) runs everything in order of
   value each tick: declare personal bankruptcy when it is cheaper than paying (see
   below), claim the daily bonus, the free hourly wheel of fortune and the bailout,
@@ -352,7 +356,10 @@ progress shows at `chrome://on-device-internals`.
   table is marked as ruled out. The current account's upgrades are marked.
 - **Forbes z Chánova** (from level 13): a Megaways slot with cascades, the Hotfix
   wheel of modifiers and free spins on 4+ incidents. When free spins start, the bot
-  plays them at once with Postupný rollout (`HOTFIX_CHOICE`). It is played by the
+  plays them at once with Postupný rollout (`HOTFIX_CHOICE`), and free spins left
+  pending (a pick nobody made, by the bot or by hand) are played as soon as the bot
+  sees them, whatever else it plans (`hotfixFreeStep`): they cost nothing and block
+  every Forbes spin until they are played. It is played by the
   grinder, by the game bot when picked there, and by the **Forbes z Chánova test**
   (panel, More), started by hand: 500 spins at the smallest bet in auto mode with games
   on, keeping the reserve (`hotfixTestStep`).
@@ -418,8 +425,7 @@ progress shows at `chrome://on-device-internals`.
   combination (`stats.baccarat`, the **Baccarat check** on the Profit tab): winners
   and pairs seen against the model, the server's return against the client's pays,
   the hidden cost, hands dealt against the drawing rules and payouts off the pays
-  (which shows whether the cut is also taken from tie and pair wins). Baccarat has
-  no screen play yet; with **Play on the game screen** on it still goes through the API.
+  (which shows whether the cut is also taken from tie and pair wins).
 - **Case opening** (from level 17, `src/cases.js`, since 2026-10-17): the bet buys a
   case and one item always drops, paying max(1, round(bet x its value)). The client
   draws a rarity (blue 79.92 %, purple 15.98 %, pink 3.2 %, red 0.64 %, gold 0.26 %)
@@ -450,8 +456,7 @@ progress shows at `chrome://on-device-internals`.
   500). Every roll is checked per upgrade combination (`stats.dice`): triples against 1
   in 36, faces per die and payouts off the model's commission rule, logged as
   `dice_payout_mismatch` when a roll pays more than a credit off.
-  Neither game has screen play; with **Play on the game screen** on they go through
-  the API. Both checks are on the Profit tab (**Dice and Case opening check**).
+  Both checks are on the Profit tab (**Dice and Case opening check**).
 - **XP per game** (panel): for each unlocked game and the next one to unlock, the house
   edge the grinder plans with, credits lost per XP point and its state (locked or
   playing at the chosen bet). The row the grinder plays next is highlighted.

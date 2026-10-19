@@ -1762,5 +1762,8 @@
   },
   "colNetError": {
     "message": "Chyba"
+  },
+  "statusHotfixFree": {
+    "message": "Forbes z Chánova: hraji čekající free spiny"
   }
 }
