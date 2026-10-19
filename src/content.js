@@ -117,12 +117,12 @@
   // 180 spins) to show how the server grows their multiplier and sizes the
   // Hotfix modifiers. Spins played by hand during the test count too.
   const HOTFIX_TEST_SPINS = 500;
-  // After a Forbes z Chánova spin that triggers free spins, and again after the
-  // free spins, the server turns game requests away for about 30 s ("počkej na
-  // animaci", 429 with a 30 s wait), so game requests hold that long instead.
-  const HOTFIX_LOCK_MS = 32_000;
-  const hotfixLocks = (path, data) =>
-    (path === '/api/hotfix/spin' && !!data?.outcome?.trigger) || path === '/api/hotfix/free';
+  // Game requests wait out the app's animation (G.hotfixLockMs) after a Forbes
+  // z Chánova free-spin trigger and after free spins, plus a margin, but never
+  // longer than the 32 s the server has always let the next request through
+  // after: it ends its lock after free spins well before the app's long ones.
+  const HOTFIX_LOCK_MARGIN_MS = 1000;
+  const HOTFIX_LOCK_MAX_MS = 32_000;
   const MAX_CAPTURE = 40;
   const SPIN_FLUSH_EVERY = 10;
   const CAPTURE_PATHS = /^\/api\/(loan|crash|shop|leaderboard|bonus|wheel)/;
@@ -501,7 +501,8 @@
       if (path === '/api/work/submit') onSubmitRejected(request?.id, data);
       return;
     }
-    if (hotfixLocks(path, data)) holdGames(HOTFIX_LOCK_MS);
+    const lock = G.hotfixLockMs(path, data);
+    if (lock) holdGames(Math.min(HOTFIX_LOCK_MAX_MS, lock + HOTFIX_LOCK_MARGIN_MS));
     if (path === '/api/profile/reset') {
       resetStats();
       render();

@@ -239,3 +239,17 @@ test('addRouletteSpin keys rows only by a zeros level the wheel can have', () =>
   assert.equal(Object.prototype.spins, undefined);
 });
 
+
+test('hotfixLockMs holds a triggering spin and free spins for as long as the app animates them', () => {
+  const blank = { mod: null, pre: null, scatters: 0, steps: [{ reels: [[1, 2]], wins: [] }] };
+  const win = { cells: [[0, 0]], win100: 10 };
+  const cascade = { ...blank, scatters: 4, steps: [{ reels: [[1, 2]], wins: [win] }, { reels: [[1, 2]], wins: [] }] };
+  const wheel = { ...blank, mod: { key: 'wilds' }, pre: [[3, 4]] };
+  assert.equal(G.hotfixLockMs('/api/hotfix/spin', { outcome: { round: cascade, trigger: 0 } }), 0);
+  assert.equal(G.hotfixLockMs('/api/hotfix/spin', { outcome: { round: cascade, trigger: 4 } }), 1250 + 1800 + 1100 + 2400);
+  assert.equal(G.hotfixLockMs('/api/hotfix/spin', { outcome: { round: wheel, trigger: 4 } }), 1250 + 5800 + 900 + 2400);
+  const free = { bet: 20, totalWin: 100, free: { rounds: [blank, { ...wheel, mod: { key: 'refactor' } }] } };
+  assert.equal(G.hotfixLockMs('/api/hotfix/free', free), 2800 + 1250 + 350 + 1250 + 5800 + 1250 + 350 + 2600);
+  assert.equal(G.hotfixLockMs('/api/hotfix/free', { ...free, totalWin: 200 }), 2800 + 1250 + 350 + 1250 + 5800 + 1250 + 350 + 2600 + 2600);
+  assert.equal(G.hotfixLockMs('/api/slot/spin', { outcome: { trigger: 4 } }), 0);
+});

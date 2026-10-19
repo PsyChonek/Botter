@@ -76,11 +76,16 @@ progress shows at `chrome://on-device-internals`.
   request's wait also holds the next game request of every tab. Before this, such a
   rejection counted as a failed round and paused that step for 10 minutes. The log
   line carries the server's own hint (`hint`: `Retry-After` or the body's field).
-- **Forbes z Chánova lock** (`HOTFIX_LOCK_MS` in `src/content.js`): after a spin that
-  triggers free spins, and again after the free spins, the server turns every game
-  request away for about 30 s. Any such response (the bot's or the app's) holds the
-  next game request of every tab for 32 s, so the free-spin pick and the spin after
-  the free spins go out once the lock is over instead of drawing a 429.
+- **Forbes z Chánova lock** (`hotfixLockMs` in `src/games.js`, applied in `onResponse`
+  in `src/content.js`): after a spin that triggers free spins, and again after the
+  free spins, the server turns every game request away until the app would have
+  animated them ("počkej na animaci", a 429 whose wait is always 30 s, so it says
+  nothing about the real lock). Any such response (the bot's or the app's) holds the
+  next game request of every tab for the app's animation time plus 1 s, from the
+  app's own timings: about 10 s before the free-spin pick, when the app shows it to
+  a player. After free spins the hold stops at 32 s (`HOTFIX_LOCK_MAX_MS`), because
+  the server has always let the next spin through by then while the app's
+  animation of a long free-spin game runs past a minute.
 - **Speed and server responses** (settings Games tab): game requests in the last
   minute and the average gap between the last 20 against the minimum set, all API
   responses (the app's and the bot's) in the last minute, then per path the responses

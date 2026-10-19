@@ -153,6 +153,56 @@
 
   const rewardTotal = (data) => Object.values(rewardsPaid(data)).reduce((a, b) => a + b, 0);
 
+  // Forbes z Chánova animation times in ms, from the app at normal speed: reels
+  // dropping in, the Hotfix wheel and its banner, redrawing the reels after it
+  // (900 when the reel sizes stay, a new drop otherwise), one winning cascade,
+  // three or more scatters, the incident banner before the free-spin pick, the
+  // free-spin intro, gap and outro banners, and a big-win banner.
+  const HOTFIX_ANIM = {
+    drop: 1250,
+    wheel: 5800,
+    morph: 900,
+    cascade: 1800,
+    scatters: 1100,
+    incident: 2400,
+    freeIntro: 2800,
+    freeGap: 350,
+    freeOutro: 2600,
+    bigWin: 2600,
+  };
+  const BIG_WIN_X = 10;
+
+  function hotfixRoundMs(round) {
+    const A = HOTFIX_ANIM;
+    let ms = A.drop;
+    if (round.mod) {
+      ms += A.wheel;
+      const first = round.steps[0].reels;
+      const sameSizes = round.pre?.every((reel, i) => reel.length === first[i].length);
+      if (round.pre) ms += sameSizes && round.mod.key !== 'refactor' ? A.morph : A.drop;
+    }
+    for (const step of round.steps) {
+      if (!step.wins.length) break;
+      ms += A.cascade;
+    }
+    if (round.scatters >= 3) ms += A.scatters;
+    return ms;
+  }
+
+  // How long the app animates a Forbes z Chánova response before it lets the
+  // player act: the free-spin pick shows once a triggering spin has animated,
+  // and the next spin once the free spins have. The server turns game requests
+  // away ("počkej na animaci") until then, so the bot waits as long. Other
+  // spins are not held and give 0.
+  function hotfixLockMs(path, data) {
+    const A = HOTFIX_ANIM;
+    if (path === '/api/hotfix/spin') return data?.outcome?.trigger ? hotfixRoundMs(data.outcome.round) + A.incident : 0;
+    if (path !== '/api/hotfix/free' || !data?.free) return 0;
+    const rounds = data.free.rounds.reduce((ms, round) => ms + hotfixRoundMs(round) + A.freeGap, 0);
+    const big = data.totalWin >= BIG_WIN_X * data.bet ? A.bigWin : 0;
+    return A.freeIntro + rounds + A.freeOutro + big;
+  }
+
   // Profit of one game API response. Net is the credit change plus whatever the
   // debt collector took from the win, because that still paid down the loan,
   // minus the rewards the same response pays but the game did not earn.
@@ -346,6 +396,7 @@
     xpAhead,
     dailyBonus,
     addDelta,
+    hotfixLockMs,
     roulettePayout,
     roulettePockets,
     addRouletteSpin,
