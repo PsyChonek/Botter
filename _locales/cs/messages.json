@@ -1700,5 +1700,19 @@
   },
   "ach_case_pen": {
     "message": "tři propisky v řadě"
+  },
+  "statusEdgeBet": {
+    "message": "Hra v plusu: $P1$ po $P2$, čekaný zisk $P3$ na kredit",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
   }
 }

@@ -198,7 +198,7 @@
   let payrollWatch = null; // drops and stakes seen, shared by every account (A.watchPayroll)
   let lottery = null; // last lottery state from /api/lottery, with the local time it came
   let rounds = {}; // crash and lottery rounds other accounts still owe (BotterAuto.roundsDue), shared
-  let edgeAt = 0; // when edgeStep last found a round that pays by itself
+  let edgeAt = 0; // when edgeStep last found a round that pays only for a while (payroll fund, Konec kvartálu)
   let spins = []; // recorded Blaze spins for the model check
   let hotfixRounds = []; // recorded Forbes z Chánova responses for its model check
   let unsavedHotfix = 0;
@@ -1831,10 +1831,15 @@
       if (plan) log.info('edge_plan', { ...plan, fund: payroll?.amount, cap: payroll?.cap, hazard: fund?.hazard, wins: winsOn });
     }
     if (!plan) return false;
-    edgeAt = now;
+    // The fund and the weekend bonus pay only while they last, so they hold work
+    // back like the grinder does. A game that pays by its model alone (Forbes z
+    // Chánova upgraded) pays the same later, so work goes first and its rounds
+    // fill the time while energy refills.
+    if (plan.payroll || winsOn) edgeAt = now;
     const { game, bet } = plan;
     if (plan.payroll) setStatus('statusPayrollBet', [credits(payroll.amount), credits(payroll.cap), msg(`game_${game}`), credits(bet)]);
-    else setStatus('statusWinsBet', [msg(`game_${game}`), credits(bet), signedPct.format(plan.ev)]);
+    else if (winsOn) setStatus('statusWinsBet', [msg(`game_${game}`), credits(bet), signedPct.format(plan.ev)]);
+    else setStatus('statusEdgeBet', [msg(`game_${game}`), credits(bet), signedPct.format(plan.ev)]);
     const res = await playRound(game, bet);
     if (!res.ok) {
       log.warn('edge_failed', { game, bet, status: res.status, error: res.data?.error });

@@ -230,6 +230,11 @@ progress shows at `chrome://on-device-internals`.
     credit of the rounds that end ahead), half Kelly on its simulated variance, until a
     winning round comes back without the bonus, which means the limit is reached. The
     bonus is booked as free income so it does not inflate the game's measured return.
+  - The same bets run any time a game's model pays over 100 % by itself (Forbes z
+    Chánova once a level of each upgrade is bought), logged as `edge_plan` with the
+    status "Paying game". Unlike the fund and the weekend bonus, that edge does not
+    run out, so these bets never hold work back: tickets go first and the bets fill
+    the time while energy refills.
   - Before Placené přesčasy and Hackathon, work waits while the energy refilling until
     Friday 17:00 still fits under the cap, so the event starts with a full bar. During
     Placené přesčasy work drains energy at once instead of keeping it for the grinder.

@@ -1700,5 +1700,19 @@
   },
   "ach_case_pen": {
     "message": "three pens in a row"
+  },
+  "statusEdgeBet": {
+    "message": "Paying game: $P1$ at $P2$ a round, $P3$ expected per credit",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
   }
 }
