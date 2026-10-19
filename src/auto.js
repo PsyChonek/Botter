@@ -942,8 +942,8 @@
   // How often to read the fund while no bet brings it: every 10 seconds once
   // the fund pays on the cheapest game, else every minute.
   function payrollPollMs(payroll, edge) {
-    if (!payroll || !Number.isFinite(edge)) return 60_000;
-    return payrollWorth(payroll) > edge / 2 ? 10_000 : 60_000;
+    if (!payroll || !Number.isFinite(edge)) return 5 * 60_000;
+    return payrollWorth(payroll) > edge / 2 ? 10_000 : 5 * 60_000;
   }
 
   // Konec kvartálu weekend: +50 % on the net profit of every round that ends
@@ -1023,6 +1023,35 @@
     const [y, m, d] = day.split('-').map(Number);
     const local = Date.UTC(y, m - 1, d, hour);
     return local - pragueOffset(local - pragueOffset(local));
+  }
+
+  // Next Produkce padá deploy (a new round starts every day at 9:00 Prague
+  // time) after now.
+  function nextDeployAt(now = Date.now()) {
+    const today = pragueAt(pragueDay(now), 9);
+    return now < today ? today : pragueAt(addDays(pragueDay(now), 1), 9);
+  }
+
+  // Milliseconds to wait before retrying a request the server turned away for
+  // going too fast, or null when the response is not that. A 429, a
+  // Retry-After header or an error text about speed counts. The wait is the
+  // Retry-After header (seconds or a date), else the body's retryAfterMs /
+  // retryAfter (seconds), else doubling from 1 s, at most RATE_LIMIT_MAX_MS.
+  const RATE_LIMIT_MAX_MS = 30_000;
+  const RATE_LIMIT_TEXT = /rate|too.?(fast|many|soon)|slow|cooldown|throttl|rychl|počkej|zpomal|animac/i;
+  function rateLimitWait(res, attempt = 0, now = Date.now()) {
+    if (!res || res.ok || !res.status) return null;
+    const text = `${res.data?.code ?? ''} ${res.data?.error ?? ''}`;
+    if (res.status !== 429 && !res.retryAfter && !RATE_LIMIT_TEXT.test(text)) return null;
+    let wait = NaN;
+    if (res.retryAfter) {
+      const seconds = Number(res.retryAfter);
+      wait = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(res.retryAfter) - now;
+    }
+    if (!(wait >= 0) && Number.isFinite(Number(res.data?.retryAfterMs))) wait = Number(res.data.retryAfterMs);
+    if (!(wait >= 0) && Number.isFinite(Number(res.data?.retryAfter))) wait = Number(res.data.retryAfter) * 1000;
+    if (!(wait >= 0)) wait = 1000 * 2 ** attempt;
+    return Math.min(RATE_LIMIT_MAX_MS, Math.max(250, wait));
   }
 
   // This week's event: { key, startAt, endAt, active }. A week runs from
@@ -1154,6 +1183,8 @@
     payrollHazard,
     payrollWorth,
     payrollPollMs,
+    nextDeployAt,
+    rateLimitWait,
     WINS_BONUS,
     bonusEdges,
     edgePlan,

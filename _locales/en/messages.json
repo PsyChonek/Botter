@@ -1717,5 +1717,70 @@
   },
   "optionsGameDelayHint": {
     "message": "The shortest time from the start of one game request (a round, a blackjack move, free spins, a ticket) to the next, shared by every open casino tab. Below 700 ms the bot's tick holds it back."
+  },
+  "optionsNetHeading": {
+    "message": "Speed and server responses"
+  },
+  "optionsNetHint": {
+    "message": "What goes to the server: game requests in the last minute and the average gap between the last ones, against the minimum set, and every API response (the app's and the bot's) per path. Limited is how often the server turned the bot away for going too fast (a 429, Retry-After or an error about speed), / how often the bot tried again after waiting. Time is the average response time of the bot's requests. Saved every 5 seconds from the last active tab."
+  },
+  "optionsNetSpeed": {
+    "message": "Game requests: $P1$ in the last minute, average gap $P2$ s (minimum $P3$ s). All API responses: $P4$ in the last minute. Counted since $P5$.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      },
+      "p4": {
+        "content": "$4"
+      },
+      "p5": {
+        "content": "$5"
+      }
+    }
+  },
+  "optionsNetErrorsHeading": {
+    "message": "Last errors"
+  },
+  "optionsNetEmpty": {
+    "message": "No request yet. Open the casino with the extension on."
+  },
+  "optionsNetReset": {
+    "message": "Reset"
+  },
+  "optionsNetNoAnswer": {
+    "message": "no answer"
+  },
+  "colNetPath": {
+    "message": "Path"
+  },
+  "colNetSeen": {
+    "message": "Responses"
+  },
+  "colNetBot": {
+    "message": "By the bot"
+  },
+  "colNetErrors": {
+    "message": "Errors"
+  },
+  "colNetLimited": {
+    "message": "Limited / retried"
+  },
+  "colNetTime": {
+    "message": "Time"
+  },
+  "colNetWhen": {
+    "message": "When"
+  },
+  "colNetStatus": {
+    "message": "Status"
+  },
+  "colNetError": {
+    "message": "Error"
   }
 }

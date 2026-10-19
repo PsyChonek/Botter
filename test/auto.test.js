@@ -759,10 +759,10 @@ test('payrollHazard waits for enough drops, then payrollWorth is that chance tim
 
 test('payrollPollMs reads the fund often once it pays', () => {
   assert.equal(A.payrollPollMs({ amount: 10_000, hazard: 4e-6 }, 0.027), 10_000);
-  assert.equal(A.payrollPollMs({ amount: 3000, hazard: 4e-6 }, 0.027), 60_000);
-  assert.equal(A.payrollPollMs({ amount: 10_000, hazard: null }, 0.027), 60_000);
-  assert.equal(A.payrollPollMs(null, 0.027), 60_000);
-  assert.equal(A.payrollPollMs({ amount: 10_000, hazard: 4e-6 }, null), 60_000);
+  assert.equal(A.payrollPollMs({ amount: 3000, hazard: 4e-6 }, 0.027), 300_000);
+  assert.equal(A.payrollPollMs({ amount: 10_000, hazard: null }, 0.027), 300_000);
+  assert.equal(A.payrollPollMs(null, 0.027), 300_000);
+  assert.equal(A.payrollPollMs({ amount: 10_000, hazard: 4e-6 }, null), 300_000);
 });
 
 test('edgePlan bets on the payroll fund once its chance times its size beats the edge', () => {
@@ -1049,4 +1049,22 @@ test('huntPlan opens cases for the knife, the Fabia and three pens', () => {
   const expected = 0.0026 * 5000 + (0.0064 / 3) * 2000 + (0.7992 / 6) ** 3 * 500;
   assert.ok(Math.abs(plan.value - expected) < 1e-9, `value ${plan.value}`);
   assert.equal(A.questGame({ key: 'rounds_x', text: 'Otevři 5 beden' }), 'cases');
+});
+
+test('rateLimitWait waits on a 429, Retry-After or a speed error and nothing else', () => {
+  assert.equal(A.rateLimitWait({ ok: true, status: 200 }), null);
+  assert.equal(A.rateLimitWait({ ok: false, status: 0, data: { error: 'timeout' } }), null);
+  assert.equal(A.rateLimitWait({ ok: false, status: 400, data: { error: 'Nemáš dost kreditů.' } }), null);
+  assert.equal(A.rateLimitWait({ ok: false, status: 429, retryAfter: '2', data: {} }), 2000);
+  assert.equal(A.rateLimitWait({ ok: false, status: 503, retryAfter: 'Mon, 19 Oct 2026 10:00:03 GMT', data: {} }, 0, Date.parse('2026-10-19T10:00:00Z')), 3000);
+  assert.equal(A.rateLimitWait({ ok: false, status: 400, data: { error: 'Moc rychle, počkej na animaci.', retryAfterMs: 1200 } }), 1200);
+  assert.equal(A.rateLimitWait({ ok: false, status: 429, data: {} }, 2), 4000);
+  assert.equal(A.rateLimitWait({ ok: false, status: 429, retryAfter: '600', data: {} }), 30_000);
+});
+
+test('nextDeployAt is the next 9:00 in Prague', () => {
+  assert.equal(A.nextDeployAt(Date.parse('2026-10-19T05:00:00Z')), Date.parse('2026-10-19T07:00:00Z'));
+  assert.equal(A.nextDeployAt(Date.parse('2026-10-19T07:00:00Z')), Date.parse('2026-10-20T07:00:00Z'));
+  // Winter time from 2026-10-25: 9:00 is 8:00 UTC.
+  assert.equal(A.nextDeployAt(Date.parse('2026-10-25T12:00:00Z')), Date.parse('2026-10-26T08:00:00Z'));
 });

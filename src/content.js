@@ -105,6 +105,7 @@
   const MAX_SUBMIT_TRIES = 3;
   const CRASH_UNLOCK = 3;
   const CRASH_POLL_MS = 60_000;
+  const CRASH_BET_POLL_MS = 10 * 60_000; // with the bot's bet already in the round
   const LEADERBOARDS = ['sprint', 'level', 'credits', 'biggest', 'losers', 'debtors'];
   const SPRINT_MAX_AGE_MS = 10 * 60_000;
   const CLEAN_LOAN = 500;
@@ -191,7 +192,7 @@
   let bjStake = 0; // stake of the open blackjack hand, to book doubles
   let sessionBase = 0; // total game net when the game bot was started
   const claimTried = {}; // kind -> last attempt, so a refused claim is not spammed
-  let crashPolledAt = 0;
+  let crashNextPoll = 0; // when Produkce padá is read again (crashStep)
   let shopReview = null; // { at, key, queue, goal } of the last shop review
   let sprint = null; // { rank, score, endAt, at } of this account in the weekly sprint
   let payroll = null; // { amount, seed, cap, at } of the shared payroll fund
@@ -291,6 +292,10 @@
     if (changes.bundle) bundle = changes.bundle.newValue ?? null;
     if (changes.payrollWatch) payrollWatch = changes.payrollWatch.newValue ?? null;
     if (changes.rounds) rounds = changes.rounds.newValue ?? {};
+    if (changes.netReset) {
+      net = emptyNet();
+      netDirty = true;
+    }
     render();
   });
 
@@ -336,9 +341,77 @@
     }
   }
 
+  // ---------- network: speed, server responses, rate limits ----------
+
+  // Every /api/ response the page sees (the app's and the bot's) counted per
+  // path, the bot's own calls with their time, rate limits and retries, the
+  // start of recent game requests and requests for the speed figures, and the
+  // last errors. Saved as `net` for the settings page every NET_SAVE_MS while
+  // something changed; the newest tab's figures win.
+  const NET_SAVE_MS = 5000;
+  const NET_RECENT = 120;
+  const NET_ERRORS = 20;
+  const emptyNet = () => ({ since: Date.now(), paths: {}, starts: [], seen: [], errors: [] });
+  let net = emptyNet();
+  let netDirty = false;
+  const netRow = (path) =>
+    (net.paths[path.split('?')[0]] ??= { seen: 0, bot: 0, errors: 0, limited: 0, retries: 0, ms: 0 });
+  function noteResponse(path, status, data) {
+    const row = netRow(path);
+    row.seen += 1;
+    net.seen = [...net.seen, Date.now()].slice(-NET_RECENT);
+    if (!status || status >= 400) {
+      row.errors += 1;
+      const error = String(data?.error ?? data?.code ?? '').slice(0, 160);
+      net.errors = [{ at: Date.now(), path, status, error }, ...net.errors].slice(0, NET_ERRORS);
+    }
+    netDirty = true;
+  }
+
+  // Bot calls the server turns away for speed are retried this many times
+  // after the wait it asks for (BotterAuto.rateLimitWait).
+  const RATE_RETRIES = 3;
+
   // Calls the casino API through the page hook, which adds the session token.
+  // Game requests are paced (see pace), and a request the server rejects for
+  // going too fast waits and is sent again instead of failing the step.
   async function api(path, body) {
-    if (G.PATH_GAME[path]) await pace();
+    const game = !!G.PATH_GAME[path];
+    for (let attempt = 0; ; attempt++) {
+      if (game) await pace();
+      const started = Date.now();
+      if (game) net.starts = [...net.starts, started].slice(-NET_RECENT);
+      const res = await send(path, body);
+      const row = netRow(path);
+      row.bot += 1;
+      row.ms += Date.now() - started;
+      // A failed fetch never reaches the page's response hook.
+      if (!res.status) noteResponse(path, 0, res.data);
+      netDirty = true;
+      const wait = A.rateLimitWait(res, attempt);
+      if (wait === null) return res;
+      row.limited += 1;
+      if (attempt >= RATE_RETRIES) {
+        log.warn('rate_limited', { path, status: res.status, error: res.data?.error, attempts: attempt + 1 });
+        return res;
+      }
+      row.retries += 1;
+      log.info('rate_limit_retry', { path, status: res.status, error: res.data?.error, wait, attempt: attempt + 1 });
+      if (game) {
+        // The next game request of any tab waits too.
+        lastGameRequest = Date.now() + wait - settings.gameDelayMs;
+        try {
+          localStorage.setItem(PACE_KEY, String(lastGameRequest));
+        } catch {
+          // See pace.
+        }
+      } else {
+        await sleep(wait);
+      }
+    }
+  }
+
+  function send(path, body) {
     const id = ++apiSeq;
     return new Promise((resolve) => {
       apiWaiters.set(id, resolve);
@@ -396,7 +469,10 @@
     // to the right account instead of an empty placeholder.
     if (early) early.push(event.data);
     else onHookEvent(event.data);
-    if (event.data.kind === 'response') resolveScreenWaiters(event.data);
+    if (event.data.kind === 'response') {
+      noteResponse(event.data.path, event.data.status, event.data.data);
+      resolveScreenWaiters(event.data);
+    }
   });
 
   // Every /api/ response the page sees, from the app or from the bot.
@@ -738,7 +814,7 @@
     lastType = null;
     workRun = false;
     bjStake = 0;
-    crashPolledAt = 0;
+    crashNextPoll = 0;
     grindPausedUntil = 0;
     for (const kind of Object.keys(claimTried)) delete claimTried[kind];
     if (readSwitch()?.to === id) sessionStorage.removeItem(SWITCH_KEY);
@@ -1672,14 +1748,18 @@
   async function crashStep() {
     const hunting = huntOn() && A.achievementTier(player, 'uptime_hero') !== null;
     if ((!settings.crashEnabled && !hunting) || player.level < CRASH_UNLOCK) return false;
-    if (Date.now() - crashPolledAt < CRASH_POLL_MS) return false;
-    crashPolledAt = Date.now();
+    if (Date.now() < crashNextPoll) return false;
+    crashNextPoll = Date.now() + CRASH_POLL_MS;
     const res = await api('/api/crash');
     const crash = res.data?.crash;
     if (res.ok && crash?.status !== 'running' && rounds.crash) saveRounds({ crash: null });
+    // No round runs until the next deploy, so there is nothing to read before it.
+    if (res.ok && crash && crash.status !== 'running') crashNextPoll = A.nextDeployAt();
     if (!res.ok || !crash || crash.status !== 'running') return true;
     if (crash.bets?.some((bet) => bet.me)) {
       markAccount({ crashRound: crash.startAt });
+      // The bet cashes out on its own; the round is only read again for the next one.
+      crashNextPoll = Date.now() + CRASH_BET_POLL_MS;
       return true;
     }
 
@@ -2669,5 +2749,10 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready);
     else ready();
     setInterval(tick, TICK_MS);
+    setInterval(() => {
+      if (!netDirty) return;
+      netDirty = false;
+      chrome.storage.local.set({ net });
+    }, NET_SAVE_MS);
   });
 })();

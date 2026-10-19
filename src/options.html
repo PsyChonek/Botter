@@ -257,6 +257,45 @@
           </div>
         </section>
 
+        <section class="card" aria-labelledby="net-heading">
+          <h2 id="net-heading" data-i18n="optionsNetHeading"></h2>
+          <p class="hint" data-i18n="optionsNetHint"></p>
+          <p id="netSpeed" aria-live="polite"></p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col" data-i18n="colNetPath"></th>
+                  <th scope="col" data-i18n="colNetSeen"></th>
+                  <th scope="col" data-i18n="colNetBot"></th>
+                  <th scope="col" data-i18n="colNetErrors"></th>
+                  <th scope="col" data-i18n="colNetLimited"></th>
+                  <th scope="col" data-i18n="colNetTime"></th>
+                </tr>
+              </thead>
+              <tbody id="netBody"></tbody>
+            </table>
+          </div>
+          <h3 data-i18n="optionsNetErrorsHeading"></h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col" data-i18n="colNetWhen"></th>
+                  <th scope="col" data-i18n="colNetPath"></th>
+                  <th scope="col" data-i18n="colNetStatus"></th>
+                  <th scope="col" data-i18n="colNetError"></th>
+                </tr>
+              </thead>
+              <tbody id="netErrors"></tbody>
+            </table>
+          </div>
+          <p id="netEmpty" class="hint" data-i18n="optionsNetEmpty"></p>
+          <div class="actions">
+            <button id="resetNet" type="button" data-i18n="optionsNetReset"></button>
+          </div>
+        </section>
+
         <section class="card" aria-labelledby="odds-heading">
           <h2 id="odds-heading" data-i18n="optionsOddsHeading"></h2>
           <p class="hint" data-i18n="optionsOddsHint"></p>

@@ -366,6 +366,59 @@ $('exportCapture').addEventListener('click', async () => {
   download('botter-capture.json', capture);
 });
 
+// Speed and server responses (the content script's `net`): game requests and
+// all responses in the last minute, the average gap between the last game
+// requests against the minimum set, then per path the responses seen (app and
+// bot), the bot's own calls, errors, rate limits with retries and the bot's
+// average time, busiest first, and the last errors.
+const clock = new Intl.DateTimeFormat(locale, { timeStyle: 'medium' });
+const seconds = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
+let netShown = null;
+function showNet(net = netShown) {
+  netShown = net;
+  const now = Date.now();
+  const starts = net?.starts ?? [];
+  const lastMinute = (times) => times.filter((t) => now - t < 60_000).length;
+  const recent = starts.slice(-20);
+  const gap = recent.length > 1 ? (recent.at(-1) - recent[0]) / (recent.length - 1) / 1000 : null;
+  const minimum = (Number(field('gameDelayMs').value) || 0) / 1000;
+  $('netSpeed').textContent = net
+    ? msg('optionsNetSpeed', [
+        num.format(lastMinute(starts)),
+        gap === null ? '-' : seconds.format(gap),
+        seconds.format(minimum),
+        num.format(lastMinute(net.seen ?? [])),
+        when.format(net.since),
+      ])
+    : '';
+  const rows = Object.entries(net?.paths ?? {})
+    .sort(([, a], [, b]) => b.seen + b.bot - (a.seen + a.bot))
+    .map(([path, row]) => {
+      const tr = document.createElement('tr');
+      tr.append(
+        cell(path),
+        cell(num.format(row.seen)),
+        cell(num.format(row.bot)),
+        cell(num.format(row.errors), row.errors ? 'neg' : ''),
+        cell(`${num.format(row.limited)} / ${num.format(row.retries)}`, row.limited ? 'neg' : ''),
+        cell(row.bot ? `${num.format(row.ms / row.bot)} ms` : '-'),
+      );
+      return tr;
+    });
+  $('netBody').replaceChildren(...rows);
+  const errors = (net?.errors ?? []).map((e) => {
+    const tr = document.createElement('tr');
+    tr.append(cell(clock.format(e.at)), cell(e.path), cell(e.status ? String(e.status) : msg('optionsNetNoAnswer')), cell(e.error || '-'));
+    return tr;
+  });
+  $('netErrors').replaceChildren(...errors);
+  $('netEmpty').hidden = rows.length > 0;
+}
+chrome.storage.local.get('net').then(({ net }) => showNet(net ?? null));
+// The last-minute figures age even when nothing new is saved.
+setInterval(() => showNet(), 5000);
+$('resetNet').addEventListener('click', () => chrome.storage.local.set({ net: null, netReset: Date.now() }));
+
 function cell(text, tone) {
   const td = document.createElement('td');
   td.textContent = text;
@@ -757,6 +810,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (changes.bank) showBankSize(changes.bank.newValue ?? {});
   if (changes.levels) showLevels(changes.levels.newValue);
   if (changes.hotfixRounds) showHotfixCount();
+  if (changes.net) showNet(changes.net.newValue ?? null);
   if (changes.settings && !saveTimer) fill({ ...DEFAULTS, ...changes.settings.newValue });
 });
 

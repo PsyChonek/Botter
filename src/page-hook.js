@@ -121,7 +121,7 @@
         response
           .clone()
           .json()
-          .then((data) => post({ kind: 'response', path: url.pathname, ok: response.ok, status: response.status, request, data, uid }))
+          .then((data) => post({ kind: 'response', path: url.pathname, ok: response.ok, status: response.status, retryAfter: response.headers.get('retry-after'), request, data, uid }))
           .catch(() => {});
       }
     } catch {}
@@ -162,7 +162,7 @@
           syncAppPlayer(data.player);
         } catch {}
       }
-      post({ kind: 'api-result', id, ok: res.ok, status: res.status, data });
+      post({ kind: 'api-result', id, ok: res.ok, status: res.status, retryAfter: res.headers.get('retry-after'), data });
     } catch (err) {
       post({ kind: 'api-result', id, ok: false, status: 0, data: { error: String(err) } });
     }

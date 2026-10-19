@@ -1717,5 +1717,70 @@
   },
   "optionsGameDelayHint": {
     "message": "Nejkratší doba od začátku jednoho herního požadavku (kolo, tah v blackjacku, free spiny, tiket) do dalšího, společná pro všechny otevřené karty kasina. Pod 700 ms ji zdržuje takt bota."
+  },
+  "optionsNetHeading": {
+    "message": "Rychlost a odpovědi serveru"
+  },
+  "optionsNetHint": {
+    "message": "Co se posílá na server: herní požadavky za poslední minutu a průměrný odstup mezi posledními, proti nastavenému minimu, a všechny odpovědi API (aplikace i bota) podle cesty. Omezeno je, kolikrát server poslal bota pryč, že jde moc rychle (429, Retry-After nebo chyba o rychlosti), / kolikrát to bot po čekání zkusil znovu. Čas je průměrná doba odpovědi na požadavky bota. Ukládá se každých 5 sekund z naposledy aktivní karty."
+  },
+  "optionsNetSpeed": {
+    "message": "Herní požadavky: $P1$ za poslední minutu, průměrný odstup $P2$ s (minimum $P3$ s). Všechny odpovědi API: $P4$ za poslední minutu. Počítáno od $P5$.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      },
+      "p4": {
+        "content": "$4"
+      },
+      "p5": {
+        "content": "$5"
+      }
+    }
+  },
+  "optionsNetErrorsHeading": {
+    "message": "Poslední chyby"
+  },
+  "optionsNetEmpty": {
+    "message": "Zatím žádný požadavek. Otevři kasino se zapnutým rozšířením."
+  },
+  "optionsNetReset": {
+    "message": "Vynulovat"
+  },
+  "optionsNetNoAnswer": {
+    "message": "bez odpovědi"
+  },
+  "colNetPath": {
+    "message": "Cesta"
+  },
+  "colNetSeen": {
+    "message": "Odpovědi"
+  },
+  "colNetBot": {
+    "message": "Od bota"
+  },
+  "colNetErrors": {
+    "message": "Chyby"
+  },
+  "colNetLimited": {
+    "message": "Omezeno / znovu"
+  },
+  "colNetTime": {
+    "message": "Čas"
+  },
+  "colNetWhen": {
+    "message": "Kdy"
+  },
+  "colNetStatus": {
+    "message": "Stav"
+  },
+  "colNetError": {
+    "message": "Chyba"
   }
 }

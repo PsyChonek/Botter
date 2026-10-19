@@ -68,6 +68,25 @@ progress shows at `chrome://on-device-internals`.
   kept in the page's localStorage, which every casino tab shares, so a second tab
   cannot double the speed. The bot ticks every 700 ms, which is the floor below that.
   Since 2026-10-17 the server does not let any game play faster than its animations.
+- **Rate limits** (`api` in `src/content.js`, `rateLimitWait` in `src/auto.js`): a bot
+  request the server turns away for going too fast (a 429, a `Retry-After` header, or
+  an error text about speed) waits what the server asks (`Retry-After`, the body's
+  `retryAfterMs` / `retryAfter`, else 1 s, 2 s, 4 s, at most 30 s) and is sent again,
+  up to 3 times, logged as `rate_limit_retry` and finally `rate_limited`. A game
+  request's wait also holds the next game request of every tab. Before this, such a
+  rejection counted as a failed round and paused that step for 10 minutes.
+- **Speed and server responses** (settings Games tab): game requests in the last
+  minute and the average gap between the last 20 against the minimum set, all API
+  responses (the app's and the bot's) in the last minute, then per path the responses
+  seen, the bot's own calls, errors, rate limits / retries and the bot's average
+  response time, and the last 20 errors. The content script keeps the figures in
+  `net`, saves them every 5 seconds while they change, and **Reset** starts over.
+- **Fewer reads**: Produkce padá is read once a minute only while a round runs and the
+  bot has no bet in it; with a bet every 10 minutes, and after the round has crashed
+  not again until the next 9:00 deploy. The payroll fund is read from the feed every 5
+  minutes while it is not worth betting on (every 10 seconds once it is), and not at
+  all while game responses bring it anyway. The profile (`/api/me`) is read only when
+  no response has given the player yet.
 - **Play on the game screen** (panel toggle, also in the settings Games tab, off by
   default; `src/screen.js`): every round the bot plays (game bot, grinder, standup)
   goes through the app's own game screen instead of the API. It opens the game from
