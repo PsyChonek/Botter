@@ -1,5 +1,5 @@
 // Monte Carlo model of Forbes z Chánova (hotfix) built from the client bundle
-// (index-DD7zv7qF.js, 2026-10-13). Facts from the client are marked CLIENT,
+// (index-DgZaIucP.js, retuned 2026-10-17). Facts from the client are marked CLIENT,
 // guesses about server behaviour the client does not show are marked GUESS.
 // Usage: node scripts/hotfix-sim.mjs [spins] [oncall] [fix] [review], with
 // VARIANT=perStep,option (e.g. 0,2) to run a single variant.
@@ -7,29 +7,31 @@ import { pathToFileURL } from 'node:url';
 
 // CLIENT: symbols 0-4 low (10 J Q K A), 5-10 high (hi1-hi6), 11 wild, 12 scatter.
 const LOW = 5, PAYING = 11, WILD = 11, SCATTER = 12;
-const K = 3.85;
+const K = 0.97;
 const q = (a) => a.map((x) => Math.max(1, Math.round(x * K)));
 const BASE = {
-  weights: [16, 16, 15, 15, 14, 10, 9, 8, 7, 6, 5, 2.2, 2.5],
-  rowWeights: [10, 20, 25, 22, 15, 8], // rows 2..7
+  weights: [16, 16, 15, 15, 14, 10, 9, 8, 7, 6, 5, 2.2, 3.4],
+  rowWeights: [25, 30, 20, 13, 8, 4], // rows 2..7
   // pays in % of the bet per way, for 3, 4, 5, 6 of a kind
-  pays: [q([1, 2, 3, 5]), q([1, 2, 3, 5]), q([1, 2, 4, 6]), q([1, 3, 4, 8]), q([2, 3, 5, 10]), q([2, 4, 8, 16]),
-    q([3, 5, 10, 20]), q([4, 6, 12, 30]), q([5, 8, 16, 40]), q([6, 10, 25, 60]), q([10, 20, 40, 100])],
-  wheelChance: 0.07,
+  pays: [q([25, 30, 40, 50]), q([25, 30, 40, 50]), q([30, 40, 50, 65]), q([30, 40, 55, 80]), q([40, 50, 70, 110]), q([45, 60, 90, 160]),
+    q([50, 70, 110, 220]), q([55, 80, 140, 280]), q([65, 110, 190, 400]), q([80, 140, 280, 550]), q([110, 220, 550, 1400])],
+  wheelChance: 0.05,
   freeWheelChance: 0.25,
   baseWheel: { wildreel: 14, wilds: 30, mystery: 24, sync: 18, maxways: 12, bonus: 2 },
   freeWheel: { wildreel: 10, wilds: 26, mystery: 22, maxways: 14, boost: 18, refactor: 10 },
   multCap: 50,
+  wildsCount: [2, 4],
+  mysteryCount: [4, 7],
 };
 // CLIENT: free spin options; +2 spins per scatter above 4, at most 50.
-const OPTIONS = [{ name: 'rollout', spins: 12, mult: 1 }, { name: 'canary', spins: 7, mult: 6 }, { name: 'bigbang', spins: 5, mult: 10 }];
+const OPTIONS = [{ name: 'rollout', spins: 10, mult: 1 }, { name: 'canary', spins: 5, mult: 6 }, { name: 'bigbang', spins: 4, mult: 8 }];
 const optionFor = (i, scatters) => ({ spins: Math.min(50, OPTIONS[i].spins + 2 * Math.max(0, scatters - 4)), mult: OPTIONS[i].mult });
 
 // CLIENT: upgrades. oncall adds to the scatter weight, fix to the wheel chance, review multiplies pays.
 function config(oncall = 0, fix = 0, review = 0) {
   const weights = BASE.weights.slice();
   weights[SCATTER] += [0, 0.07, 0.14, 0.2][oncall];
-  const pays = BASE.pays.map((p) => p.map((x) => Math.max(1, Math.round(x * [1, 1.025, 1.05, 1.075, 1.1][review]))));
+  const pays = BASE.pays.map((p) => p.map((x) => Math.max(1, Math.round(x * [1, 1.035, 1.07, 1.1, 1.135][review]))));
   return { ...BASE, weights, pays, wheelChance: BASE.wheelChance + [0, 0.004, 0.008, 0.012][fix] };
 }
 
@@ -85,13 +87,13 @@ function cascade(grid, remove, cfg, noLow) {
 
 const countScatters = (grid) => grid.reduce((n, reel) => n + reel.filter((x) => x === SCATTER).length, 0);
 
-// The modifier sizes the client does not give. MEASURED: from 491 recorded
-// spins at 2026-10-13 (scripts/hotfix-check.mjs), GUESS: not seen yet.
+// Modifier details. CLIENT: sizes from the config since 2026-10-17 (before it,
+// 491 spins on 2026-10-13 measured wilds 3 to 6 and mystery 5 to 9 cells).
+// MEASURED: from the 2026-10-13 spins (scripts/hotfix-check.mjs), GUESS: not seen yet.
 const G = {
-  // MEASURED: 'wilds' turns 3 to 6 cells wild on reels 2-6 (17 seen: 3, 8, 5 and 1 times).
-  wildsAdded: { 3: 3, 4: 8, 5: 5, 6: 1 },
+  wildsCount: BASE.wildsCount, // CLIENT: 'wilds' turns 2 to 4 cells wild, MEASURED: on reels 2-6
   wildsReels: [1, 2, 3, 4, 5],
-  mysteryCells: [5, 9], // MEASURED: 'mystery' resolves 5 to 9 random non-scatter cells to one paying symbol
+  mysteryCells: BASE.mysteryCount, // CLIENT: 'mystery' resolves 4 to 7 random non-scatter cells to one paying symbol
   // MEASURED: 'sync' copies the leftmost of 2 or 3 adjacent reels onto the others,
   // wilds included, even onto reel 6. GUESS: any reel can be the leftmost (5 seen, all from reel 3 on).
   syncReels: [2, 3],
@@ -109,7 +111,7 @@ function applyModifier(key, cfg, ctx) {
   if (key === 'wildreel') grid[randInt(1, 4)].fill(WILD);
   if (key === 'wilds') {
     const pool = cells(G.wildsReels);
-    for (let k = Number(pickKey(G.wildsAdded)); k > 0 && pool.length; k--) {
+    for (let k = randInt(...G.wildsCount); k > 0 && pool.length; k--) {
       const [r, i] = pool.splice(randInt(0, pool.length - 1), 1)[0];
       grid[r][i] = WILD;
     }
@@ -163,25 +165,30 @@ function freeGame(cfg, option, scatters, perStep) {
   return win;
 }
 
+// One paid spin with the free spins it triggers: { win, free } in units of the
+// bet, free being the free spins' share (null when none started).
+function round(cfg, option, perStep) {
+  const r = spin(cfg, false, {});
+  const free = r.scatters >= 4 || r.bonus ? freeGame(cfg, option, r.scatters, perStep) : null;
+  return { win: r.win + (free ?? 0), free };
+}
+
 function simulate(cfg, spins, option, perStep) {
   let paid = 0, freePaid = 0, triggers = 0, sq = 0;
   for (let n = 0; n < spins; n++) {
-    const r = spin(cfg, false, {});
-    let w = r.win;
-    if (r.scatters >= 4 || r.bonus) {
+    const { win, free } = round(cfg, option, perStep);
+    if (free !== null) {
       triggers++;
-      const f = freeGame(cfg, option, r.scatters, perStep);
-      freePaid += f;
-      w += f;
+      freePaid += free;
     }
-    paid += w;
-    sq += w * w;
+    paid += win;
+    sq += win * win;
   }
   const mean = paid / spins;
   return { rtp: mean, free: freePaid / spins, triggerEvery: spins / triggers, sd: Math.sqrt(sq / spins - mean * mean) };
 }
 
-export { LOW, PAYING, WILD, SCATTER, BASE, OPTIONS, G as GUESS, optionFor, config, evaluate, simulate };
+export { LOW, PAYING, WILD, SCATTER, BASE, OPTIONS, G as GUESS, optionFor, config, evaluate, round, simulate };
 
 // Run as a script, not when imported (scripts/hotfix-check.mjs uses the model).
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

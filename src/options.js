@@ -421,6 +421,7 @@ function showProfit(stats = {}) {
   showCombos(stats.combos ?? {});
   showRoulette(stats.roulette ?? {});
   showBaccarat(stats.baccarat ?? {});
+  showTables(stats.dice ?? {}, stats.cases ?? {});
 }
 
 // Baccarat model check per upgrade combination (BotterBaccarat.addHand): the
@@ -452,6 +453,44 @@ function showBaccarat(check) {
   }
   $('baccaratBody').replaceChildren(...rows);
   $('baccaratEmpty').hidden = rows.length > 0;
+}
+
+// Kostky and Case opening model checks per upgrade combination
+// (BotterDice.addRoll, BotterCases.addOpen): the rare outcomes seen against
+// the model (triples; red and gold drops), what the server paid against the
+// stakes and the model's return, the cost the credits show beyond the payout,
+// and payouts that broke the client's pays.
+function showTables(dice, cases) {
+  const K = globalThis.BotterCases;
+  const share = (seen, chance, rounds) => `${num.format(seen)} / ${num.format(Math.round(chance * rounds))}`;
+  const rows = [];
+  const add = (game, combo, row, rounds, rare, model, checked) => {
+    const upgrades = O.comboUpgrades(game, combo);
+    const hidden = row.wagered ? (row.paid - row.wagered - row.net) / row.wagered : null;
+    const tr = document.createElement('tr');
+    tr.append(
+      cell(msg(`game_${game}`)),
+      cell(Object.entries(upgrades).map(([name, level]) => `${name} ${level}`).join(', ')),
+      cell(num.format(rounds)),
+      cell(rare),
+      cell(row.wagered ? pct2.format(row.paid / row.wagered) : '-'),
+      cell(model === null ? '-' : pct2.format(model)),
+      cell(hidden === null ? '-' : pct2.format(hidden), hidden !== null && Math.abs(hidden) >= 0.001 ? 'neg' : ''),
+      cell(`${num.format(row.payErrors)} / ${num.format(checked)}`, row.payErrors ? 'neg' : ''),
+    );
+    rows.push(tr);
+  };
+  for (const [combo, row] of Object.entries(dice).sort(([a], [b]) => a.localeCompare(b))) {
+    const model = row.checkedWagered ? row.expected / row.checkedWagered : null;
+    add('dice', combo, row, row.rolls, share(row.triples, 1 / 36, row.rolls), model, row.checked);
+  }
+  for (const [combo, row] of Object.entries(cases).sort(([a], [b]) => a.localeCompare(b))) {
+    const upgrades = O.comboUpgrades('cases', combo);
+    const rare = ['red', 'gold'].map((r) => share(row.rarities?.[r] ?? 0, K.chance(r, upgrades), row.opens)).join(' · ');
+    add('cases', combo, row, row.opens, rare, K.rtp(upgrades), row.opens - row.unknown);
+  }
+  $('tablesBody').replaceChildren(...rows);
+  $('tablesEmpty').hidden = rows.length > 0;
 }
 
 // Roulette model check per zeros level (G.addRouletteSpin): zero pockets seen
@@ -510,19 +549,26 @@ function showCombos(combos) {
   $('comboEmpty').hidden = rows.length > 0;
 }
 
+// Sum of two model check rows, field by field, counts nested in arrays and
+// objects (dice faces, case rarities) included.
+function addCounts(a, b) {
+  const out = Array.isArray(b) ? [...(a ?? [])] : { ...a };
+  for (const [field, value] of Object.entries(b)) {
+    out[field] = typeof value === 'object' && value !== null ? addCounts(out[field], value) : (out[field] ?? 0) + value;
+  }
+  return out;
+}
+
 // Totals of several accounts' stats, for the "all accounts" profit view.
 function sumStats(list) {
-  const total = { games: {}, combos: {}, roulette: {}, baccarat: {}, work: { tickets: 0, net: 0, xp: 0 }, free: {} };
+  const total = { games: {}, combos: {}, roulette: {}, baccarat: {}, dice: {}, cases: {}, work: { tickets: 0, net: 0, xp: 0 }, free: {} };
   for (const stats of list) {
     for (const [game, row] of Object.entries(stats.games ?? {})) G.addDelta(total.games, { game, ...row });
     for (const [game, rows] of Object.entries(stats.combos ?? {})) {
       for (const [combo, row] of Object.entries(rows)) G.addDelta((total.combos[game] ??= {}), { ...row, game: combo });
     }
-    for (const check of ['roulette', 'baccarat']) {
-      for (const [key, row] of Object.entries(stats[check] ?? {})) {
-        const sum = (total[check][key] ??= {});
-        for (const [field, value] of Object.entries(row)) sum[field] = (sum[field] ?? 0) + value;
-      }
+    for (const check of ['roulette', 'baccarat', 'dice', 'cases']) {
+      for (const [key, row] of Object.entries(stats[check] ?? {})) total[check][key] = addCounts(total[check][key], row);
     }
     for (const key of Object.keys(total.work)) total.work[key] += stats.work?.[key] ?? 0;
     for (const [kind, amount] of Object.entries(stats.free ?? {})) total.free[kind] = (total.free[kind] ?? 0) + amount;

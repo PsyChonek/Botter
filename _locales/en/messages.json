@@ -1664,5 +1664,41 @@
         "content": "$3"
       }
     }
+  },
+  "game_dice": {
+    "message": "Dice"
+  },
+  "game_cases": {
+    "message": "Case opening"
+  },
+  "optionsTablesHeading": {
+    "message": "Dice and Case opening check"
+  },
+  "optionsTablesHint": {
+    "message": "Every Dice roll and every case opened, by the upgrades it was played with. The bot models Dice as fair dice with the commission taken from the net win, and Case opening by the item odds and values in the client. The server shows neither, so this checks them. Rare is the triples seen against the model for Dice, the red and gold items for Case opening. Server return is what the server paid against the stakes, Model what the client's rules give. Payout errors are rounds paid more than a credit off the model (such as a commission taken another way)."
+  },
+  "optionsTablesEmpty": {
+    "message": "No Dice roll or case opened since the check started."
+  },
+  "colTablesRare": {
+    "message": "Rare (seen / expected)"
+  },
+  "ach_dice_triple": {
+    "message": "triple win"
+  },
+  "ach_dice_edge": {
+    "message": "sum 4 or 17 win"
+  },
+  "ach_dice_taken": {
+    "message": "Small lost to a triple"
+  },
+  "ach_case_knife": {
+    "message": "gold knife from a case"
+  },
+  "ach_case_car": {
+    "message": "burning Fabia from a case"
+  },
+  "ach_case_pen": {
+    "message": "three pens in a row"
   }
 }

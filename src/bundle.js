@@ -1,6 +1,6 @@
 // Checks the casino's app bundle against the client facts the bot's models
 // copy: shop catalog, unlock levels, bet levels, roulette zeros, the payroll
-// fund's share, and every slot, blackjack and roulette table the odds models
+// fund's share, and every slot, table game and case table the odds models
 // were built from. A table the bundle no longer contains means the game math
 // changed and the model is stale. Used by the content script whenever the
 // bundle's file name changes, and by scripts/bundle.mjs. Classic script:
@@ -38,17 +38,17 @@
     ['slotingi', 'upgrades', '[0,0.5,1,1.5],'],
     ['slotingi', 'gulas upgrade', '[1,1.05,1.1,1.15,1.2],'],
     ['slotingi', 'mint upgrade', '[0,0.003,0.006,0.009];'],
-    ['hotfix', 'weights', 'weights:[16,16,15,15,14,10,9,8,7,6,5,2.2,2.5],rowWeights:[10,20,25,22,15,8]'],
-    ['hotfix', 'pay scale', '3.85,'],
-    ['hotfix', 'pays', '[1,2,3,5]),'],
-    ['hotfix', 'top pays', '[10,20,40,100])],wheelChance:0.07,freeWheelChance:0.25'],
-    ['hotfix', 'wheels', 'baseWheel:{wildreel:14,wilds:30,mystery:24,sync:18,maxways:12,bonus:2},freeWheel:{wildreel:10,wilds:26,mystery:22,maxways:14,boost:18,refactor:10},multCap:50'],
-    ['hotfix', 'free spins', 'spins:12,mult:1},'],
-    ['hotfix', 'free spins', 'spins:7,mult:6},'],
-    ['hotfix', 'free spins', 'spins:5,mult:10}'],
+    ['hotfix', 'weights', 'weights:[16,16,15,15,14,10,9,8,7,6,5,2.2,3.4],rowWeights:[25,30,20,13,8,4]'],
+    ['hotfix', 'pay scale', '=0.97,'],
+    ['hotfix', 'pays', '[25,30,40,50]),'],
+    ['hotfix', 'top pays', '[110,220,550,1400])],wheelChance:0.05,freeWheelChance:0.25'],
+    ['hotfix', 'wheels', 'baseWheel:{wildreel:14,wilds:30,mystery:24,sync:18,maxways:12,bonus:2},freeWheel:{wildreel:10,wilds:26,mystery:22,maxways:14,boost:18,refactor:10},multCap:50,wildsCount:[2,4],mysteryCount:[4,7]'],
+    ['hotfix', 'free spins', 'spins:10,mult:1},'],
+    ['hotfix', 'free spins', 'spins:5,mult:6},'],
+    ['hotfix', 'free spins', 'spins:4,mult:8}'],
     ['hotfix', 'upgrades', '[0,0.07,0.14,0.2],'],
     ['hotfix', 'fix upgrade', '[0,0.004,0.008,0.012],'],
-    ['hotfix', 'review upgrade', '[1,1.025,1.05,1.075,1.1];'],
+    ['hotfix', 'review upgrade', '[1,1.035,1.07,1.1,1.135];'],
     ['blackjack', 'ties upgrade', '[22,21,20,19,18],'],
     ['blackjack', 'blackjack pays', '[1,1.2,1.5];'],
     ['roulette', 'pays', 'číslo 35:1 · tucet a sloupec 2:1 · barva, sudá/lichá, polovina 1:1'],
@@ -59,6 +59,27 @@
     ['baccarat', 'pair pays', '{key:`ppair`,label:`Pár hráče`,pays:`10:1`}'],
     ['baccarat', 'tie refund', 'remíza vrací polovinu sázky na Hráče a Bankéře'],
     ['baccarat', 'card points', 'e.rank===`A`?1:[`10`,`J`,`Q`,`K`].includes(e.rank)?0:Number(e.rank)'],
+    ['dice', 'commission upgrade', '[0.1,0.07,0.04,0.015];'],
+    ['dice', 'insurance', 'Když padne trojice, vrátí se polovina sázek na Malá, Velká, Lichá a Sudá.'],
+    ['dice', 'sum pays', '{4:60,5:30,6:17,7:12,8:8,9:6,10:6,11:6,12:6,13:8,14:12,15:17,16:30,17:60}'],
+    ['dice', 'number pays', '[0,1,2,3],'],
+    ['dice', 'even-money pays', '`1:1`,`small`],[`Velká`,'],
+    ['dice', 'even-money pays', '`1:1`,`big`],[`Lichá / Sudá`,`lichý / sudý součet`,`1:1`,`odd`]'],
+    ['dice', 'triple pays', '[`Tři stejné`,`padnou tři stejná čísla`,`30:1`,`anytriple`]'],
+    ['dice', 'pair pays', '[`Dvě různá čísla`,`padnou obě čísla`,`5:1`,`combo12`]'],
+    ['dice', 'double pays', '[`Dvojice`,`číslo padne aspoň dvakrát`,`10:1`,`double1`]'],
+    ['dice', 'given triple pays', '[`Konkrétní trojice`,`třikrát to samé číslo`,`180:1`,`triple1`]'],
+    ['cases', 'rarity odds', '{blue:0.7992,purple:0.1598,pink:0.032,red:0.0064,gold:0.0026}'],
+    ['cases', 'supplier upgrade', '=0.0202,'],
+    ['cases', 'kitchen upgrade', '=0.0002;'],
+    ['cases', 'item pay', 'Math.max(1,Math.round(e*t.value))'],
+    // Case opening items as rarity, value and weight, in the client's order.
+    ...[
+      ['blue', 0.15, 1], ['blue', 0.2, 1], ['blue', 0.25, 1], ['blue', 0.3, 1], ['blue', 0.35, 1], ['blue', 0.45, 1],
+      ['purple', 1, 1], ['purple', 1.1, 1], ['purple', 1.3, 1], ['purple', 1.6, 1],
+      ['pink', 3, 1], ['pink', 4, 1], ['pink', 5, 1], ['red', 12, 2], ['red', 20, 1],
+      ['gold', 50, 6], ['gold', 100, 3], ['gold', 250, 1],
+    ].map(([rarity, value, weight]) => ['cases', `${rarity} item ${value}x`, `rarity:\`${rarity}\`,value:${value},weight:${weight}}`]),
     ['payroll', 'share', 'Mzdový fond · 0,5 % z každé sázky'],
     ['xp', 'big wins', '[{key:`big`,x:10,xp:15},{key:`mega`,x:25,xp:40},{key:`super`,x:50,xp:100}]'],
     ['bets', 'max bet by level', 'e>=15?1000:e>=10?400:e>=6?200:e>=3?100:40'],

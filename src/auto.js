@@ -3,6 +3,8 @@
 // Classic script: globalThis.BotterAuto in the extension, require() in Node.
 (function (root) {
   const BAC = root.BotterBaccarat ?? require('./baccarat.js');
+  const DICE = root.BotterDice ?? require('./dice.js');
+  const CASES = root.BotterCases ?? require('./cases.js');
   const CRASH_DOUBLING_MS = 4 * 60 * 60 * 1000;
   // A round that survives until the next 9:00 deploy pays every open bet at the
   // production multiplier reached after 24 hours.
@@ -476,6 +478,8 @@
     blackjack: /blackjack/,
     roulette: /rulet|roulette/,
     baccarat: /bakarat|baccarat/,
+    dice: /kostk|dice/,
+    cases: /case opening|bedn|beden/,
     crash: /produkce|crash/,
   };
 
@@ -600,6 +604,12 @@
     lottery_days: { reward: [300, 2000, 5000], tiers: [1, 7, 30] }, // tickets on 1 / 7 / 30 draws
     bac_pair: { reward: 1000 }, // win a baccarat bet on a pair
     bac_tie: { reward: 1000 }, // win a baccarat bet on a tie
+    dice_triple: { reward: 2000 }, // win a Kostky bet on a triple
+    dice_edge: { reward: 2000 }, // win a Kostky bet on the sum 4 or 17
+    dice_taken: { reward: 500 }, // lose a Malá or Velká bet to a triple
+    case_knife: { reward: 5000 }, // a gold knife from a case
+    case_car: { reward: 2000 }, // the burning Fabia from a case
+    case_pen: { reward: 500 }, // three pens in a row
   };
   // Per hand of the bot's strategy, from 2,000,000 simulated hands with no
   // upgrades (natural 4.76 %, five-card win 0.51 %; maxed upgrades 0.65 %).
@@ -639,10 +649,31 @@
     bac_pair: { spot: 'ppair', chance: BAC.PAIR_CHANCE, edge: 1 - BAC.spotRtp('ppair', {}) },
   };
 
+  // Kostky bets the hunt places: a sum of 4 (a 17 counts the same), any
+  // triple, and Malá, which a triple takes. Their edge depends on the
+  // commission, so it is taken at the player's upgrades.
+  const DICE_HUNT = {
+    dice_edge: { spot: 'sum4', chance: DICE.spotChance('sum4') },
+    dice_triple: { spot: 'anytriple', chance: DICE.spotChance('anytriple') },
+    dice_taken: { spot: DICE.BEST_SPOT, chance: 6 / 216 },
+  };
+
+  // The side bet with the best value over its own loss at this bet, or null:
+  // sides is { key: { spot, chance, edge } }, only open achievements count.
+  function bestSide(sides, open, bet) {
+    return Object.entries(sides)
+      .filter(([key]) => open(key))
+      .map(([key, side]) => ({ key, ...side, value: side.chance * achievementReward(key, 0) }))
+      .reduce((a, b) => (a && a.value - bet * a.edge >= b.value - bet * b.edge ? a : b), null);
+  }
+
   // Next game round worth playing for achievements, or null. Every round is
   // valued at the rewards it can unlock times their chance: a natural and a
   // five-card win per blackjack hand, a straight bet on 0 per roulette spin, a
-  // tie or pair bet per baccarat hand (whichever pays more), any round at night, and the next rounds-played tier spread over the rounds
+  // tie or pair bet per baccarat hand (whichever pays more), a sum, triple or
+  // Malá bet per Kostky roll (the same way), a gold knife, the burning Fabia
+  // and a third pen in a row per case (the pens counted as three in a row),
+  // any round at night, and the next rounds-played tier spread over the rounds
   // it still needs (finishing it costs those rounds, so a round is worth the
   // reward over that count). A round is played when that beats its expected
   // loss, on the game where the margin is biggest, at the smallest bet.
@@ -680,17 +711,24 @@
         own.push({ key: 'zero_hero', value: achievementReward('zero_hero', 0) / pockets });
         spot = ROULETTE_ZERO_SPOT;
       }
-      if (game === 'baccarat') {
-        // One side bet a hand, the one with the best value over its own loss.
-        const side = Object.entries(BAC_HUNT)
-          .filter(([key]) => open(key))
-          .map(([key, bac]) => ({ key, ...bac, value: bac.chance * achievementReward(key, 0) }))
-          .reduce((a, b) => (a && a.value - bet * a.edge >= b.value - bet * b.edge ? a : b), null);
+      if (game === 'baccarat' || game === 'dice') {
+        // One side bet a round, the one with the best value over its own loss.
+        const upgrades = player.upgrades?.dice;
+        const sides = game === 'baccarat' ? BAC_HUNT : Object.fromEntries(
+          Object.entries(DICE_HUNT).map(([key, side]) => [key, { ...side, edge: 1 - DICE.spotRtp(side.spot, upgrades) }]),
+        );
+        const side = bestSide(sides, open, bet);
         if (side) {
           own.push({ key: side.key, value: side.value });
           spot = side.spot;
           spotEdge = side.edge;
         }
+      }
+      if (game === 'cases') {
+        const upgrades = player.upgrades?.cases;
+        if (open('case_knife')) own.push({ key: 'case_knife', value: CASES.chance('gold', upgrades) * achievementReward('case_knife', 0) });
+        if (open('case_car')) own.push({ key: 'case_car', value: CASES.chance('car', upgrades) * achievementReward('case_car', 0) });
+        if (open('case_pen')) own.push({ key: 'case_pen', value: CASES.chance('pen', upgrades) ** 3 * achievementReward('case_pen', 0) });
       }
       const targets = [...shared, ...own];
       if (!targets.length) continue;

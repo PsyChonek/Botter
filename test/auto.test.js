@@ -1022,3 +1022,31 @@ test('lotteryNumbers leans toward often or rarely drawn numbers', () => {
   assert.ok(hits('hot') > 2.5);
   assert.ok(hits('cold') < 0.2);
 });
+
+test('huntPlan rolls Kostky for a triple, then a 4 or 17, then a triple against Malá', () => {
+  const ctx = huntCtx({ level: 25, unlocks: { roulette: 15, dice: 25 }, edges: { roulette: 1 - 36 / 39, dice: 0.076 } });
+  const done = { zero_hero: { tier: 1 }, regular: { tier: 3 } };
+  const plan = A.huntPlan(hunter({ achievements: done }), ctx);
+  assert.equal(plan.game, 'dice');
+  assert.equal(plan.spot, 'anytriple');
+  // 1 in 36 for 2,000 against 20 * (1 - 31 * 0.9 / 36) lost.
+  assert.ok(Math.abs(plan.value - 2000 / 36) < 1e-9, `value ${plan.value}`);
+  assert.ok(Math.abs(plan.loss - 20 * (1 - (1 + 30 * 0.9) / 36)) < 1e-9, `loss ${plan.loss}`);
+  const edge = A.huntPlan(hunter({ achievements: { ...done, dice_triple: { tier: 1 } } }), ctx);
+  assert.equal(edge.spot, 'sum4');
+  const taken = A.huntPlan(hunter({ achievements: { ...done, dice_triple: { tier: 1 }, dice_edge: { tier: 1 } } }), ctx);
+  assert.equal(taken.spot, 'small');
+  assert.deepEqual(taken.targets, ['dice_taken']);
+  assert.equal(A.questGame({ key: 'rounds_x', text: 'Hoď 10× Kostkami' }), 'dice');
+});
+
+test('huntPlan opens cases for the knife, the Fabia and three pens', () => {
+  const ctx = huntCtx({ level: 17, unlocks: { cases: 17 }, edges: { cases: 0.131 } });
+  const plan = A.huntPlan(hunter({ achievements: { regular: { tier: 3 } } }), ctx);
+  assert.equal(plan.game, 'cases');
+  assert.equal(plan.spot, null);
+  assert.deepEqual(plan.targets, ['case_knife', 'case_car', 'case_pen']);
+  const expected = 0.0026 * 5000 + (0.0064 / 3) * 2000 + (0.7992 / 6) ** 3 * 500;
+  assert.ok(Math.abs(plan.value - expected) < 1e-9, `value ${plan.value}`);
+  assert.equal(A.questGame({ key: 'rounds_x', text: 'Otevři 5 beden' }), 'cases');
+});

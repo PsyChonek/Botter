@@ -16,7 +16,9 @@
     blackjack: { unlock: 10 },
     hotfix: { unlock: 13, path: '/api/hotfix/spin' },
     roulette: { unlock: 15 },
+    cases: { unlock: 17, path: '/api/cases/open' },
     baccarat: { unlock: 20, path: '/api/baccarat/deal' },
+    dice: { unlock: 25, path: '/api/dice/roll' },
   };
   const LOTTERY_UNLOCK = 4;
   const GAME_KEYS = Object.keys(GAMES);
@@ -32,6 +34,8 @@
     '/api/hotfix/free': 'hotfix',
     '/api/roulette/spin': 'roulette',
     '/api/baccarat/deal': 'baccarat',
+    '/api/cases/open': 'cases',
+    '/api/dice/roll': 'dice',
     '/api/blackjack/deal': 'blackjack',
     '/api/blackjack/action': 'blackjack',
     '/api/lottery/buy': 'lottery',
@@ -49,8 +53,10 @@
     hotfix: { oncall: [3, 9000, 2], fix: [3, 8000, 2], review: [4, 7000, 1.8] },
     roulette: { zeros: [2, 15000, 2.5] },
     baccarat: { cut: [3, 12000, 2], push: [1, 25000, 1] },
+    dice: { house: [3, 15000, 2], insure: [1, 30000, 1] },
+    cases: { supplier: [3, 10000, 2], kitchen: [2, 20000, 2] },
   };
-  const SHOP_UNLOCK = { global: 1, blaze: 1, crash: 3, skeleton: 5, slotingi: 7, blackjack: 10, hotfix: 13, roulette: 15, baccarat: 20 };
+  const SHOP_UNLOCK = { global: 1, blaze: 1, crash: 3, skeleton: 5, slotingi: 7, blackjack: 10, hotfix: 13, roulette: 15, cases: 17, baccarat: 20, dice: 25 };
 
   // Next level of an upgrade: its price and the player level it needs.
   function upgradeOffer(upgrades, game, key) {
@@ -76,8 +82,8 @@
   // it to pay back.
   const UPGRADE_PLAN = [
     'blaze:star', 'skeleton:team', 'blaze:lucky', 'blaze:wild', 'skeleton:wild', 'slotingi:gulas', 'skeleton:deploy',
-    'slotingi:crown', 'roulette:zeros', 'baccarat:push', 'baccarat:cut', 'blackjack:ties', 'blackjack:bjpay',
-    'hotfix:review', 'hotfix:oncall', 'hotfix:fix',
+    'slotingi:crown', 'roulette:zeros', 'dice:house', 'dice:insure', 'baccarat:push', 'baccarat:cut', 'blackjack:ties', 'blackjack:bjpay',
+    'hotfix:review', 'hotfix:oncall', 'hotfix:fix', 'cases:supplier', 'cases:kitchen',
   ].map((entry) => {
     const [game, key] = entry.split(':');
     return { game, key };
@@ -155,7 +161,7 @@
     if (!game || !data?.player || typeof creditsBefore !== 'number') return null;
     let rounds = 1;
     let wagered;
-    if (path === '/api/roulette/spin' || path === '/api/baccarat/deal') {
+    if (path === '/api/roulette/spin' || path === '/api/baccarat/deal' || path === '/api/dice/roll') {
       wagered = Object.values(request?.bets ?? {}).reduce((sum, amount) => sum + amount, 0);
     } else if (path === '/api/blackjack/deal') {
       wagered = data.hand?.stake ?? request?.bet ?? 0;

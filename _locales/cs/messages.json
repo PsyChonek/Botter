@@ -1664,5 +1664,41 @@
         "content": "$3"
       }
     }
+  },
+  "game_dice": {
+    "message": "Kostky"
+  },
+  "game_cases": {
+    "message": "Case opening"
+  },
+  "optionsTablesHeading": {
+    "message": "Kontrola Kostek a Case opening"
+  },
+  "optionsTablesHint": {
+    "message": "Každý hod Kostkami a každá otevřená bedna podle upgradů, se kterými padly. Kostky bot modeluje jako férové kostky s provizí z čisté výhry, Case opening podle šancí a hodnot předmětů z klienta. Server to neukazuje, proto se to tady kontroluje. Vzácné je u Kostek počet trojic proti očekávání, u Case opening červené a zlaté předměty proti očekávání. Návratnost serveru je, co server vyplatil proti sázkám, Model co dávají pravidla klienta. Chyby výplaty jsou kola zaplacená o víc než kredit jinak, než říká model (třeba jinak počítaná provize)."
+  },
+  "optionsTablesEmpty": {
+    "message": "Od začátku kontroly žádný hod Kostkami ani otevřená bedna."
+  },
+  "colTablesRare": {
+    "message": "Vzácné (viděno / čekáno)"
+  },
+  "ach_dice_triple": {
+    "message": "výhra na trojici"
+  },
+  "ach_dice_edge": {
+    "message": "výhra na součet 4 nebo 17"
+  },
+  "ach_dice_taken": {
+    "message": "Malá prohraná na trojici"
+  },
+  "ach_case_knife": {
+    "message": "zlatý nůž z bedny"
+  },
+  "ach_case_car": {
+    "message": "zapálená Fabie z bedny"
+  },
+  "ach_case_pen": {
+    "message": "tři propisky v řadě"
   }
 }

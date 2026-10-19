@@ -7,6 +7,8 @@
   const G = globalThis.BotterGames;
   const BJ = globalThis.BotterBlackjack;
   const BAC = globalThis.BotterBaccarat;
+  const DICE = globalThis.BotterDice;
+  const CASES = globalThis.BotterCases;
   const A = globalThis.BotterAuto;
   const O = globalThis.BotterOdds;
   const Z = globalThis.BotterBlaze;
@@ -89,6 +91,8 @@
     combos: {}, // game -> upgrade combination (BotterOdds.combo) -> the same rows as games
     roulette: {}, // zeros level -> roulette model check (G.addRouletteSpin)
     baccarat: {}, // upgrade combination -> baccarat model check (BotterBaccarat.addHand)
+    dice: {}, // upgrade combination -> Kostky model check (BotterDice.addRoll)
+    cases: {}, // upgrade combination -> Case opening model check (BotterCases.addOpen)
     plainXp: {}, // rows like games, only rounds played off Hackathon weekends (BotterAuto.planXpRate)
     hotfixTest: null, // { spins, done } of the Forbes z Chánova test (hotfixTestStep)
     work: { tickets: 0, net: 0, xp: 0 },
@@ -426,6 +430,16 @@
         if (path === '/api/baccarat/deal') {
           const own = (data.player.upgrades ?? player?.upgrades)?.baccarat;
           BAC.addHand((stats.baccarat ??= {}), O.combo('baccarat', { baccarat: own }), own, request, data, delta.net);
+        }
+        if (path === '/api/dice/roll') {
+          const own = (data.player.upgrades ?? player?.upgrades)?.dice;
+          DICE.addRoll((stats.dice ??= {}), O.combo('dice', { dice: own }), own, request, data, delta.net);
+          const rule = DICE.payout(request?.bets, data.dice, own);
+          if (rule !== null && Math.abs(rule - (Number(data.payout) || 0)) > 1) log.warn('dice_payout_mismatch', { bets: request.bets, dice: data.dice, paid: data.payout, model: rule });
+        }
+        if (path === '/api/cases/open') {
+          const own = (data.player.upgrades ?? player?.upgrades)?.cases;
+          CASES.addOpen((stats.cases ??= {}), O.combo('cases', { cases: own }), request, data, delta.net);
         }
         if (!hackathonOn()) G.addDelta(stats.plainXp, delta);
         bookGrind(delta.net);
@@ -1173,12 +1187,16 @@
   const screenUnsent = (game, error) =>
     SCREEN_UNSENT.includes(error) || (error === 'button_missing' && game !== 'blackjack');
 
-  // spot is the roulette or baccarat bet; the screen can only lay chips on the
-  // even-money roulette spots, so other bets always go through the API.
-  // Baccarat bets the better of Hráč and Bankéř unless a side bet is asked for.
+  // Games the screen cannot play: Forbes z Chánova's free-spin pick needs its
+  // own clicks, and baccarat, Kostky and Case opening have no screen play yet.
+  const NO_SCREEN_GAMES = ['hotfix', 'baccarat', 'dice', 'cases'];
+
+  // spot is the roulette, baccarat or Kostky bet; the screen can only lay chips
+  // on the even-money roulette spots, so other bets always go through the API.
+  // Baccarat bets the better of Hráč and Bankéř and Kostky bets Malá unless
+  // another spot is asked for.
   async function playRound(game, bet, spot = settings.rouletteBet) {
-    // Forbes z Chánova has no screen play: its free-spin pick needs its own clicks. Nor has baccarat yet.
-    if (settings.playOnScreen && game !== 'hotfix' && game !== 'baccarat' && (game !== 'roulette' || G.ROULETTE_BETS.includes(spot))) {
+    if (settings.playOnScreen && !NO_SCREEN_GAMES.includes(game) && (game !== 'roulette' || G.ROULETTE_BETS.includes(spot))) {
       const res = await playOnScreen(game, bet, spot);
       if (res.ok || res.status !== 0) return res;
       log.warn('screen_play_failed', { game, bet, error: res.data?.error });
@@ -1190,6 +1208,7 @@
       const side = BAC.SPOTS.includes(spot) ? spot : BAC.bestSpot(player.upgrades?.baccarat);
       return api('/api/baccarat/deal', { bets: { [side]: bet } });
     }
+    if (game === 'dice') return api('/api/dice/roll', { bets: { [DICE.SPOTS.includes(spot) ? spot : DICE.BEST_SPOT]: bet } });
     if (game === 'hotfix') return playHotfix(bet);
     return api(G.GAMES[game].path, { bet });
   }
