@@ -1029,3 +1029,26 @@ test('edgePlan keeps a paying game under the auto size cap, smallest level inclu
   assert.equal(A.edgePlan({ ...ctx, caps: { hotfix: 50 } }).bet, 40);
   assert.equal(A.edgePlan({ ...ctx, caps: { hotfix: 14 } }), null);
 });
+
+test('speedLearn waits just past what the server refused and keeps probing shorter', () => {
+  const path = '/api/roulette/spin';
+  let speed = {};
+  assert.equal(A.speedWait(speed, path, 4200, 32_000), 4200);
+  // Refused 4,200 ms after the spin: the next waits just past it.
+  speed = A.speedLearn(speed, path, 4200, 4200, true);
+  assert.equal(A.speedWait(speed, path, 4200, 32_000), 4350);
+  // A refusal shorter than the learned wait does not shorten it.
+  speed = A.speedLearn(speed, path, 4200, 3000, true);
+  assert.equal(A.speedWait(speed, path, 4200, 32_000), 4350);
+  // Ten accepted in a row trim 50 ms.
+  for (let i = 0; i < 9; i++) speed = A.speedLearn(speed, path, 4200, 4350, false);
+  assert.equal(A.speedWait(speed, path, 4200, 32_000), 4350);
+  speed = A.speedLearn(speed, path, 4200, 4350, false);
+  assert.equal(A.speedWait(speed, path, 4200, 32_000), 4300);
+  // A game with no animation never waits below nothing, nor above the cap.
+  let other = {};
+  for (let i = 0; i < 30; i++) other = A.speedLearn(other, '/api/cases/open', 0, 0, false);
+  assert.equal(A.speedWait(other, '/api/cases/open', 0, 32_000), 0);
+  assert.equal(A.speedWait(A.speedLearn({}, '/api/hotfix/free', 0, 40_000, true), '/api/hotfix/free', 0, 32_000), 32_000);
+  assert.deepEqual([0, 1, 2].map(A.speedRetryWait), [150, 300, 600]);
+});

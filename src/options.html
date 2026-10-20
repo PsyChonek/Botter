@@ -228,6 +228,8 @@
           <h2 id="games-heading" data-i18n="optionsGamesHeading"></h2>
           <p class="hint" data-i18n="optionsGamesHint"></p>
           <label class="check"><span data-i18n="optionsPlayOnScreen"></span><input type="checkbox" role="switch" name="playOnScreen" /></label>
+          <label class="check"><span data-i18n="optionsMaxSpeed"></span><input type="checkbox" role="switch" name="maxSpeed" aria-describedby="maxSpeedHint" /></label>
+          <p id="maxSpeedHint" class="hint" data-i18n="optionsMaxSpeedHint"></p>
           <div class="grid">
             <div>
               <label for="gameBet" data-i18n="optionsGameBet"></label>
@@ -249,7 +251,7 @@
               <label for="reserve" data-i18n="optionsReserve"></label>
               <input id="reserve" name="reserve" type="number" min="0" step="10" />
             </div>
-            <div>
+            <div data-when="!maxSpeed">
               <label for="gameDelayMs" data-i18n="optionsGameDelay"></label>
               <input id="gameDelayMs" name="gameDelayMs" type="number" min="0" step="100" aria-describedby="gameDelayHint" />
               <p id="gameDelayHint" class="hint" data-i18n="optionsGameDelayHint"></p>

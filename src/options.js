@@ -1,6 +1,7 @@
 const msg = (key, subs) => chrome.i18n.getMessage(key, subs) || key;
 
 const CHECKBOXES = [
+  'maxSpeed',
   'guessUnknown',
   'stopAtNorm',
   'autoClaim',
@@ -93,6 +94,7 @@ const DEFAULTS = {
   takeProfit: 0,
   reserve: 0,
   gameDelayMs: 1500,
+  maxSpeed: true,
 };
 
 const G = globalThis.BotterGames;
@@ -175,8 +177,10 @@ function showLotteryLines() {
 
 // data-when="name" shows an element while that checkbox is ticked or that
 // number is above 0; data-when="name:value" while that field equals value.
-// Space-separated conditions must all hold; "|" separates alternatives.
+// Space-separated conditions must all hold; "|" separates alternatives; a
+// leading "!" turns a condition around.
 function holds(condition) {
+  if (condition.startsWith('!')) return !holds(condition.slice(1));
   const [name, value] = condition.split(':');
   const el = field(name);
   if (el.type === 'checkbox') return el.checked;
@@ -382,7 +386,7 @@ function showNet(net = netShown) {
   const lastMinute = (times) => times.filter((t) => now - t < 60_000).length;
   const recent = starts.slice(-20);
   const gap = recent.length > 1 ? (recent.at(-1) - recent[0]) / (recent.length - 1) / 1000 : null;
-  const minimum = (Number(field('gameDelayMs').value) || 0) / 1000;
+  const minimum = field('maxSpeed').checked ? 0 : (Number(field('gameDelayMs').value) || 0) / 1000;
   $('netSpeed').textContent = net
     ? msg('optionsNetSpeed', [
         num.format(lastMinute(starts)),

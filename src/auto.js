@@ -1015,6 +1015,38 @@
     return Math.min(RATE_LIMIT_MAX_MS, Math.max(250, wait));
   }
 
+  // Max speed: game requests wait only as long after the last game response as
+  // the server takes, learned per path of that response. The wait is the app's
+  // animation of the response (GameData.animationLockMs, 0 for most) plus a
+  // learned extra per path, which may be negative down to no wait at all. A
+  // refused request (the server's "počkej na animaci") raises the extra to just
+  // past the wait it refused; SPEED_PROBE accepted in a row trim it, so it
+  // keeps probing for a shorter one. speed: { [path]: { extra, streak } }.
+  const SPEED_STEP_UP_MS = 150;
+  const SPEED_STEP_DOWN_MS = 50;
+  const SPEED_PROBE = 10;
+  const SPEED_RETRIES = 6;
+
+  // Milliseconds to wait after a response on path whose animation takes lock ms.
+  function speedWait(speed, path, lock, max) {
+    return Math.min(max, Math.max(0, lock + (speed?.[path]?.extra ?? 0)));
+  }
+
+  // The table after a game request sent waited ms after a response on path
+  // (whose animation took lock ms) was refused or accepted.
+  function speedLearn(speed, path, lock, waited, refused) {
+    const row = speed?.[path] ?? { extra: 0, streak: 0 };
+    let next;
+    if (refused) next = { extra: Math.max(row.extra, waited - lock + SPEED_STEP_UP_MS), streak: 0 };
+    else if (row.streak + 1 < SPEED_PROBE) next = { ...row, streak: row.streak + 1 };
+    else next = { extra: Math.max(-lock, row.extra - SPEED_STEP_DOWN_MS), streak: 0 };
+    return { ...speed, [path]: next };
+  }
+
+  // Wait before retrying a refused game request at max speed: doubling from
+  // the step up, instead of the server's own hint, which is always 30 s.
+  const speedRetryWait = (attempt) => SPEED_STEP_UP_MS * 2 ** attempt;
+
   // This week's event: { key, startAt, endAt, active }. A week runs from
   // Monday 9:00, like the sprint.
   function weekendEvent(now = Date.now()) {
@@ -1144,6 +1176,10 @@
     lotteryNumbers,
     nextDeployAt,
     rateLimitWait,
+    SPEED_RETRIES,
+    speedWait,
+    speedLearn,
+    speedRetryWait,
     WINS_BONUS,
     bonusEdges,
     edgePlan,

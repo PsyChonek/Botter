@@ -68,6 +68,22 @@ progress shows at `chrome://on-device-internals`.
   kept in the page's localStorage, which every casino tab shares, so a second tab
   cannot double the speed. The bot ticks every 700 ms, which is the floor below that.
   Since 2026-10-17 the server does not let any game play faster than its animations.
+- **Max speed** (settings Games tab, on by default since 2026-10-20, `maxSpeed`):
+  instead of that minimum, a game request waits only as long after the last game
+  response as the server takes. The wait is learned per path of that response
+  (`speedWait` / `speedLearn` in `src/auto.js`, `learnSpeed` in `src/content.js`):
+  the app's animation of the response where it is known (`animationLockMs`: roulette,
+  Forbes triggers and free spins), plus a learned extra that starts at 0 and may go
+  negative down to no wait. A first attempt the server refuses ("počkej na animaci")
+  raises the extra to 150 ms past the wait it refused, and every 10 accepted in a row
+  trim 50 ms, so the bot settles just above the server's lock and keeps probing for a
+  shorter one. A refused request is retried after 150 ms, 300 ms, 600 ms and so on (6
+  times) instead of the 30 s the server asks for, and only first attempts teach the
+  wait, so one long animation does not slow every later round. A step that played
+  runs again at once instead of on the next tick. The learned waits sit in the page's
+  localStorage (`botter:speed`), shared by every casino tab, and refusals are logged
+  as `speed_learned`. Off, the minimum above applies and known animations are held
+  1 s longer.
 - **Rate limits** (`api` in `src/content.js`, `rateLimitWait` in `src/auto.js`): a bot
   request the server turns away for going too fast (a 429, a `Retry-After` header, or
   an error text about speed) waits what the server asks (`Retry-After`, the body's

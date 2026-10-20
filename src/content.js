@@ -32,6 +32,7 @@
     takeProfit: 0,
     reserve: 0,
     gameDelayMs: 1500,
+    maxSpeed: true, // game requests wait only what the server takes (learnSpeed), not gameDelayMs
     playOnScreen: false,
     hotfixForce: false, // test switch: send hotfixForceValue as force on every Forbes z Chánova spin
     hotfixForceValue: '',
@@ -323,40 +324,76 @@
 
   // Game requests (every path in G.PATH_GAME: rounds, blackjack actions,
   // Forbes free spins, lottery tickets, rounds on the game screen) start at
-  // least settings.gameDelayMs apart. The last start is kept in the page's
-  // localStorage, which every casino tab shares, so a second tab or another
-  // code path never plays faster than the setting. The tick (TICK_MS) is the
-  // floor below that.
-  const PACE_KEY = 'botter:lastGameRequest';
-  let lastGameRequest = 0;
+  // least settings.gameDelayMs apart, or with max speed (settings.maxSpeed)
+  // only as long after the last game response as the server takes (see
+  // learnSpeed). The earliest next start is kept in the page's localStorage,
+  // which every casino tab shares, so a second tab or another code path never
+  // plays faster.
+  const PACE_KEY = 'botter:nextGameAt';
+  let nextGameAt = 0;
+  function readNextGame() {
+    try {
+      return Math.max(nextGameAt, Number(localStorage.getItem(PACE_KEY)) || 0);
+    } catch {
+      // Storage blocked: this tab's own clock still paces it.
+      return nextGameAt;
+    }
+  }
   async function pace() {
     for (;;) {
-      let last = lastGameRequest;
-      try {
-        last = Math.max(last, Number(localStorage.getItem(PACE_KEY)) || 0);
-      } catch {
-        // Storage blocked: this tab's own clock still paces it.
-      }
-      const wait = last + settings.gameDelayMs - Date.now();
+      const wait = readNextGame() - Date.now();
       if (wait <= 0) break;
       await sleep(wait);
     }
-    lastGameRequest = Date.now();
-    try {
-      localStorage.setItem(PACE_KEY, String(lastGameRequest));
-    } catch {
-      // See above.
-    }
+    holdGames(settings.maxSpeed ? 0 : settings.gameDelayMs);
   }
 
   // Holds the next game request of every tab until ms from now.
   function holdGames(ms) {
-    lastGameRequest = Math.max(lastGameRequest, Date.now() + ms - settings.gameDelayMs);
+    nextGameAt = Math.max(readNextGame(), Date.now() + ms);
     try {
-      localStorage.setItem(PACE_KEY, String(lastGameRequest));
+      localStorage.setItem(PACE_KEY, String(nextGameAt));
     } catch {
-      // See pace.
+      // See readNextGame.
     }
+  }
+
+  // Max speed: the wait the server takes after each game response, learned
+  // per path (BotterAuto.speedLearn) from the bot's own game requests and kept
+  // in localStorage for every tab. lastGame is the last game response seen,
+  // the one the next request waits after.
+  const SPEED_KEY = 'botter:speed';
+  let speed = {};
+  try {
+    speed = JSON.parse(localStorage.getItem(SPEED_KEY)) ?? {};
+  } catch {
+    // Nothing learned yet, or storage blocked.
+  }
+  let lastGame = null;
+  let gameRequests = 0;
+  const speedHold = (game) => A.speedWait(speed, game.path, game.lock, ANIM_LOCK_MAX_MS);
+
+  // A game response at max speed, the bot's or the app's: the next game
+  // request waits after it. The bot's own are noted as soon as they return,
+  // since the page hook can report them to onResponse a moment later.
+  function noteGame(path, data) {
+    lastGame = { path, at: Date.now(), lock: G.animationLockMs(path, data) };
+    holdGames(speedHold(lastGame));
+  }
+
+  // Learns from a game request sent waited ms after the response game. Only
+  // the server's animation refusals count, and only within the longest hold,
+  // so an unrelated refusal cannot stretch every later wait.
+  function learnSpeed(game, waited, res) {
+    const refused = res.status === 429 && /animac/i.test(String(res.data?.error ?? ''));
+    if (refused && waited > ANIM_LOCK_MAX_MS) return;
+    speed = A.speedLearn(speed, game.path, game.lock, waited, refused);
+    try {
+      localStorage.setItem(SPEED_KEY, JSON.stringify(speed));
+    } catch {
+      // See readNextGame.
+    }
+    if (refused) log.info('speed_learned', { path: game.path, waited, wait: speedHold(game) });
   }
 
   // ---------- network: speed, server responses, rate limits ----------
@@ -387,7 +424,8 @@
   }
 
   // Bot calls the server turns away for speed are retried this many times
-  // after the wait it asks for (BotterAuto.rateLimitWait).
+  // after the wait it asks for (BotterAuto.rateLimitWait); game requests at
+  // max speed more often, after short waits (BotterAuto.speedRetryWait).
   const RATE_RETRIES = 3;
 
   // Calls the casino API through the page hook, which adds the session token.
@@ -395,10 +433,15 @@
   // going too fast waits and is sent again instead of failing the step.
   async function api(path, body) {
     const game = !!G.PATH_GAME[path];
+    const fast = game && settings.maxSpeed;
     for (let attempt = 0; ; attempt++) {
       if (game) await pace();
       const started = Date.now();
-      if (game) net.starts = [...net.starts, started].slice(-NET_RECENT);
+      const after = lastGame;
+      if (game) {
+        gameRequests += 1;
+        net.starts = [...net.starts, started].slice(-NET_RECENT);
+      }
       const res = await send(path, body);
       const row = netRow(path);
       row.bot += 1;
@@ -406,18 +449,26 @@
       // A failed fetch never reaches the page's response hook.
       if (!res.status) noteResponse(path, 0, res.data);
       netDirty = true;
-      const wait = A.rateLimitWait(res, attempt);
+      let wait = A.rateLimitWait(res, attempt);
+      if (fast && wait !== null) wait = A.speedRetryWait(attempt);
+      // Only a first attempt says how long the wait after that response must be:
+      // a retry's wait also holds the retry waits, which one long animation
+      // would otherwise carry over to every later round.
+      if (fast && after && res.status && attempt === 0) learnSpeed(after, started - after.at, res);
+      if (fast && res.ok) noteGame(path, res.data);
       if (wait === null) return res;
       row.limited += 1;
-      if (attempt >= RATE_RETRIES) {
+      if (attempt >= (fast ? A.SPEED_RETRIES : RATE_RETRIES)) {
         log.warn('rate_limited', { path, status: res.status, error: res.data?.error, attempts: attempt + 1 });
         return res;
       }
       row.retries += 1;
       const hint = res.retryAfter ?? res.data?.retryAfterMs ?? res.data?.retryAfter;
       log.info('rate_limit_retry', { path, status: res.status, error: res.data?.error, hint, wait, attempt: attempt + 1 });
-      // A game request's wait holds the next game request of every tab too.
-      if (game) holdGames(wait);
+      // A game request's wait holds the next game request of every tab too; at
+      // max speed it is at least the newly learned wait after the last response.
+      if (fast && after) holdGames(Math.max(wait, after.at + speedHold(after) - Date.now()));
+      else if (game) holdGames(wait);
       else await sleep(wait);
     }
   }
@@ -505,7 +556,12 @@
       return;
     }
     const lock = G.animationLockMs(path, data);
-    if (lock) holdGames(Math.min(ANIM_LOCK_MAX_MS, lock + ANIM_LOCK_MARGIN_MS));
+    if (settings.maxSpeed && G.PATH_GAME[path]) {
+      // The bot's own response was noted when it returned (noteGame in api).
+      if (lastGame?.path !== path || Date.now() - lastGame.at > 1000) noteGame(path, data);
+    } else if (lock) {
+      holdGames(Math.min(ANIM_LOCK_MAX_MS, lock + ANIM_LOCK_MARGIN_MS));
+    }
     if (path === '/api/profile/reset') {
       resetStats();
       render();
@@ -2249,6 +2305,7 @@
   async function tick() {
     if ((!settings.enabled && !settings.gamesEnabled && !settings.autoMode) || busy || switching) return;
     busy = true;
+    const sent = gameRequests;
     try {
       await step();
     } catch (err) {
@@ -2256,6 +2313,8 @@
     } finally {
       busy = false;
     }
+    // At max speed a step that played goes again at once instead of on the next tick.
+    if (settings.maxSpeed && gameRequests !== sent) setTimeout(tick);
   }
 
   function startWork() {

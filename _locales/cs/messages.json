@@ -279,6 +279,12 @@
   "optionsReserve": {
     "message": "Rezerva: kredity, které se nikdy nevsadí ani neutratí"
   },
+  "optionsMaxSpeed": {
+    "message": "Maximální rychlost: hrát tak rychle, jak server dovolí"
+  },
+  "optionsMaxSpeedHint": {
+    "message": "Herní požadavky čekají po každé herní odpovědi jen tak dlouho, kolik server potřebuje, naučeno pro každou hru zvlášť: požadavek, který odmítne („počkej na animaci“), zvedne čekání té hry těsně nad odmítnuté a zkusí se znovu po 0,15 s, 0,3 s, 0,6 s a dál místo 30 s, které chce server, a každých 10 přijatých za sebou čekání zkrátí, takže bot pořád hledá nejkratší. Naučená čekání sdílí všechny otevřené karty kasina. Vypnuté: každý herní požadavek čeká minimální dobu níže."
+  },
   "optionsGameDelay": {
     "message": "Minimální odstup her (ms)"
   },
