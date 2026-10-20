@@ -739,7 +739,7 @@
     "message": "Sázka při farmění XP"
   },
   "optionsGrindHint": {
-    "message": "Auto hra vybere odemčenou hru s nejnižší simulovanou výhodou kasina při tvých vylepšeních. XP za kolo roste přímo úměrně sázce, takže každá výše sázky stojí za XP stejně: sázka určuje jen to, jak rychle XP přibývá a kolik je v jednom kole ve hře. U limitu grinder přejde na menší sázku a při denním rozpočtu nikdy nevsadí víc, než z něj zbývá. Auto nastaví sázku podle kreditů nad rezervou, bez toho, co ještě dlužíš na půjčce: hra smí vsadit nejvýš tolik, kolik vychází na 185 směrodatných odchylek jednoho kola, takže Forbes z Chánova si drží asi 2 100 sázek a ruleta asi 185. Hra, která na kredity moc kolísá, přenechá místo další nejlevnější, a stejný limit platí i pro hry, které vydělávají."
+    "message": "Auto hra vybere odemčenou hru s nejnižší simulovanou výhodou kasina při tvých vylepšeních. XP za kolo roste přímo úměrně sázce, takže každá výše sázky stojí za XP stejně: sázka určuje jen to, jak rychle XP přibývá a kolik je v jednom kole ve hře. U limitu grinder přejde na menší sázku a při denním rozpočtu nikdy nevsadí víc, než z něj zbývá. Auto nastaví sázku podle kreditů nad rezervou, bez toho, co ještě dlužíš na půjčce: hra smí vsadit nejvýš tolik, kolik vychází na 185 směrodatných odchylek jednoho kola, takže Forbes z Chánova si drží asi 1 200 sázek a ruleta asi 185. Hra, která na kredity moc kolísá, přenechá místo další nejlevnější, a stejný limit platí i pro hry, které vydělávají."
   },
   "optionsShopHeading": {
     "message": "Vylepšení z obchodu"

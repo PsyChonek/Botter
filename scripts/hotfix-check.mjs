@@ -87,6 +87,9 @@ for (const grid of clean) {
 const chi = seen.reduce((sum, n, s) => sum + (n - expected[s]) ** 2 / expected[s], 0);
 console.log(`   symbols: chi-square ${chi.toFixed(1)} on ${seen.length - 1} degrees of freedom (above ${(seen.length - 1 + 3 * Math.sqrt(2 * (seen.length - 1))).toFixed(0)} the weights differ); wilds on reels 1 and 6: ${wildsOff[0]}`);
 console.log(`   scatters per spin ${(seen[SCATTER] / clean.length).toFixed(2)}`);
+// The model never puts two scatters on one reel, as the server never has (drawReel in hotfix-sim.mjs).
+const doubled = all.flatMap(({ round }) => round.steps).filter((step) => step.reels.some((reel) => reel.filter((s) => s === SCATTER).length > 1)).length;
+console.log(`   grids with two scatters on a reel: ${doubled} (the model allows none)`);
 
 // 3. The Hotfix wheel: how often it turns and what it picks.
 const mods = (list) => list.filter((round) => round.mod).map((round) => round.mod);

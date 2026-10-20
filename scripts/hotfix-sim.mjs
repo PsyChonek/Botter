@@ -48,11 +48,20 @@ const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 function reelWeights(cfg, reel, noLow) {
   return cfg.weights.map((w, s) => (s === WILD && (reel < 1 || reel > 4)) || (noLow && s < LOW) ? 0 : w);
 }
+// MEASURED: a reel never holds two scatters. Not one of 6,483 recorded grids
+// (spins, cascade steps and free spins, 2026-10-13 to 2026-10-20) had two,
+// and the scatters per spin fit this rule (0 to 3: 1,079 / 759 / 230 / 42 seen
+// in 2,110 spins, 1,075 / 759 / 230 / 39 modelled) where scatters on any cell
+// gave 1,075 / 723 / 242 / 55 and 12 spins with 4+ against none seen. So a
+// cell drawn on a reel that already shows a scatter is never one.
+const noScatter = (w) => w.map((x, s) => (s === SCATTER ? 0 : x));
+function drawReel(w, n, kept = []) {
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(pick(kept.includes(SCATTER) || out.includes(SCATTER) ? noScatter(w) : w));
+  return out;
+}
 function drawGrid(cfg, rows, noLow) {
-  return rows.map((n, reel) => {
-    const w = reelWeights(cfg, reel, noLow);
-    return Array.from({ length: n }, () => pick(w));
-  });
+  return rows.map((n, reel) => drawReel(reelWeights(cfg, reel, noLow), n));
 }
 const drawRows = (cfg) => Array.from({ length: 6 }, () => 2 + pick(cfg.rowWeights));
 
@@ -79,8 +88,7 @@ function evaluate(grid, cfg) {
 function cascade(grid, remove, cfg, noLow) {
   return grid.map((reel, r) => {
     const kept = reel.filter((_, i) => !remove[r][i]);
-    const w = reelWeights(cfg, r, noLow);
-    const fresh = Array.from({ length: reel.length - kept.length }, () => pick(w));
+    const fresh = drawReel(reelWeights(cfg, r, noLow), reel.length - kept.length, kept);
     return [...fresh, ...kept];
   });
 }

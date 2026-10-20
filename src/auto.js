@@ -245,10 +245,10 @@
   }
 
   // Auto bet size: a game's bet is at most the bankroll over this many standard
-  // deviations of one round, so the credits ride out its swings. Forbes z
-  // Chánova (sd about 11.4 bets) then keeps about 2,100 bets, which ran dry 2 %
-  // of the time in a simulation of 30,000 spins at +6.9 % (1,500 bets: 9 %, 420
-  // bets: 52 %); roulette (sd 1) keeps 185.
+  // deviations of one round, so the credits ride out its swings: Forbes z
+  // Chánova (sd about 6.5 bets) keeps about 1,200 bets, roulette (sd 1) 185.
+  // Picked when Forbes looked like +6.9 %: 2,100 bets of its swing then ran dry
+  // 2 % of the time over 30,000 spins (1,500 bets: 9 %, 420 bets: 52 %).
   const AUTO_RESERVE_SDS = 185;
 
   // Biggest bet the auto size allows a game with this variance per credit

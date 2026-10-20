@@ -66,7 +66,7 @@
     buyUpgrades: false,
     saveForUpgrades: true,
     spareUpgrades: true,
-    firstGame: 'hotfix', // game whose upgrades are bought first (shopPriority), '' for none
+    firstGame: '', // game whose upgrades are bought first (shopPriority), '' for none
     recordSpins: true,
     learnBlaze: true,
     captureDebug: false,

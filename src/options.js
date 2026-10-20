@@ -72,7 +72,7 @@ const DEFAULTS = {
   buyUpgrades: false,
   saveForUpgrades: true,
   spareUpgrades: true,
-  firstGame: 'hotfix',
+  firstGame: '',
   recordSpins: true,
   learnBlaze: true,
   captureDebug: false,

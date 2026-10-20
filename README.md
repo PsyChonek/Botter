@@ -66,7 +66,7 @@ simulated in `scripts/odds.mjs`, not the noisy measured one:
 
 | Game | Unupgraded | Fully upgraded |
 | --- | ---: | ---: |
-| Forbes z Chánova (modelled) | ~94 % | ~123 % |
+| Forbes z Chánova (modelled) | ~73 % | ~91 % |
 | Kostky (Malá) | 92.4 % | 97.9 % |
 | Roulette | 92.3 % | 97.3 % |
 | Baccarat (Bankéř) | 90.5 % | 97.8 % |
@@ -76,7 +76,7 @@ simulated in `scripts/odds.mjs`, not the noisy measured one:
 | Skeleton Slots | ~71 % | ~94 % |
 | Blaze 20 Wild | ~63 % | ~95 % |
 
-Forbes z Chánova is modelled from the client's tables (retuned 2026-10-17). It pays over 100 % once a level of each upgrade is bought, so it is the grind game from level 13, as long as the server matches the client. Run the Forbes test to check that.
+Forbes z Chánova is modelled from the client's tables (retuned 2026-10-17) plus one rule only the server shows: a reel never holds two scatters (found 2026-10-20). That halves how often free spins start, so it never pays over 100 % and stays below roulette even maxed. Run the Forbes test after an update to check the model again.
 
 Every strategy, formula and setting is described in the [full reference](docs/reference.md).
 
