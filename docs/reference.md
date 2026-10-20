@@ -132,7 +132,14 @@ progress shows at `chrome://on-device-internals`.
   grinder plays the unlocked game with the lowest simulated edge. Every round pays at
   least 1 XP (since 2026-10-09), so small bets are cheaper per XP but slower (a
   2026-10 test on roulette: 1.4 credits lost per XP at 20, about 2.5 from 100 up); the
-  bet is the one picked in the settings. The panel shows each game's XP per credit and loss per XP
+  bet is the one picked in the settings, or **Auto** (the default since 2026-10-20,
+  `grindBet` 0): each game may bet at most the credits above the reserve, less what a
+  loan still owes, over 185 standard deviations of one round (`A.autoBetCap`), so
+  Forbes z Chánova (sd about 11.4 bets) keeps about 2,100 bets behind it and roulette
+  185. A simulation of 30,000 Forbes spins at +6.9 % ran 2,100 bets dry 2 % of the
+  time, 1,500 bets 9 % and 420 bets 52 %. A game that swings too hard for the credits
+  gives way to the next cheapest (`A.autoGrindPlan`), and with nothing that fits the
+  grinder waits. The panel shows each game's XP per credit and loss per XP
   measured from its tracked rounds, for information only. Near a limit the grinder
   steps down to a smaller bet; under a daily budget it never bets more than what is
   left of it.
@@ -263,6 +270,9 @@ progress shows at `chrome://on-device-internals`.
     grind bet of 100. So on the game the grinder would play, these bets go up to the
     XP grinding bet whenever the grinder's limits allow it (`floors` in `edgePlan`,
     since 2026-10-19); held for a Hackathon or out of budget, they fall back to Kelly.
+    With the Auto bet size they also stay under its cap, the smallest bet included
+    (`caps` in `edgePlan`), so a paying game is not played on credits that cannot
+    ride out its swings.
   - Before Placené přesčasy and Hackathon, work waits while the energy refilling until
     Friday 17:00 still fits under the cap, so the event starts with a full bar. During
     Placené přesčasy work drains energy at once instead of keeping it for the grinder.

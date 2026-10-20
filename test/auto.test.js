@@ -995,3 +995,37 @@ test('nextDeployAt is the next 9:00 in Prague', () => {
   // Winter time from 2026-10-25: 9:00 is 8:00 UTC.
   assert.equal(A.nextDeployAt(Date.parse('2026-10-25T12:00:00Z')), Date.parse('2026-10-26T08:00:00Z'));
 });
+
+test('autoGrindPlan sizes the bet to the credits and drops a game too swingy for them', () => {
+  const unlocks = { hotfix: 13, roulette: 15 };
+  const games = Object.keys(unlocks);
+  const edges = { hotfix: -0.069, roulette: 0.027 };
+  const levels = [20, 40, 100, 200, 400, 1000];
+  const caps = (bankroll) => ({ hotfix: A.autoBetCap(130, bankroll), roulette: A.autoBetCap(1, bankroll) });
+  // About 42,000 covers Forbes at 20 (2,100 bets of sd 11.4), not at 40.
+  assert.deepEqual(A.autoGrindPlan(games, 1000, 20, unlocks, edges, caps(42_500), levels), { game: 'hotfix', bet: 20 });
+  assert.deepEqual(A.autoGrindPlan(games, 1000, 20, unlocks, edges, caps(250_000), levels), { game: 'hotfix', bet: 100 });
+  // Below that roulette, at what its own swing allows; under the limits' bet.
+  assert.deepEqual(A.autoGrindPlan(games, 1000, 20, unlocks, edges, caps(30_000), levels), { game: 'roulette', bet: 100 });
+  assert.deepEqual(A.autoGrindPlan(games, 40, 20, unlocks, edges, caps(30_000), levels), { game: 'roulette', bet: 40 });
+  assert.equal(A.autoGrindPlan(games, 1000, 20, unlocks, edges, caps(3_000), levels), null);
+  assert.equal(A.autoBetCap(undefined, 1_000_000), 0);
+  assert.equal(A.autoBetCap(1, -500), 0);
+});
+
+test('edgePlan keeps a paying game under the auto size cap, smallest level included', () => {
+  const ctx = {
+    level: 20,
+    unlocks: { hotfix: 13 },
+    edges: { hotfix: -0.069 },
+    variances: { hotfix: 130 },
+    levels: [20, 40, 100, 200, 400, 1000],
+    bankroll: 30_000,
+    kelly: 0.5,
+    winsBonus: 0,
+    floors: { hotfix: 100 },
+  };
+  assert.equal(A.edgePlan(ctx).bet, 100);
+  assert.equal(A.edgePlan({ ...ctx, caps: { hotfix: 50 } }).bet, 40);
+  assert.equal(A.edgePlan({ ...ctx, caps: { hotfix: 14 } }), null);
+});

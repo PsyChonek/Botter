@@ -709,6 +709,9 @@
   "grind_auto": {
     "message": "Cheapest per XP (auto)"
   },
+  "grindBet_auto": {
+    "message": "Auto (sized to the credits)"
+  },
   "scatter_symbols": {
     "message": "stars counted per symbol"
   },
@@ -736,7 +739,7 @@
     "message": "XP grinding bet"
   },
   "optionsGrindHint": {
-    "message": "Auto game picks the unlocked game with the lowest simulated house edge at your upgrades. XP per round is proportional to the bet, so every bet level costs the same per XP: the bet only sets how fast XP comes in and how much rides on one round. Near a limit the grinder steps down to a smaller bet, and under a daily budget it never bets more than is left of it."
+    "message": "Auto game picks the unlocked game with the lowest simulated house edge at your upgrades. XP per round is proportional to the bet, so every bet level costs the same per XP: the bet only sets how fast XP comes in and how much rides on one round. Near a limit the grinder steps down to a smaller bet, and under a daily budget it never bets more than is left of it. Auto sizes the bet to the credits above the reserve, not counting what a loan still owes: a game may bet at most that over 185 standard deviations of one round, so Forbes z Chánova keeps about 2,100 bets behind it and roulette about 185. A game that swings too hard for the credits gives way to the next cheapest, and paying games are held to the same limit."
   },
   "optionsShopHeading": {
     "message": "Shop upgrades"

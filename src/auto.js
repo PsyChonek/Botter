@@ -244,6 +244,31 @@
     return game && edges[game] !== undefined ? { game, bet } : null;
   }
 
+  // Auto bet size: a game's bet is at most the bankroll over this many standard
+  // deviations of one round, so the credits ride out its swings. Forbes z
+  // Chánova (sd about 11.4 bets) then keeps about 2,100 bets, which ran dry 2 %
+  // of the time in a simulation of 30,000 spins at +6.9 % (1,500 bets: 9 %, 420
+  // bets: 52 %); roulette (sd 1) keeps 185.
+  const AUTO_RESERVE_SDS = 185;
+
+  // Biggest bet the auto size allows a game with this variance per credit
+  // staked (BotterOdds.variances). 0 for a game without one.
+  function autoBetCap(variance, bankroll) {
+    if (!(variance > 0) || !(bankroll > 0)) return 0;
+    return bankroll / (AUTO_RESERVE_SDS * Math.sqrt(Math.max(1, variance)));
+  }
+
+  // grindPlan for the auto bet size: only games whose cap fits the smallest
+  // level, played at the biggest level under both the cap and the bet the
+  // limits allow. A game that swings too hard for the credits gives way to the
+  // next cheapest one.
+  function autoGrindPlan(games, bet, level, unlocks, edges, caps, levels) {
+    const fits = games.filter((game) => caps[game] >= levels[0]);
+    const plan = grindPlan(fits, bet, level, unlocks, edges);
+    if (!plan) return null;
+    return { game: plan.game, bet: levels.filter((step) => step <= Math.min(bet, caps[plan.game])).at(-1) };
+  }
+
   // What the XP grinder knows per game, for the panel: the simulated edge, XP
   // per credit wagered and credits lost per XP point, with the account's XP
   // bonus (GameData.prestigeBonus) on the XP tracked without it.
@@ -911,7 +936,9 @@
   // it. The pick is the biggest expected profit per round.
   // ctx: level, unlocks, edges, gains and variances per game, levels
   // (affordable bets, ascending), bankroll (credits above the reserve), kelly,
-  // winsBonus (0 off the weekend or past its limit), floors (bet per game).
+  // winsBonus (0 off the weekend or past its limit), floors (bet per game),
+  // caps (the auto bet size's most per game, autoBetCap; even the smallest
+  // level must fit under it).
   function edgePlan(ctx) {
     const levels = ctx.levels ?? [];
     let best = null;
@@ -923,6 +950,7 @@
       const variance = ctx.variances?.[game] ?? 1;
       const floor = ctx.floors?.[game] ?? 0;
       for (const bet of levels) {
+        if (ctx.caps && !(bet <= ctx.caps[game])) continue;
         if (bet !== levels[0] && bet > floor && bet > (ev / variance) * ctx.kelly * ctx.bankroll) continue;
         const value = ev * bet;
         if (!best || value > best.value) best = { game, bet, ev, value };
@@ -1072,6 +1100,9 @@
     loanCycle,
     wheelReady,
     grindPlan,
+    AUTO_RESERVE_SDS,
+    autoBetCap,
+    autoGrindPlan,
     grindReport,
     cheapestGame,
     xpCost,

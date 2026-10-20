@@ -68,7 +68,7 @@ const DEFAULTS = {
   xpBudget: 0,
   grindMinBalance: 0,
   grindGame: 'auto',
-  grindBet: 20,
+  grindBet: 0,
   buyUpgrades: false,
   saveForUpgrades: true,
   spareUpgrades: true,
@@ -120,6 +120,7 @@ for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = msg(
 for (const el of document.querySelectorAll('[data-i18n-label]')) el.setAttribute('aria-label', msg(el.dataset.i18nLabel));
 document.documentElement.lang = locale;
 
+field('grindBet').add(new Option(msg('grindBet_auto'), '0'));
 for (const name of BET_SELECTS) {
   for (const bet of G.BET_LEVELS) field(name).add(new Option(num.format(bet), String(bet)));
 }
@@ -139,8 +140,8 @@ async function load() {
     'bank',
   ]);
   const values = { ...DEFAULTS, ...settings };
-  // The grind bet used to have an 'auto' choice, which is gone.
-  if (!G.BET_LEVELS.includes(values.grindBet)) values.grindBet = DEFAULTS.grindBet;
+  // 0 is the auto bet size; the old 'auto' choice meant it too.
+  if (values.grindBet !== 0 && !G.BET_LEVELS.includes(values.grindBet)) values.grindBet = 0;
   fill(values);
   $('apiKey').value = apiKey;
   $('openrouterKey').value = openrouterKey;

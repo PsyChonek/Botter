@@ -62,7 +62,7 @@
     xpBudget: 0,
     grindMinBalance: 0,
     grindGame: 'auto',
-    grindBet: 20,
+    grindBet: 0, // 0: auto size (autoCaps), else a bet level
     buyUpgrades: false,
     saveForUpgrades: true,
     spareUpgrades: true,
@@ -1733,7 +1733,7 @@
     if (!game) return 0;
     const edge = learning ? O.edges([game], player.upgrades, blazeMode())[game] : edges[game];
     const variance = O.variances([game], player.upgrades, blazeMode())[game];
-    const bet = learning ? G.BET_LEVELS[0] : wantedGrindBet();
+    const bet = learning ? G.BET_LEVELS[0] : wantedGrindBet(game);
     return A.levelUpCushion(G.xpAhead(player, A.MARGIN_LEVELS), rate, edge, bet, variance, A.MARGIN_SIGMAS);
   }
 
@@ -1745,8 +1745,26 @@
     return A.cheapestGame(candidates, player.level, GRIND_UNLOCKS, edges);
   }
 
-  // The bet the grinder wants before its limits: the one picked in the settings.
-  const wantedGrindBet = () => Number(settings.grindBet) || G.BET_LEVELS[0];
+  // The auto bet size: grindBet 0 (or a setting from before a bet was picked
+  // by hand, 'auto') sizes each game's bet by its swing (BotterAuto.autoBetCap).
+  const autoBetSize = () => !Number(settings.grindBet);
+
+  // Most each game may bet with the auto size, from the credits above the
+  // reserve less what a loan still owes: borrowed credits are not a bankroll.
+  function autoCaps(games, reserve) {
+    const bankroll = player.credits - reserve - (player.loan?.debt ?? 0);
+    const variances = O.variances(games, player.upgrades, blazeMode());
+    return Object.fromEntries(games.map((game) => [game, A.autoBetCap(variances[game], bankroll)]));
+  }
+
+  // The bet the grinder wants on a game before its limits: the one picked in
+  // the settings, or the biggest level the auto size allows it, at least the
+  // smallest.
+  function wantedGrindBet(game) {
+    if (!autoBetSize()) return Number(settings.grindBet);
+    const cap = Math.min(autoCaps([game], limits().reserve)[game], player.maxBet);
+    return G.BET_LEVELS.filter((bet) => bet <= cap).at(-1) ?? G.BET_LEVELS[0];
+  }
 
   // The goal upgrade the grinder leaves credits for, or null. Its verdict says
   // the credits buy more XP as the upgrade than as grinding, so they are not
@@ -1966,6 +1984,7 @@
       kelly: EDGE_KELLY,
       winsBonus: winsOn ? A.WINS_BONUS : 0,
       floors: grind ? { [grind.game]: grind.bet } : {},
+      caps: autoBetSize() ? autoCaps(G.GAME_KEYS, reserve) : null,
     });
     const note = plan ? `${plan.game} ${plan.bet}` : '';
     if (note !== edgeNote) {
@@ -2075,7 +2094,8 @@
 
   // The bet is the one picked in the settings: XP per round is proportional to
   // the bet, so every level costs the same per XP and the bet only sets the pace.
-  // A setting from before the bet was picked by hand ('auto') starts at the smallest.
+  // With the auto size the bet is the biggest the limits and the game's swing
+  // allow, and a game too swingy for the credits gives way to the next cheapest.
   // Before a Hackathon weekend the grinder holds (BotterAuto.grindHold), and on
   // it the daily limit is the pooled weekend budget (BotterAuto.grindBudget).
   function grindChoice(saving = true) {
@@ -2086,13 +2106,16 @@
     const { budget, lost } = A.grindBudget(stats.grind, limit.xpBudget, event, now);
     if (A.grindHold(event, now)) return { lost, levels, candidates, edges, plan: null };
     const learning = learningBlaze();
-    const wanted = learning ? G.BET_LEVELS[0] : wantedGrindBet();
+    const auto = !learning && autoBetSize();
+    const wanted = learning ? G.BET_LEVELS[0] : auto ? Infinity : Number(settings.grindBet);
     const bet = A.grindBet({ ...limit, xpBudget: budget }, player.credits, lost, levels, wanted);
     if (learning) return { lost, levels, candidates, edges, plan: bet ? { game: 'blaze', bet } : null };
     // On a Konec kvartálu weekend the bonus on wins lowers each game's loss by its own amount.
     const bonus = winsBonusOn(now) ? A.WINS_BONUS : 0;
     const pickEdges = A.bonusEdges(edges, O.gains(candidates, player.upgrades, blazeMode()), bonus);
-    const plan = A.grindPlan(candidates, bet, player.level, GRIND_UNLOCKS, pickEdges);
+    const plan = auto
+      ? A.autoGrindPlan(candidates, bet, player.level, GRIND_UNLOCKS, pickEdges, autoCaps(candidates, limit.reserve), levels)
+      : A.grindPlan(candidates, bet, player.level, GRIND_UNLOCKS, pickEdges);
     return { lost, levels, candidates, edges, plan };
   }
 
