@@ -189,13 +189,18 @@
     return ms;
   }
 
-  // How long the app animates a Forbes z Chánova response before it lets the
-  // player act: the free-spin pick shows once a triggering spin has animated,
-  // and the next spin once the free spins have. The server turns game requests
-  // away ("počkej na animaci") until then, so the bot waits as long. Other
-  // spins are not held and give 0.
-  function hotfixLockMs(path, data) {
+  // The roulette wheel turns this long before the app shows the pocket (DA in
+  // the app bundle).
+  const ROULETTE_SPIN_MS = 4200;
+
+  // How long the app animates a game response before it lets the player act.
+  // The server turns game requests away ("počkej na animaci") until then, so
+  // the bot waits as long: every roulette spin, and on Forbes z Chánova a spin
+  // that triggers free spins (the pick shows once it has animated) and the free
+  // spins (the next spin once they have). Other responses give 0.
+  function animationLockMs(path, data) {
     const A = HOTFIX_ANIM;
+    if (path === '/api/roulette/spin') return ROULETTE_SPIN_MS;
     if (path === '/api/hotfix/spin') return data?.outcome?.trigger ? hotfixRoundMs(data.outcome.round) + A.incident : 0;
     if (path !== '/api/hotfix/free' || !data?.free) return 0;
     const rounds = data.free.rounds.reduce((ms, round) => ms + hotfixRoundMs(round) + A.freeGap, 0);
@@ -442,7 +447,7 @@
     xpAhead,
     dailyBonus,
     addDelta,
-    hotfixLockMs,
+    animationLockMs,
     roulettePayout,
     roulettePockets,
     addRouletteSpin,

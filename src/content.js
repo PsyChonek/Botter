@@ -118,12 +118,13 @@
   // 180 spins) to show how the server grows their multiplier and sizes the
   // Hotfix modifiers. Spins played by hand during the test count too.
   const HOTFIX_TEST_SPINS = 500;
-  // Game requests wait out the app's animation (G.hotfixLockMs) after a Forbes
-  // z Chánova free-spin trigger and after free spins, plus a margin, but never
-  // longer than the 32 s the server has always let the next request through
-  // after: it ends its lock after free spins well before the app's long ones.
-  const HOTFIX_LOCK_MARGIN_MS = 1000;
-  const HOTFIX_LOCK_MAX_MS = 32_000;
+  // Game requests wait out the app's animation (G.animationLockMs) after a
+  // roulette spin, a Forbes z Chánova free-spin trigger and free spins, plus a
+  // margin, but never longer than the 32 s the server has always let the next
+  // request through after: it ends its lock after free spins well before the
+  // app's long ones.
+  const ANIM_LOCK_MARGIN_MS = 1000;
+  const ANIM_LOCK_MAX_MS = 32_000;
   const MAX_CAPTURE = 40;
   const SPIN_FLUSH_EVERY = 10;
   const CAPTURE_PATHS = /^\/api\/(loan|crash|shop|leaderboard|bonus|wheel)/;
@@ -503,8 +504,8 @@
       if (path === '/api/work/submit') onSubmitRejected(request?.id, data);
       return;
     }
-    const lock = G.hotfixLockMs(path, data);
-    if (lock) holdGames(Math.min(HOTFIX_LOCK_MAX_MS, lock + HOTFIX_LOCK_MARGIN_MS));
+    const lock = G.animationLockMs(path, data);
+    if (lock) holdGames(Math.min(ANIM_LOCK_MAX_MS, lock + ANIM_LOCK_MARGIN_MS));
     if (path === '/api/profile/reset') {
       resetStats();
       render();
@@ -1479,14 +1480,15 @@
   }
 
   // Personal bankruptcy once it is planned and execution allows it, after the
-  // shop and the grinder have spent the credits the reset would wipe, and
+  // grinder has spent the credits the reset would wipe (the shop sells nothing
+  // with the debt open, so it cannot spend them), and
   // unless finishing the current level first costs less than losing its XP. On
   // a sprint podium it waits for the sprint to end, so the prize is paid and
   // the bankruptcy lands on the new sprint's first points.
   async function bankruptStep() {
     if (!player.loan?.execution || !bankruptPlanned()) return false;
     if (Date.now() - (claimTried.bankrupt ?? 0) < CLAIM_RETRY_MS) return false;
-    if (shopOffer() || grindReady()) return false;
+    if (grindReady()) return false;
     const price = xpPrice();
     if (A.waitForLevel(player, price, workPerXp())) return false;
     // With the sprint protection off the podium is not read or waited for.
@@ -1781,8 +1783,11 @@
   // Buys the goal upgrade as soon as it fits above the reserve. A purchase
   // changes the upgrades, so the next tick reviews the queue and buys the next
   // goal right away if that fits too; only a refused buy waits.
+  // The shop sells nothing while a loan shark debt is open ("S dluhem u
+  // lichváře obchod neprodává"), so nothing is tried until it is repaid.
   async function buyStep() {
     if (!settings.buyUpgrades || Date.now() - (claimTried.buy ?? 0) < CRASH_POLL_MS) return false;
+    if (player.loan?.debt > 0) return false;
     const offer = shopOffer();
     if (!offer) return false;
     setStatus('statusBuying', [`${offer.game}:${offer.key}`, String(offer.next), credits(offer.price)]);

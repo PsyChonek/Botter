@@ -76,14 +76,15 @@ progress shows at `chrome://on-device-internals`.
   request's wait also holds the next game request of every tab. Before this, such a
   rejection counted as a failed round and paused that step for 10 minutes. The log
   line carries the server's own hint (`hint`: `Retry-After` or the body's field).
-- **Forbes z Chánova lock** (`hotfixLockMs` in `src/games.js`, applied in `onResponse`
-  in `src/content.js`): after a spin that triggers free spins, and again after the
-  free spins, the server turns every game request away until the app would have
+- **Animation lock** (`animationLockMs` in `src/games.js`, applied in `onResponse`
+  in `src/content.js`): after every roulette spin (the wheel turns 4.2 s, since
+  2026-10-20) and on Forbes z Chánova after a spin that triggers free spins and again
+  after the free spins, the server turns every game request away until the app would have
   animated them ("počkej na animaci", a 429 whose wait is always 30 s, so it says
   nothing about the real lock). Any such response (the bot's or the app's) holds the
   next game request of every tab for the app's animation time plus 1 s, from the
   app's own timings: about 10 s before the free-spin pick, when the app shows it to
-  a player. After free spins the hold stops at 32 s (`HOTFIX_LOCK_MAX_MS`), because
+  a player. After free spins the hold stops at 32 s (`ANIM_LOCK_MAX_MS`), because
   the server has always let the next spin through by then while the app's
   animation of a long free-spin game runs past a minute.
 - **Speed and server responses** (settings Games tab): game requests in the last
@@ -194,9 +195,10 @@ progress shows at `chrome://on-device-internals`.
   500 plus the lost XP at the grinder's measured credits per XP (`bankruptWorth` in
   `src/auto.js`; before any XP price is measured, only with no XP at stake).
   - Once it is planned, credits are worth nothing past the reset, so the bot stops
-    repaying, the shop plan buys with no reserve and the grinder bets down to the last
-    credit, ignoring the daily budget and minimum balance. It declares when nothing is
-    left to buy or bet.
+    repaying and the grinder bets down to the last credit, ignoring the daily budget
+    and minimum balance. It declares when nothing is left to bet. The shop sells
+    nothing while a debt is open ("S dluhem u lichváře obchod neprodává", seen
+    2026-10-20), so the bot tries no purchase until the debt is repaid or wiped.
   - Near the end of a level it waits for the level-up when the XP into the level is
     worth more than the garnish on the work pay that finishes it (half of the missing
     XP times credits per work XP, `waitForLevel`). Otherwise it declares right away
