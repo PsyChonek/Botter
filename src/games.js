@@ -369,6 +369,52 @@
       .sort((a, b) => b.rounds - a.rounds);
   }
 
+  const ROW_FIELDS = ['rounds', 'wagered', 'net', 'xp'];
+  const rowOf = (row) => Object.fromEntries(ROW_FIELDS.map((field) => [field, row?.[field] ?? 0]));
+  const rowLess = (row, base) => Object.fromEntries(ROW_FIELDS.map((field) => [field, (row?.[field] ?? 0) - (base?.[field] ?? 0)]));
+
+  // Game rows less what they held at the profit base (profitBase).
+  function rowsSince(games, base = {}) {
+    return Object.fromEntries(Object.entries(games).map(([game, row]) => [game, rowLess(row, base[game])]));
+  }
+
+  // Where the panel's Profit table starts counting: from the account's last
+  // výpověď (player.prestige), and each game from its last upgrade, so a row
+  // shows the return of what is played now. The base holds the stats as they
+  // were then, and the table subtracts it. Returns the same base when nothing
+  // changed. A first base starts each game at its current upgrade combination,
+  // as far back as that combination's row (current(game)) reaches; a game
+  // without one (null) keeps all its rounds. global (the bet limits) changes no
+  // game's return, so buying it resets nothing.
+  function profitBase(base, player, stats, current) {
+    const prestige = Number(player.prestige) || 0;
+    const upgrades = Object.fromEntries(Object.entries(player.upgrades ?? {}).map(([game, own]) => [game, JSON.stringify(own)]));
+    if (!base) {
+      const games = {};
+      for (const [game, row] of Object.entries(stats.games)) {
+        const since = current(game);
+        if (since) games[game] = rowLess(row, since);
+      }
+      return { prestige, upgrades, games, work: { tickets: 0, net: 0 }, free: 0 };
+    }
+    if (base.prestige !== prestige) {
+      return {
+        prestige,
+        upgrades,
+        games: Object.fromEntries(Object.entries(stats.games).map(([game, row]) => [game, rowOf(row)])),
+        work: { tickets: stats.work.tickets, net: stats.work.net },
+        free: Object.values(stats.free).reduce((sum, amount) => sum + amount, 0),
+      };
+    }
+    const changed = Object.keys({ ...upgrades, ...base.upgrades }).filter((game) => upgrades[game] !== base.upgrades[game]);
+    if (!changed.length) return base;
+    const games = { ...base.games };
+    for (const game of changed) {
+      if (game !== 'global') games[game] = rowOf(stats.games[game]);
+    }
+    return { ...base, upgrades, games };
+  }
+
   const api = {
     BET_LEVELS,
     ENERGY_MS,
@@ -402,6 +448,8 @@
     addRouletteSpin,
     totalNet,
     profitRows,
+    rowsSince,
+    profitBase,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

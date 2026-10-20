@@ -338,8 +338,12 @@ progress shows at `chrome://on-device-internals`.
   capture of raw loan, crash, shop, leaderboard and bonus responses for export.
 - **Profit tracking**: every game response (bot or manual play) is booked per game
   from the credit balance before and after, plus anything the debt collector took
-  from the win. The panel shows rounds, net and return rate per game; the settings
-  Profit tab shows wagered, returned, net, return rate, net per round and XP, plus credits
+  from the win. The panel shows rounds, net and return rate per game, counted from the
+  account's last výpověď and each game from its last upgrade (bought by the bot or by
+  hand; the bet limits do not count), so a row shows the return of what is played now
+  (`stats.profitBase`, `G.profitBase`, since 2026-10-20; the first base started each
+  game at its current upgrade level). The settings
+  Profit tab keeps every round: wagered, returned, net, return rate, net per round and XP, plus credits
   earned per work ticket. Crash bets are booked when they settle, from the round's bet list.
   Every round of a game with an odds model is also booked under the upgrade levels it
   was played with (`stats.combos`, keyed by `BotterOdds.combo`), and the Profit tab's
@@ -480,8 +484,8 @@ progress shows at `chrome://on-device-internals`.
   than four columns) has the auto switch, the account, the status line, Start/Stop
   for work and for games with the ticket type and the game, and the auto mode parts
   as chips. Below them are collapsible sections, which stay open or closed across
-  reloads (`panelOpen`): **Profit** (net and return per game, work, bonuses summed,
-  a total; rounds in the row tooltip), **XP per game** (unlocked games and the next
+  reloads (`panelOpen`): **Profit** (net and return per game since its last upgrade,
+  work, bonuses summed, a total, all since the last výpověď; rounds in the row tooltip), **XP per game** (unlocked games and the next
   unlock only), **Upgrade queue** and **More** (play on the game
   screen, the Forbes z Chánova test, Forbes force, answer accuracy and AI cost).
   Longer explanations are tooltips. A bundle update shows as one small line at the

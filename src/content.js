@@ -94,6 +94,7 @@
     cases: {}, // upgrade combination -> Case opening model check (BotterCases.addOpen)
     plainXp: {}, // rows like games, only rounds played off Hackathon weekends (BotterAuto.planXpRate)
     hotfixTest: null, // { spins, done } of the Forbes z Chánova test (hotfixTestStep)
+    profitBase: null, // where the panel's Profit table starts counting (BotterGames.profitBase)
     work: { tickets: 0, net: 0, xp: 0 },
     free: { daily: 0, bailout: 0 },
     crashBooked: [],
@@ -493,6 +494,7 @@
       saveAccount();
     }
     trackLevel(data);
+    if (data?.player) syncProfitBase(data.player);
     if (settings.captureDebug && CAPTURE_PATHS.test(path)) {
       capture = [...capture, { at: Date.now(), path, ok, request, data }].slice(-MAX_CAPTURE);
       chrome.storage.local.set({ capture });
@@ -588,6 +590,23 @@
     sessionBase = 0;
     saveStats();
     log.info('profile_reset', { account: accountId });
+  }
+
+  // Restarts the panel's Profit table after a výpověď, and a game's row after
+  // its upgrades change (bought by the bot or by hand), before the response's
+  // own round is booked. Only the table starts over: stats.games keeps every
+  // round for the XP rates and the settings Profit tab.
+  function syncProfitBase(own) {
+    const current = (game) => {
+      const combo = O.combo(game, own.upgrades);
+      return combo === null ? null : (stats.combos[game]?.[combo] ?? {});
+    };
+    const next = G.profitBase(stats.profitBase, own, stats, current);
+    if (next === stats.profitBase) return;
+    const reset = stats.profitBase && next.prestige !== stats.profitBase.prestige ? 'all' : Object.keys(next.games).filter((game) => next.games[game] !== stats.profitBase?.games[game]);
+    stats.profitBase = next;
+    saveStats();
+    log.info('profit_reset', { games: reset });
   }
 
   // Level-up, standup quest and achievement rewards are paid with whatever response
@@ -2490,19 +2509,23 @@
 
   const tone = (n) => (n > 0 ? 'pos' : n < 0 ? 'neg' : '');
 
-  // Net per game, work and free income, with the rounds in each row's tooltip.
-  // Free income is one row; its parts are in the settings Profit tab.
+  // Net per game, work and free income, with the rounds in each row's tooltip,
+  // counted from the last výpověď and each game from its last upgrade
+  // (syncProfitBase). Free income is one row; its parts are in the settings
+  // Profit tab.
   function renderProfit() {
-    const rows = G.profitRows(stats.games).map((row) => ({
+    const base = stats.profitBase ?? { games: {}, work: { tickets: 0, net: 0 }, free: 0 };
+    const rows = G.profitRows(G.rowsSince(stats.games, base.games)).map((row) => ({
       name: msg(`game_${row.game}`),
       net: row.net,
       rtp: row.rtp,
       title: msg('panelRounds', [num.format(row.rounds)]),
     }));
-    if (stats.work.tickets > 0) {
-      rows.push({ name: msg('panelWork'), net: stats.work.net, rtp: null, title: msg('panelTickets', [num.format(stats.work.tickets)]) });
+    const tickets = stats.work.tickets - base.work.tickets;
+    if (tickets > 0) {
+      rows.push({ name: msg('panelWork'), net: stats.work.net - base.work.net, rtp: null, title: msg('panelTickets', [num.format(tickets)]) });
     }
-    const free = Object.values(stats.free).reduce((sum, amount) => sum + amount, 0);
+    const free = Object.values(stats.free).reduce((sum, amount) => sum + amount, 0) - base.free;
     if (free) rows.push({ name: msg('panelFree'), net: free, rtp: null, title: '' });
     ui.body.replaceChildren(
       ...rows.map((row) => {

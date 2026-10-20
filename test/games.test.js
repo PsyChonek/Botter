@@ -67,6 +67,33 @@ test('profitRows computes return rate and net per round', () => {
   assert.equal(G.totalNet({ a: { net: 5 }, b: { net: -8 } }), -3);
 });
 
+test('profitBase restarts a game on its upgrade and everything on a výpověď', () => {
+  const stats = {
+    games: { hotfix: { rounds: 100, wagered: 4000, net: -900, xp: 50 }, roulette: { rounds: 10, wagered: 1000, net: -30, xp: 9 } },
+    work: { tickets: 5, net: 700 },
+    free: { daily: 300, levelUp: 200 },
+  };
+  const player = { prestige: 0, upgrades: { hotfix: { fix: 1 }, roulette: { zeros: 2 }, global: { bets: 1 } } };
+  // First base: Forbes from its current combination's row, roulette (no row) all-time.
+  const first = G.profitBase(null, player, stats, (game) => (game === 'hotfix' ? { rounds: 40, wagered: 1600, net: -100, xp: 20 } : null));
+  assert.deepEqual(G.rowsSince(stats.games, first.games).hotfix, { rounds: 40, wagered: 1600, net: -100, xp: 20 });
+  assert.deepEqual(G.rowsSince(stats.games, first.games).roulette, stats.games.roulette);
+  assert.equal(G.profitBase(first, player, stats, () => null), first);
+
+  // Bet limits change no return; a Forbes upgrade restarts only Forbes.
+  const bets = G.profitBase(first, { ...player, upgrades: { ...player.upgrades, global: { bets: 2 } } }, stats, () => null);
+  assert.deepEqual(bets.games, first.games);
+  const bought = G.profitBase(bets, { ...player, upgrades: { ...player.upgrades, hotfix: { fix: 2 }, global: { bets: 2 } } }, stats, () => null);
+  const since = G.rowsSince(stats.games, bought.games);
+  assert.equal(G.profitRows(since).length, 1);
+  assert.equal(since.roulette.net, -30);
+
+  const quit = G.profitBase(bought, { prestige: 1, upgrades: {} }, stats, () => null);
+  assert.equal(G.profitRows(G.rowsSince(stats.games, quit.games)).length, 0);
+  assert.deepEqual(quit.work, { tickets: 5, net: 700 });
+  assert.equal(quit.free, 500);
+});
+
 test('upgradeOffer prices the next level like the shop does', () => {
   assert.deepEqual(G.upgradeOffer({}, 'crash', 'sla'), { game: 'crash', key: 'sla', next: 1, price: 4000, minLevel: 3 });
   assert.equal(G.upgradeOffer({ crash: { sla: 1 } }, 'crash', 'sla').price, 8800);
