@@ -9,7 +9,7 @@ const require = createRequire(import.meta.url);
 const B = require('../src/bundle.js');
 const G = require('../src/games.js');
 const O = require('../src/odds.js');
-const SITE = 'https://skeleton-casino.vercel.app';
+const SITE = 'https://skeleton-casino.jrezab.cz';
 
 async function load(path) {
   if (path) return { name: B.bundleName(`/assets/${path.split(/[\\/]/).at(-1)}`) ?? path, text: readFileSync(path, 'utf8') };

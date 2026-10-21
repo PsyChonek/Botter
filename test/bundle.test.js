@@ -50,7 +50,7 @@ test('a bundle the patterns no longer fit says so instead of passing', () => {
 });
 
 test('bundleName reads the file name from a script URL', () => {
-  assert.equal(B.bundleName('https://skeleton-casino.vercel.app/assets/index-DD7zv7qF.js'), 'index-DD7zv7qF.js');
+  assert.equal(B.bundleName('https://skeleton-casino.jrezab.cz/assets/index-DD7zv7qF.js'), 'index-DD7zv7qF.js');
   assert.equal(B.bundleName('https://example.com/app.js'), null);
 });
 

@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/AI-Gemini%20Nano%20%7C%20Claude%20%7C%20OpenRouter-a6d13c?labelColor=1d3011" alt="AI solvers">
 </p>
 
-Botter is a Chrome extension that plays [Skeleton Casino](https://skeleton-casino.vercel.app/)
+Botter is a Chrome extension that plays [Skeleton Casino](https://skeleton-casino.jrezab.cz/)
 for you. It answers the work tickets, claims every free bonus and only gambles where the
 math says it pays, using exact odds models of each game at your account's upgrades.
 
