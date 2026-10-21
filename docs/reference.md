@@ -161,9 +161,9 @@ progress shows at `chrome://on-device-internals`.
   star scatter counts symbols; the Blaze model check decides once 50 spins are
   recorded, until then the lower rule is used). A game without a model is
   never picked. XP per round grows with the bet the same way in every game, so the
-  grinder plays the unlocked game with the lowest simulated edge. Every round pays at
-  least 1 XP (since 2026-10-09), so small bets are cheaper per XP but slower (a
-  2026-10 test on roulette: 1.4 credits lost per XP at 20, about 2.5 from 100 up); the
+  grinder plays the unlocked game with the lowest simulated edge. Since 2026-10-15 a
+  round pays XP at its real value, sometimes 0 (the 1 XP floor of 2026-10-09 is gone),
+  so every bet costs the same per XP and the bet only sets the pace; the
   bet is the one picked in the settings, or **Auto** (the default since 2026-10-20,
   `grindBet` 0): each game may bet at most the credits above the reserve, less what a
   loan still owes, over 185 standard deviations of one round (`A.autoBetCap`), so
