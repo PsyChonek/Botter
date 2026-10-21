@@ -168,6 +168,10 @@
   // refilled points do not keep interrupting the grinder.
   const WORK_MIN_ENERGY = 5;
   const LOGGED_OUT_WAIT_MS = 10_000;
+  // A saved account whose profile fails to load this many times in a row is
+  // set aside for BROKEN_ACCOUNT_MS and the page returns to one that works.
+  const LOAD_FAIL_LIMIT = 3;
+  const BROKEN_ACCOUNT_MS = 30 * 60_000;
   // The speedy achievement wants a right answer within 3 seconds of the task
   // opening, so the hunt aims well inside that.
   const SPEEDY_MS = 2500;
@@ -194,6 +198,7 @@
   let legacyStats = null; // stats saved before accounts existed
   let accountOptions = ''; // what the account dropdown currently lists
   let switching = false;
+  let loadFails = 0; // failed profile loads in a row on this page
   let early = []; // page-hook responses received before load() finished
   let task = null; // current task as returned by /api/work/start
   let answeredTaskId = null; // task the bot already clicked an answer for
@@ -904,7 +909,9 @@
   // can switch back to it and rotation can project its energy.
   function saveAccount(force = false) {
     if (!accountId || !player) return Promise.resolve();
-    const saved = accounts[accountId] ?? {};
+    // A profile that loads ends the account's time set aside (loadFailed).
+    const { brokenUntil, ...saved } = accounts[accountId] ?? {};
+    if (brokenUntil) force = true;
     const session = readSession();
     // The page can lag behind a refresh the hook already reported; never step back.
     const own = session?.uid === accountId && C.isNewerSession(session.raw, saved.session);
@@ -998,8 +1005,12 @@
   async function loadPlayer() {
     setStatus('statusLoading');
     const res = await api('/api/me');
-    if (res.ok) return;
-    if (readSession()) return sleep(LOGGED_OUT_WAIT_MS);
+    if (res.ok) {
+      loadFails = 0;
+      return;
+    }
+    const session = readSession();
+    if (session) return loadFailed(session.uid, res);
     const marker = readSwitch();
     sessionStorage.removeItem(SWITCH_KEY);
     const expired = marker && accounts[marker.to];
@@ -1015,6 +1026,33 @@
     log.warn('session_expired', { login: expired.login });
     setStatus('statusSessionExpired', [expired.login ?? marker.to]);
     if (accounts[marker.from]?.session) await switchAccount(marker.from);
+  }
+
+  // A saved account to go to instead of one that cannot load: the one the
+  // switch came from, then home, then any other saved login not set aside.
+  function fallbackAccount(skip, from) {
+    const now = Date.now();
+    const usable = (id) => id && id !== skip && accounts[id]?.session && !(accounts[id].brokenUntil > now);
+    return [from, settings.homeAccount, ...Object.keys(accounts)].find(usable) ?? null;
+  }
+
+  // The page is logged in but the profile does not load (the casino failing
+  // for this account). After LOAD_FAIL_LIMIT tries in a row the account is set
+  // aside for BROKEN_ACCOUNT_MS, so rotation skips it, and the page switches
+  // back to an account that works instead of retrying this one forever.
+  async function loadFailed(id, res) {
+    loadFails += 1;
+    log.warn('profile_load_failed', { id, status: res.status, error: res.data?.error, attempt: loadFails });
+    const saved = accounts[id];
+    if (loadFails < LOAD_FAIL_LIMIT || !saved) return sleep(LOGGED_OUT_WAIT_MS);
+    accounts[id] = { ...saved, brokenUntil: Date.now() + BROKEN_ACCOUNT_MS };
+    await chrome.storage.local.set({ [ACCOUNT_PREFIX + id]: accounts[id] });
+    const fallback = fallbackAccount(id, readSwitch()?.from);
+    log.warn('account_set_aside', { login: saved.login, minutes: BROKEN_ACCOUNT_MS / 60_000, to: fallback && accounts[fallback].login });
+    setStatus('statusAccountBroken', [saved.login ?? id, String(BROKEN_ACCOUNT_MS / 60_000)]);
+    if (!fallback) return sleep(LOGGED_OUT_WAIT_MS);
+    loadFails = 0;
+    await switchAccount(fallback);
   }
 
   // Whether a saved account could still place the smallest XP grinding bet,
@@ -1043,7 +1081,7 @@
     if ((here.crash || here.lottery) && now - accountSince < ROUNDS_STAY_MS) return false;
     const today = A.dayKey(now);
     const candidates = Object.entries(accounts)
-      .filter(([id, saved]) => id !== accountId && saved.session)
+      .filter(([id, saved]) => id !== accountId && saved.session && !(saved.brokenUntil > now))
       .map(([id, saved]) => ({
         id,
         seenAt: saved.seenAt ?? 0,
@@ -2292,6 +2330,7 @@
 
   async function step() {
     if (settings.autoMode) return autoStep();
+    if (!player) return loadPlayer();
     if (await claimFreebies()) return;
     if (settings.gamesEnabled && (await hotfixFreeStep())) return;
     // The game bot would gamble the other account's credits, so only the work bot leaves.

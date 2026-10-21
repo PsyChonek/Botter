@@ -1162,6 +1162,17 @@
       }
     }
   },
+  "statusAccountBroken": {
+    "message": "Účtu $P1$ se nedaří načíst profil, bot ho na $P2$ min odloží a vrátí se na jiný účet.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
   "optionsRotateAccounts": {
     "message": "Přepnout na jiný uložený účet, když tomuhle dojde energie"
   },

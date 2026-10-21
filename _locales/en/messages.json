@@ -1162,6 +1162,17 @@
       }
     }
   },
+  "statusAccountBroken": {
+    "message": "$P1$ cannot load its profile, so it is set aside for $P2$ min and the bot returns to another account.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
   "optionsRotateAccounts": {
     "message": "Switch to another saved account when this one runs out of energy"
   },
