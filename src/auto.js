@@ -1047,6 +1047,18 @@
   // the step up, instead of the server's own hint, which is always 30 s.
   const speedRetryWait = (attempt) => SPEED_STEP_UP_MS * 2 ** attempt;
 
+  // Max speed for work tickets: the least time a ticket stays open before a
+  // submit the server accepts, kept per ticket type in the same table as the
+  // game waits. A refused submit made openMs after the ticket opened raises it
+  // past that by a step that doubles with each refusal of the same ticket
+  // (tries before it), so a retry never lands just short again; accepted ones
+  // trim it like a game wait.
+  function workSpeedLearn(speed, key, openMs, refused, tries = 0) {
+    if (!refused) return speedLearn(speed, key, 0, openMs, false);
+    const row = speed?.[key] ?? { extra: 0, streak: 0 };
+    return { ...speed, [key]: { extra: Math.max(row.extra, openMs + speedRetryWait(tries)), streak: 0 } };
+  }
+
   // This week's event: { key, startAt, endAt, active }. A week runs from
   // Monday 9:00, like the sprint.
   function weekendEvent(now = Date.now()) {
@@ -1180,6 +1192,7 @@
     speedWait,
     speedLearn,
     speedRetryWait,
+    workSpeedLearn,
     WINS_BONUS,
     bonusEdges,
     edgePlan,

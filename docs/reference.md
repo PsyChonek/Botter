@@ -22,6 +22,21 @@ The full description of every feature, model and setting. The short version is t
   the panel to work only those.
   When energy runs out it waits for the refill. It also dismisses the level-up
   and daily-bonus modals, which would otherwise block the screen.
+- **Max speed for work** (the same `maxSpeed` setting as games, since 2026-10-21;
+  `workDwell` / `learnWork` in `src/content.js`, `workSpeedLearn` in `src/auto.js`):
+  no human delays, reading time or typing pace. A "Přepiš kód" line is entered at once,
+  since the server only sees the finished text, and the work screen is polled every
+  150 ms. Each ticket is submitted once it has been open for the least time learned for
+  its type, under `work:<type>` in the same `botter:speed` table as the game waits
+  (starting at 0). A submit the server refuses raises that time to just past the one
+  refused, by 150 ms, 300 ms, 600 ms and so on for each refusal of the same ticket, and
+  is retried up to 6 times; 10 accepted in a row trim 50 ms. Refusals are logged as
+  `work_speed_learned`. Off, the bot keeps the human delays and the remembered minimum
+  (`stats.dwell`), which only grows.
+- **Unloadable accounts**: a logged-in account whose profile (`/api/me`) fails three
+  times in a row is set aside for 30 minutes (`brokenUntil` on its saved record), and
+  the page switches back to the account it came from, else home, else any other saved
+  one. Rotation skips it until then, and a profile that loads clears it.
 - The answer is chosen in this order:
   1. **Answer bank**: every submit response contains the correct answer
      (`result.answer`), so each ticket is learned the first time it is seen,

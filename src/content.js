@@ -104,6 +104,14 @@
     dwell: {}, // task type -> least ms open before a submit the server accepts
   };
   const MAX_SUBMIT_TRIES = 3;
+  const MAX_WORK_DWELL_MS = 60_000;
+  // At max speed the work screen is polled this often instead of every tick,
+  // and a picked ticket card is not clicked again for this long while its
+  // ticket is on the way.
+  const WORK_FAST_TICK_MS = 150;
+  const CARD_WAIT_MS = 3000;
+  // Enough for React to render a click or an input before the next one.
+  const RENDER_MS = 50;
   const CRASH_UNLOCK = 3;
   const CRASH_POLL_MS = 60_000;
   const CRASH_BET_POLL_MS = 10 * 60_000; // with the bot's bet already in the round
@@ -204,6 +212,8 @@
   let answeredTaskId = null; // task the bot already clicked an answer for
   let pending = null; // { taskId, source } of the bot's last answer
   let taskOpenedAt = 0; // local time the current task was started
+  let cardClickedAt = 0; // local time the bot last picked a ticket card
+  let fastTick = null; // pending fast work poll (WORK_FAST_TICK_MS)
   let submitTries = 0; // submits of the current task the server rejected
   let lastType = null;
   let workRun = false; // energy went above WORK_MIN_ENERGY and is being worked down
@@ -247,6 +257,8 @@
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
   const humanDelay = () => C.delayBetween(settings.minDelayMs, settings.maxDelayMs);
+  // Pause before closing a ticket's result and before picking the next one.
+  const workPause = () => (settings.maxSpeed ? 0 : humanDelay() / 2);
 
   // ---------- storage ----------
 
@@ -393,12 +405,31 @@
     const refused = res.status === 429 && /animac/i.test(String(res.data?.error ?? ''));
     if (refused && waited > ANIM_LOCK_MAX_MS) return;
     speed = A.speedLearn(speed, game.path, game.lock, waited, refused);
+    saveSpeed();
+    if (refused) log.info('speed_learned', { path: game.path, waited, wait: speedHold(game) });
+  }
+
+  function saveSpeed() {
     try {
       localStorage.setItem(SPEED_KEY, JSON.stringify(speed));
     } catch {
       // See readNextGame.
     }
-    if (refused) log.info('speed_learned', { path: game.path, waited, wait: speedHold(game) });
+  }
+
+  // Max speed for work (BotterAuto.workSpeedLearn): the least time a ticket of
+  // each type stays open before the bot submits it, learned from the server's
+  // refusals in the same table, under work:<type>. Off, the remembered minimum
+  // that only grows (stats.dwell) and a reading time apply.
+  const workKey = (type) => `work:${type}`;
+  const workDwell = (current) =>
+    settings.maxSpeed
+      ? A.speedWait(speed, workKey(current.type), 0, MAX_WORK_DWELL_MS)
+      : C.minDwellMs(current, stats.dwell[current.type]);
+  function learnWork(type, openMs, refused) {
+    speed = A.workSpeedLearn(speed, workKey(type), openMs, refused, submitTries);
+    saveSpeed();
+    if (refused) log.info('work_speed_learned', { type, openMs, wait: A.speedWait(speed, workKey(type), 0, MAX_WORK_DWELL_MS) });
   }
 
   // ---------- network: speed, server responses, rate limits ----------
@@ -799,6 +830,8 @@
       stats.work.net += data.player.credits - creditsBefore + (result.garnished ?? 0) - G.rewardTotal(data);
       stats.work.xp += (result.xpGain ?? 0) / G.prestigeBonus(data.player.prestige);
     }
+    const mine = pending?.taskId === taskId ? pending : null;
+    if (settings.maxSpeed && task?.id === taskId && mine?.openMs !== undefined) learnWork(task.type, mine.openMs, false);
     if (task && task.id === taskId && Number.isInteger(result.answer)) {
       bank[C.taskKey(task)] = C.bankEntry(task, result.answer);
       const source = pending?.taskId === taskId ? pending.source : 'manual';
@@ -817,18 +850,25 @@
   // retried after a longer, remembered minimum; expired tasks the app closes itself.
   function onSubmitRejected(taskId, data) {
     if (!task || task.id !== taskId) return;
+    const mine = pending?.taskId === taskId ? pending : null;
     pending = null;
     const fields = { ticket: C.ticketLabel(task.id), type: task.type, code: data?.code, error: data?.error };
     if (data?.code === 'expired' || data?.code === 'already_solved') {
       log.warn('submit_rejected', fields);
       return;
     }
-    const openMs = Date.now() - taskOpenedAt;
-    stats.dwell[task.type] = C.slowerDwell(stats.dwell[task.type], openMs);
-    saveStats();
+    // At max speed the time at the submit teaches the wait; otherwise the
+    // remembered minimum grows from the time the rejection came back.
+    const openMs = settings.maxSpeed ? (mine?.openMs ?? Date.now() - taskOpenedAt) : Date.now() - taskOpenedAt;
+    if (settings.maxSpeed) {
+      learnWork(task.type, openMs, true);
+    } else {
+      stats.dwell[task.type] = C.slowerDwell(stats.dwell[task.type], openMs);
+      saveStats();
+    }
     submitTries += 1;
-    log.warn('submit_rejected', { ...fields, openMs, nextDwellMs: stats.dwell[task.type], tries: submitTries });
-    if (submitTries >= MAX_SUBMIT_TRIES) {
+    log.warn('submit_rejected', { ...fields, openMs, nextDwellMs: workDwell(task), tries: submitTries });
+    if (submitTries >= (settings.maxSpeed ? A.SPEED_RETRIES : MAX_SUBMIT_TRIES)) {
       pressKey('Escape');
       return;
     }
@@ -1167,13 +1207,18 @@
 
     setStatus('statusAnswering', [C.ticketLabel(current.id), msg(`source_${source}`)]);
     const timeLeft = current.expiresAt - Date.now() - 2000;
-    const dwell = C.minDwellMs(current, stats.dwell[current.type]);
+    const dwell = workDwell(current);
     const dwellLeft = dwell - (Date.now() - taskOpenedAt);
     // The achievement hunt answers a banked ticket fast for the 3-second
-    // achievement, unless the server has proved it rejects that.
+    // achievement, unless the server has proved it rejects that. Max speed
+    // waits only what the server needs.
     const speedy =
       huntOn() && source === 'bank' && dwell < SPEEDY_MS && A.achievementTier(player, 'speedy') !== null;
-    const wait = speedy ? Math.max(dwellLeft, SPEEDY_MIN_MS) : Math.max(humanDelay() - (Date.now() - started), dwellLeft);
+    const wait = settings.maxSpeed
+      ? dwellLeft
+      : speedy
+        ? Math.max(dwellLeft, SPEEDY_MIN_MS)
+        : Math.max(humanDelay() - (Date.now() - started), dwellLeft);
     await sleep(Math.min(wait, timeLeft));
     if (!workOn() || task?.id !== current.id) return;
 
@@ -1186,7 +1231,7 @@
       log.warn('answer_button_missing', { ticket: C.ticketLabel(current.id), index });
       return;
     }
-    pending = { taskId: current.id, source };
+    pending = { taskId: current.id, source, openMs: Date.now() - taskOpenedAt };
     button.click();
   }
 
@@ -1204,21 +1249,22 @@
     setStatus('statusTyping', [C.ticketLabel(current.id), num.format([...code].length)]);
     input.focus();
     setInputValue.call(input, '');
-    for (const ch of code) {
-      setInputValue.call(input, input.value + ch);
+    // The server only sees the finished line, so max speed enters it at once.
+    for (const chunk of settings.maxSpeed ? [code] : code) {
+      setInputValue.call(input, input.value + chunk);
       input.dispatchEvent(new Event('input', { bubbles: true }));
-      await sleep(C.delayBetween(TYPING_MIN_MS, TYPING_MAX_MS));
+      await sleep(settings.maxSpeed ? RENDER_MS : C.delayBetween(TYPING_MIN_MS, TYPING_MAX_MS));
       if (!workOn() || task?.id !== current.id) return;
     }
-    const dwellLeft = C.minDwellMs(current, stats.dwell[current.type]) - (Date.now() - taskOpenedAt);
-    await sleep(Math.max(dwellLeft, C.delayBetween(200, 500)));
+    const dwellLeft = workDwell(current) - (Date.now() - taskOpenedAt);
+    await sleep(Math.max(dwellLeft, settings.maxSpeed ? RENDER_MS : C.delayBetween(200, 500)));
     if (!workOn() || task?.id !== current.id) return;
     if (input.value !== code) {
       log.warn('typing_mismatch', { ticket: C.ticketLabel(current.id) });
       answeredTaskId = null;
       return;
     }
-    pending = { taskId: current.id, source: 'typed' };
+    pending = { taskId: current.id, source: 'typed', openMs: Date.now() - taskOpenedAt };
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
   }
 
@@ -1234,7 +1280,7 @@
         return;
       }
       button.click();
-      await sleep(C.delayBetween(150, 400));
+      await sleep(settings.maxSpeed ? RENDER_MS : C.delayBetween(150, 400));
       if (!workOn() || task?.id !== current.id) return;
     }
     const submit = taskEl.querySelector('.ticket-submit');
@@ -1242,7 +1288,7 @@
       log.warn('answer_button_missing', { ticket: C.ticketLabel(current.id), index, field: 'submit' });
       return;
     }
-    pending = { taskId: current.id, source };
+    pending = { taskId: current.id, source, openMs: Date.now() - taskOpenedAt };
     submit.click();
   }
 
@@ -1324,7 +1370,7 @@
       // Typing tickets have no answer buttons to mark, so the result panel is
       // the only sign that a "Přepiš kód" ticket is done.
       if (screen.querySelector('section.work-result') || taskEl.querySelector('button.right, button.wrong')) {
-        await sleep(humanDelay() / 2);
+        await sleep(workPause());
         pressKey('Escape');
         return;
       }
@@ -1346,10 +1392,13 @@
       setStatus('statusNoEnergy');
       return;
     }
+    // Fast polling sees the lobby again before the picked ticket arrives.
+    if (Date.now() - cardClickedAt < CARD_WAIT_MS && taskOpenedAt < cardClickedAt) return;
     setStatus('statusStarting');
-    await sleep(humanDelay() / 2);
+    await sleep(workPause());
     if (!workOn()) return;
     lastType = type;
+    cardClickedAt = Date.now();
     card.click();
   }
 
@@ -2352,8 +2401,15 @@
     } finally {
       busy = false;
     }
-    // At max speed a step that played goes again at once instead of on the next tick.
+    // At max speed a step that played goes again at once instead of on the next
+    // tick, and the work screen is polled faster than the tick.
     if (settings.maxSpeed && gameRequests !== sent) setTimeout(tick);
+    else if (settings.maxSpeed && workOn() && !fastTick && document.querySelector('.work-screen')) {
+      fastTick = setTimeout(() => {
+        fastTick = null;
+        tick();
+      }, WORK_FAST_TICK_MS);
+    }
   }
 
   function startWork() {

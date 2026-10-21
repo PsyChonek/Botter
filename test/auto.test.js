@@ -1052,3 +1052,16 @@ test('speedLearn waits just past what the server refused and keeps probing short
   assert.equal(A.speedWait(A.speedLearn({}, '/api/hotfix/free', 0, 40_000, true), '/api/hotfix/free', 0, 32_000), 32_000);
   assert.deepEqual([0, 1, 2].map(A.speedRetryWait), [150, 300, 600]);
 });
+
+test('workSpeedLearn steps past a refused submit by a doubling step and trims after accepted ones', () => {
+  const key = 'work:bug';
+  let speed = {};
+  assert.equal(A.speedWait(speed, key, 0, 60_000), 0);
+  speed = A.workSpeedLearn(speed, key, 400, true, 0);
+  assert.equal(A.speedWait(speed, key, 0, 60_000), 550);
+  // The same ticket refused again at 600 ms: the step doubles.
+  speed = A.workSpeedLearn(speed, key, 600, true, 1);
+  assert.equal(A.speedWait(speed, key, 0, 60_000), 900);
+  for (let i = 0; i < 10; i++) speed = A.workSpeedLearn(speed, key, 900, false);
+  assert.equal(A.speedWait(speed, key, 0, 60_000), 850);
+});

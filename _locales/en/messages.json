@@ -280,10 +280,10 @@
     "message": "Reserve: credits never bet or spent"
   },
   "optionsMaxSpeed": {
-    "message": "Max speed: play as fast as the server allows"
+    "message": "Max speed: play and work as fast as the server allows"
   },
   "optionsMaxSpeedHint": {
-    "message": "Game requests wait only as long after each game response as the server takes, learned per game: a request it refuses (\"počkej na animaci\") raises that game's wait to just past the one refused and is retried after 0.15 s, 0.3 s, 0.6 s and so on instead of the 30 s the server asks for, and every 10 accepted in a row trim it, so the bot keeps finding the shortest wait. The learned waits are shared by every casino tab. Off, every game request waits the minimum time below."
+    "message": "Game requests wait only as long after each game response as the server takes, learned per game: a request it refuses (\"počkej na animaci\") raises that game's wait to just past the one refused and is retried after 0.15 s, 0.3 s, 0.6 s and so on instead of the 30 s the server asks for, and every 10 accepted in a row trim it, so the bot keeps finding the shortest wait. The learned waits are shared by every casino tab. Work tickets the same way: no reading or typing delays, a typed line is entered at once, and each ticket type is submitted as soon as it has been open for the learned least time the server accepts, which a refused submit raises past the refused time and 10 accepted in a row trim. Off, every game request waits the minimum time below and work keeps the human delays."
   },
   "optionsGameDelay": {
     "message": "Minimum time between game requests (ms)"
