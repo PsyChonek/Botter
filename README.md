@@ -30,7 +30,7 @@ math says it pays, using exact odds models of each game at your account's upgrad
 | --- | --- |
 | **Work** | Solves all four ticket types: bug hunt, "Co to vypíše?", "Založ task" and "Přepiš kód". Every submit response carries the right answer, so the bank learns each ticket the first time it sees it. |
 | **AI fallback** | Unknown tickets go to on-device Gemini Nano (free, offline), the Claude API or any OpenRouter model. |
-| **Games** | Blaze 20 Wild, Skeleton Slots, Slotingi, Forbes z Chánova, roulette, blackjack, baccarat, Kostky and Case opening, through the API or (for the older games) by pressing the real game screen's buttons. |
+| **Games** | Blaze 20 Wild, Skeleton Slots, Slotingi, Forbes z Chánova, roulette, blackjack, baccarat, Kostky, Case opening and Kniha mrtvého kódu, through the API or (for the older games) by pressing the real game screen's buttons. |
 | **Auto mode** | One switch. Claims the daily bonus, wheel and bailout, repays debt or declares bankruptcy when that is cheaper, runs the daily standup quests, hunts achievements, plays the lottery when it pays, and grinds XP on the lowest-edge game within a loss budget. |
 | **Upgrades** | Buys shop upgrades only when the XP still to grind earns the price back. |
 | **Books** | Profit, return and XP per credit for every game, upgrade level and account. Roulette, baccarat, Kostky and Case opening results are checked against the model. |
@@ -72,6 +72,7 @@ simulated in `scripts/odds.mjs`, not the noisy measured one:
 | Baccarat (Bankéř) | 90.5 % | 97.8 % |
 | Blackjack | 87.6 % | 97.1 % |
 | Case opening | 86.9 % | 96.2 % |
+| Kniha mrtvého kódu | ~80 % | ~95 % |
 | Slotingi | ~74 % | ~93 % |
 | Skeleton Slots | ~71 % | ~94 % |
 | Blaze 20 Wild | ~63 % | ~95 % |

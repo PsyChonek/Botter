@@ -1671,6 +1671,9 @@
   "game_cases": {
     "message": "Case opening"
   },
+  "game_egypt": {
+    "message": "Book of Dead Code"
+  },
   "optionsTablesHeading": {
     "message": "Dice and Case opening check"
   },
@@ -1700,6 +1703,12 @@
   },
   "ach_case_pen": {
     "message": "three pens in a row"
+  },
+  "ach_egypt_free": {
+    "message": "Book of Dead Code free spins"
+  },
+  "ach_egypt_books5": {
+    "message": "five books at once"
   },
   "statusEdgeBet": {
     "message": "Paying game: $P1$ at $P2$ a round, $P3$ expected per credit",

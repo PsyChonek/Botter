@@ -1671,6 +1671,9 @@
   "game_cases": {
     "message": "Case opening"
   },
+  "game_egypt": {
+    "message": "Kniha mrtvého kódu"
+  },
   "optionsTablesHeading": {
     "message": "Kontrola Kostek a Case opening"
   },
@@ -1700,6 +1703,12 @@
   },
   "ach_case_pen": {
     "message": "tři propisky v řadě"
+  },
+  "ach_egypt_free": {
+    "message": "free spiny v Knize mrtvého kódu"
+  },
+  "ach_egypt_books5": {
+    "message": "pět knih naráz"
   },
   "statusEdgeBet": {
     "message": "Hra v plusu: $P1$ po $P2$, čekaný zisk $P3$ na kredit",

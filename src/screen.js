@@ -24,6 +24,7 @@
     roulette: 'main.table-screen.roulette',
     baccarat: 'main.table-screen.baccarat',
     dice: 'main.table-screen.dice',
+    egypt: 'main.table-screen.egypt',
   };
   // Games played with the bet +/- and one button: its selector and the path it sends.
   const SPIN_PATHS = {
@@ -32,6 +33,7 @@
     slotingi: '/api/slotingi/spin',
     hotfix: '/api/hotfix/spin',
     cases: '/api/cases/open',
+    egypt: '/api/egypt/spin',
   };
   const SPIN_BUTTONS = { cases: 'button.cs-open' };
   // Chip tables: their main button is idle when it is enabled.

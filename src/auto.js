@@ -5,6 +5,7 @@
   const BAC = root.BotterBaccarat ?? require('./baccarat.js');
   const DICE = root.BotterDice ?? require('./dice.js');
   const CASES = root.BotterCases ?? require('./cases.js');
+  const EGYPT = root.BotterEgypt ?? require('./egypt.js');
   const CRASH_DOUBLING_MS = 4 * 60 * 60 * 1000;
   // A round that survives until the next 9:00 deploy pays every open bet at the
   // production multiplier reached after 24 hours.
@@ -505,6 +506,7 @@
     baccarat: /bakarat|baccarat/,
     dice: /kostk|dice/,
     cases: /case opening|bedn|beden/,
+    egypt: /knih\w* mrtv|egypt/,
     crash: /produkce|crash/,
   };
 
@@ -635,6 +637,8 @@
     case_knife: { reward: 5000 }, // a gold knife from a case
     case_car: { reward: 2000 }, // the burning Fabia from a case
     case_pen: { reward: 500 }, // three pens in a row
+    egypt_free: { reward: 2000 }, // start Kniha mrtvého kódu free spins (3+ books)
+    egypt_books5: { reward: 4000 }, // five books on one Kniha mrtvého kódu spin
   };
   // Per hand of the bot's strategy, from 2,000,000 simulated hands with no
   // upgrades (natural 4.76 %, five-card win 0.51 %; maxed upgrades 0.65 %).
@@ -698,6 +702,7 @@
   // tie or pair bet per baccarat hand (whichever pays more), a sum, triple or
   // Malá bet per Kostky roll (the same way), a gold knife, the burning Fabia
   // and a third pen in a row per case (the pens counted as three in a row),
+  // three and five books per Kniha mrtvého kódu spin,
   // any round at night, and the next rounds-played tier spread over the rounds
   // it still needs (finishing it costs those rounds, so a round is worth the
   // reward over that count). A round is played when that beats its expected
@@ -754,6 +759,11 @@
         if (open('case_knife')) own.push({ key: 'case_knife', value: CASES.chance('gold', upgrades) * achievementReward('case_knife', 0) });
         if (open('case_car')) own.push({ key: 'case_car', value: CASES.chance('car', upgrades) * achievementReward('case_car', 0) });
         if (open('case_pen')) own.push({ key: 'case_pen', value: CASES.chance('pen', upgrades) ** 3 * achievementReward('case_pen', 0) });
+      }
+      if (game === 'egypt') {
+        const upgrades = player.upgrades?.egypt;
+        if (open('egypt_free')) own.push({ key: 'egypt_free', value: EGYPT.freeChance(upgrades) * achievementReward('egypt_free', 0) });
+        if (open('egypt_books5')) own.push({ key: 'egypt_books5', value: EGYPT.bookChance(5, upgrades) * achievementReward('egypt_books5', 0) });
       }
       const targets = [...shared, ...own];
       if (!targets.length) continue;

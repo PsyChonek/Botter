@@ -19,6 +19,7 @@
     cases: { unlock: 17, path: '/api/cases/open' },
     baccarat: { unlock: 20, path: '/api/baccarat/deal' },
     dice: { unlock: 25, path: '/api/dice/roll' },
+    egypt: { unlock: 30, path: '/api/egypt/spin' },
   };
   const LOTTERY_UNLOCK = 4;
   const GAME_KEYS = Object.keys(GAMES);
@@ -36,6 +37,7 @@
     '/api/baccarat/deal': 'baccarat',
     '/api/cases/open': 'cases',
     '/api/dice/roll': 'dice',
+    '/api/egypt/spin': 'egypt',
     '/api/blackjack/deal': 'blackjack',
     '/api/blackjack/action': 'blackjack',
     '/api/lottery/buy': 'lottery',
@@ -55,8 +57,9 @@
     baccarat: { cut: [3, 12000, 2], push: [1, 25000, 1] },
     dice: { house: [3, 15000, 2], insure: [1, 30000, 1] },
     cases: { supplier: [3, 10000, 2], kitchen: [2, 20000, 2] },
+    egypt: { archeo: [3, 15000, 2], cleanup: [4, 12000, 1.8], deadline: [2, 25000, 2] },
   };
-  const SHOP_UNLOCK = { global: 1, blaze: 1, crash: 3, skeleton: 5, slotingi: 7, blackjack: 10, hotfix: 13, roulette: 15, cases: 17, baccarat: 20, dice: 25 };
+  const SHOP_UNLOCK = { global: 1, blaze: 1, crash: 3, skeleton: 5, slotingi: 7, blackjack: 10, hotfix: 13, roulette: 15, cases: 17, baccarat: 20, dice: 25, egypt: 30 };
 
   // Next level of an upgrade: its price and the player level it needs.
   function upgradeOffer(upgrades, game, key) {
@@ -84,6 +87,7 @@
     'blaze:star', 'skeleton:team', 'blaze:lucky', 'blaze:wild', 'skeleton:wild', 'slotingi:gulas', 'skeleton:deploy',
     'slotingi:crown', 'roulette:zeros', 'dice:house', 'dice:insure', 'baccarat:push', 'baccarat:cut', 'blackjack:ties', 'blackjack:bjpay',
     'hotfix:review', 'hotfix:oncall', 'hotfix:fix', 'cases:supplier', 'cases:kitchen',
+    'egypt:deadline', 'egypt:archeo', 'egypt:cleanup',
   ].map((entry) => {
     const [game, key] = entry.split(':');
     return { game, key };

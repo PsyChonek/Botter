@@ -17,6 +17,7 @@ const BJ = require('../src/blackjack.js');
 const BAC = require('../src/baccarat.js');
 const Dice = require('../src/dice.js');
 const Cases = require('../src/cases.js');
+const Egypt = require('../src/egypt.js');
 const args = process.argv.slice(2);
 const onlyAt = args.indexOf('--only');
 const ONLY = onlyAt >= 0 ? new Set(args.splice(onlyAt, 2)[1].split(',')) : null;
@@ -397,36 +398,18 @@ function hotfixSim([oncall, fix, review]) {
   return summary(returns);
 }
 
-// ---------- Kniha mrtvého kódu: 5x3, 10 lines, book wild and scatter ----------
-// From the client's paytable rules. Open points: the book's special symbol is
-// drawn evenly from the nine paying symbols, freeBoost is added to its weight
-// on every reel during free spins, books count anywhere (5 or more pay as 5),
-// and a line pays its first non-book symbol with the books that extend it.
-const EG_SYMBOLS = ['scarab', 'cobra', 'urn', 'cat', 'eye', 'anubis', 'horus', 'mummy', 'pharaoh', 'book'];
-const EG_WEIGHTS = { scarab: 24, cobra: 24, urn: 23, cat: 19, eye: 19, anubis: 6, horus: 6, mummy: 4, pharaoh: 3, book: 2.7 };
-const EG_HIGH = ['anubis', 'horus', 'mummy', 'pharaoh'];
-const EG_LINES = [
-  [1, 1, 1, 1, 1], [0, 0, 0, 0, 0], [2, 2, 2, 2, 2], [0, 1, 2, 1, 0], [2, 1, 0, 1, 2],
-  [1, 2, 2, 2, 1], [1, 0, 0, 0, 1], [2, 2, 1, 0, 0], [0, 0, 1, 2, 2], [2, 1, 1, 1, 0],
-];
-// Pays for 2 to 5 of a kind, per unit of total bet on one line of ten.
-const EG_PAYTABLE = {
-  scarab: [0, 6, 20, 80], cobra: [0, 6, 20, 80], urn: [0, 6, 20, 80], cat: [0, 6, 30, 120], eye: [0, 6, 30, 120],
-  anubis: [5, 20, 60, 200], horus: [5, 20, 60, 200], mummy: [5, 25, 100, 400], pharaoh: [10, 50, 200, 1000],
-};
-const EG_SCATTER = [2, 20, 200];
-const EG = { freeSpins: 10, freeBoost: 9, archeo: 0.04, cleanup: 0.4 };
-const EG_BOOK = 9;
-const EG_PAYING = 9;
-const egMin = (sym) => (EG_HIGH.includes(EG_SYMBOLS[sym]) ? 2 : 3);
+// ---------- Kniha mrtvého kódu: the tables in src/egypt.js ----------
+// Open points: the special symbol is drawn evenly from the nine paying
+// symbols, and a line pays its first non-book symbol with the books that
+// extend it.
+const EG_BOOK = Egypt.SYMBOLS.indexOf('book');
+const EG_PAYING = EG_BOOK;
+const egMin = (sym) => Egypt.minCount(Egypt.SYMBOLS[sym]);
+const egPays = Egypt.SYMBOLS.slice(0, EG_PAYING).map((s) => Egypt.PAYTABLE[s]);
 
 function egyptConfig([archeo, cleanup, deadline], special = -1) {
-  const weights = EG_SYMBOLS.map((s) => EG_WEIGHTS[s]);
-  weights[EG_BOOK] += archeo * EG.archeo;
-  weights[0] -= cleanup * EG.cleanup;
-  weights[1] -= cleanup * EG.cleanup;
-  if (special >= 0) weights[special] += EG.freeBoost;
-  return { draw: picker(weights), freeSpins: EG.freeSpins + deadline };
+  const cfg = Egypt.config({ archeo, cleanup, deadline }, special >= 0 ? Egypt.SYMBOLS[special] : null);
+  return { draw: picker(Egypt.SYMBOLS.map((s) => cfg.weights[s])), freeSpins: cfg.freeSpins };
 }
 
 // One spin's line and scatter pay per unit bet, the books it shows and, with
@@ -434,7 +417,7 @@ function egyptConfig([archeo, cleanup, deadline], special = -1) {
 function egyptSpin(draw, special = -1) {
   const grid = [0, 1, 2, 3, 4].map(() => [draw(), draw(), draw()]);
   let paid = 0;
-  for (const line of EG_LINES) {
+  for (const line of Egypt.LINES) {
     let sym = EG_BOOK;
     let count = 0;
     for (; count < 5; count++) {
@@ -443,11 +426,11 @@ function egyptSpin(draw, special = -1) {
       if (sym === EG_BOOK) sym = s;
       else if (s !== sym) break;
     }
-    if (sym !== EG_BOOK && count >= egMin(sym)) paid += EG_PAYTABLE[EG_SYMBOLS[sym]][count - 2] / EG_LINES.length;
+    if (sym !== EG_BOOK && count >= egMin(sym)) paid += egPays[sym][count - 2] / Egypt.LINES.length;
   }
   let books = 0;
   for (const reel of grid) for (const s of reel) if (s === EG_BOOK) books++;
-  if (books >= 3) paid += EG_SCATTER[Math.min(books, 5) - 3];
+  if (books >= 3) paid += Egypt.SCATTER[Math.min(books, 5) - 3];
   const reels = special >= 0 ? grid.filter((reel) => reel.includes(special)).length : 0;
   return { paid, books, reels };
 }
@@ -466,7 +449,7 @@ function egyptSim(levels) {
       for (let left = base.freeSpins; left > 0; left--) {
         const fs = egyptSpin(free[special], special);
         paid += fs.paid;
-        if (fs.reels >= egMin(special)) paid += EG_PAYTABLE[EG_SYMBOLS[special]][fs.reels - 2];
+        if (fs.reels >= egMin(special)) paid += egPays[special][fs.reels - 2];
         if (fs.books >= 3) left += base.freeSpins;
       }
     }

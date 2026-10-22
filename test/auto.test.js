@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const A = require('../src/auto.js');
+const E = require('../src/egypt.js');
 
 test('crashMult doubles every four hours', () => {
   assert.equal(A.crashMult(0, 0), 1);
@@ -1064,4 +1065,15 @@ test('workSpeedLearn steps past a refused submit by a doubling step and trims af
   assert.equal(A.speedWait(speed, key, 0, 60_000), 900);
   for (let i = 0; i < 10; i++) speed = A.workSpeedLearn(speed, key, 900, false);
   assert.equal(A.speedWait(speed, key, 0, 60_000), 850);
+});
+
+test('huntPlan spins Kniha mrtvého kódu for its free spins and five books', () => {
+  const ctx = huntCtx({ level: 30, unlocks: { egypt: 30 }, edges: { egypt: 0.2 } });
+  const plan = A.huntPlan(hunter({ achievements: { regular: { tier: 3 } } }), ctx);
+  assert.equal(plan.game, 'egypt');
+  assert.deepEqual(plan.targets, ['egypt_free', 'egypt_books5']);
+  const expected = E.freeChance({}) * 2000 + E.bookChance(5, {}) * 4000;
+  assert.ok(Math.abs(plan.value - expected) < 1e-9, `value ${plan.value}`);
+  assert.equal(A.questGame({ key: 'rounds_x', text: 'Zatoč 20× Knihou mrtvého kódu' }), 'egypt');
+  assert.equal(A.questGame({ key: 'spins_egypt', text: 'Zatoč 20×' }), 'egypt');
 });
