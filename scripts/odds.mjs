@@ -387,7 +387,8 @@ const casesSim = ([supplier, kitchen]) => distributionSim(Cases.distribution({ s
 // ---------- Forbes z Chánova: the model in scripts/hotfix-sim.mjs ----------
 // Free spins as Postupný rollout (the bot's pick) with the multiplier +1 per
 // winning spin (the 2026-10-13 test). A round's return spreads about ten times
-// wider than the other slots', so it gets HOTFIX_FACTOR times the spins.
+// wider than the other slots', so it (and Kniha mrtvého kódu) gets
+// HOTFIX_FACTOR times the spins.
 const HOTFIX_FACTOR = 5;
 function hotfixSim([oncall, fix, review]) {
   const cfg = hotfixConfig(oncall, fix, review);
@@ -396,10 +397,89 @@ function hotfixSim([oncall, fix, review]) {
   return summary(returns);
 }
 
+// ---------- Kniha mrtvého kódu: 5x3, 10 lines, book wild and scatter ----------
+// From the client's paytable rules. Open points: the book's special symbol is
+// drawn evenly from the nine paying symbols, freeBoost is added to its weight
+// on every reel during free spins, books count anywhere (5 or more pay as 5),
+// and a line pays its first non-book symbol with the books that extend it.
+const EG_SYMBOLS = ['scarab', 'cobra', 'urn', 'cat', 'eye', 'anubis', 'horus', 'mummy', 'pharaoh', 'book'];
+const EG_WEIGHTS = { scarab: 24, cobra: 24, urn: 23, cat: 19, eye: 19, anubis: 6, horus: 6, mummy: 4, pharaoh: 3, book: 2.7 };
+const EG_HIGH = ['anubis', 'horus', 'mummy', 'pharaoh'];
+const EG_LINES = [
+  [1, 1, 1, 1, 1], [0, 0, 0, 0, 0], [2, 2, 2, 2, 2], [0, 1, 2, 1, 0], [2, 1, 0, 1, 2],
+  [1, 2, 2, 2, 1], [1, 0, 0, 0, 1], [2, 2, 1, 0, 0], [0, 0, 1, 2, 2], [2, 1, 1, 1, 0],
+];
+// Pays for 2 to 5 of a kind, per unit of total bet on one line of ten.
+const EG_PAYTABLE = {
+  scarab: [0, 6, 20, 80], cobra: [0, 6, 20, 80], urn: [0, 6, 20, 80], cat: [0, 6, 30, 120], eye: [0, 6, 30, 120],
+  anubis: [5, 20, 60, 200], horus: [5, 20, 60, 200], mummy: [5, 25, 100, 400], pharaoh: [10, 50, 200, 1000],
+};
+const EG_SCATTER = [2, 20, 200];
+const EG = { freeSpins: 10, freeBoost: 9, archeo: 0.04, cleanup: 0.4 };
+const EG_BOOK = 9;
+const EG_PAYING = 9;
+const egMin = (sym) => (EG_HIGH.includes(EG_SYMBOLS[sym]) ? 2 : 3);
+
+function egyptConfig([archeo, cleanup, deadline], special = -1) {
+  const weights = EG_SYMBOLS.map((s) => EG_WEIGHTS[s]);
+  weights[EG_BOOK] += archeo * EG.archeo;
+  weights[0] -= cleanup * EG.cleanup;
+  weights[1] -= cleanup * EG.cleanup;
+  if (special >= 0) weights[special] += EG.freeBoost;
+  return { draw: picker(weights), freeSpins: EG.freeSpins + deadline };
+}
+
+// One spin's line and scatter pay per unit bet, the books it shows and, with
+// a special symbol, how many reels hold it.
+function egyptSpin(draw, special = -1) {
+  const grid = [0, 1, 2, 3, 4].map(() => [draw(), draw(), draw()]);
+  let paid = 0;
+  for (const line of EG_LINES) {
+    let sym = EG_BOOK;
+    let count = 0;
+    for (; count < 5; count++) {
+      const s = grid[count][line[count]];
+      if (s === EG_BOOK) continue;
+      if (sym === EG_BOOK) sym = s;
+      else if (s !== sym) break;
+    }
+    if (sym !== EG_BOOK && count >= egMin(sym)) paid += EG_PAYTABLE[EG_SYMBOLS[sym]][count - 2] / EG_LINES.length;
+  }
+  let books = 0;
+  for (const reel of grid) for (const s of reel) if (s === EG_BOOK) books++;
+  if (books >= 3) paid += EG_SCATTER[Math.min(books, 5) - 3];
+  const reels = special >= 0 ? grid.filter((reel) => reel.includes(special)).length : 0;
+  return { paid, books, reels };
+}
+
+// A free spin's special symbol expands over every reel that holds it once it
+// is on enough reels, and pays on all ten lines.
+function egyptSim(levels) {
+  const base = egyptConfig(levels);
+  const free = Array.from({ length: EG_PAYING }, (_, sym) => egyptConfig(levels, sym).draw);
+  const returns = new Float64Array(SPINS * HOTFIX_FACTOR);
+  for (let n = 0; n < returns.length; n++) {
+    const spin = egyptSpin(base.draw);
+    let paid = spin.paid;
+    if (spin.books >= 3) {
+      const special = (rand() * EG_PAYING) | 0;
+      for (let left = base.freeSpins; left > 0; left--) {
+        const fs = egyptSpin(free[special], special);
+        paid += fs.paid;
+        if (fs.reels >= egMin(special)) paid += EG_PAYTABLE[EG_SYMBOLS[special]][fs.reels - 2];
+        if (fs.books >= 3) left += base.freeSpins;
+      }
+    }
+    returns[n] = paid;
+  }
+  return summary(returns);
+}
+
 // ---------- write ----------
 const kept = ONLY ? require('../src/odds-table.js') : null;
-const table = kept ?? { blaze: { symbols: {}, reels: {} }, skeleton: {}, slotingi: {}, hotfix: {}, chances: { blaze: { symbols: {}, reels: {} } } };
+const table = kept ?? { blaze: { symbols: {}, reels: {} }, skeleton: {}, slotingi: {}, hotfix: {}, egypt: {}, chances: { blaze: { symbols: {}, reels: {} } } };
 table.hotfix ??= {};
+table.egypt ??= {};
 const wanted = (game) => !ONLY || ONLY.has(game);
 const started = Date.now();
 const done = (game) => console.log(`${game} done in ${Math.round((Date.now() - started) / 1000)} s`);
@@ -420,6 +500,7 @@ for (const [game, sim, maxLevels] of [
   ['dice', diceSim, [3, 1]],
   ['cases', casesSim, [3, 2]],
   ['hotfix', hotfixSim, [3, 3, 4]],
+  ['egypt', egyptSim, [3, 4, 2]],
 ].filter(([game]) => wanted(game))) {
   table.chances[game] = {};
   for (const [levels, key] of combos(maxLevels)) {
@@ -437,8 +518,8 @@ writeFileSync(
   `// Generated by scripts/odds.mjs (${SPINS.toLocaleString('en')} spins per combination). Do not edit.
 // Slot return to player per upgrade combination. Keys are the upgrade levels in
 // order: blaze lucky/wild/star (per scatter rule), skeleton team/wild/deploy,
-// slotingi crown/gulas/mint, hotfix oncall/fix/review (${(SPINS * HOTFIX_FACTOR).toLocaleString('en')}
-// spins each). chances holds [share of rounds that end ahead,
+// slotingi crown/gulas/mint, hotfix oncall/fix/review and egypt
+// archeo/cleanup/deadline (${(SPINS * HOTFIX_FACTOR).toLocaleString('en')} spins each). chances holds [share of rounds that end ahead,
 // share of ${SESSION_ROUNDS.toLocaleString('en')}-round sessions that end ahead, mean net profit per unit
 // bet of the rounds that end ahead, variance of one round's return, share of
 // rounds paying ${BIG_WINS.join(' / ')} times the bet or more] per game and

@@ -24,6 +24,7 @@
     dice: [['house', 3], ['insure', 1]],
     cases: [['supplier', 3], ['kitchen', 2]],
     hotfix: [['oncall', 3], ['fix', 3], ['review', 4]],
+    egypt: [['archeo', 3], ['cleanup', 4], ['deadline', 2]],
   };
   const key = (game, own) => UPGRADES[game].map(([name, max]) => level(own, name, max)).join('');
 
@@ -55,6 +56,7 @@
       case 'skeleton':
       case 'slotingi':
       case 'hotfix':
+      case 'egypt':
         return TABLE[game]?.[key(game, own)] ?? null;
       case 'roulette':
         return 36 / (37 + ROULETTE_EXTRA_ZEROS - level(own, 'zeros', ROULETTE_EXTRA_ZEROS));
