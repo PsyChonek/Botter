@@ -251,6 +251,20 @@ progress shows at `chrome://on-device-internals`.
     it or waiting for the level, plus the account's credits above 500, which go with
     it. A test checks the formula against a Monte Carlo run. At most once a week,
     because of the block. The loan is booked as free income.
+  - **Level loan** (on by default, `levelLoan` in `src/auto.js`): the shark charges
+    nothing in the first hour, then 8 % of the principal for every full hour since
+    `loan.takenAt`, compounded (the client's own formula). A partial repayment does
+    not lower it, only a full one closes the loan. With no loan, no block and the
+    clean-loan trick done, while the grinder is what runs next (no work available, no
+    upgrade being saved for, Blaze not being learned), the bot takes the biggest loan
+    when the next level-up reward (1,000 per level) beats the expected loss on the XP
+    left in the level plus one hour of interest, and the loan lets the grinder bet
+    more. Its credits count as the grinder's bankroll. Once the loan is 10 minutes old
+    it is repaid in full as soon as the credits cover it (checked every minute, never
+    in part), then taken again if it still pays, so each loan starts a new free hour.
+    A grind that falls behind keeps the loan until a level-up or work pay covers it,
+    and only then pays interest. Taken before the loan cycle, whose loan is never
+    repaid. The shop sells nothing while it is open, so no upgrade is saved for then.
   - **Sprint**: story points are the XP earned since Monday 9:00, and the top three
     are paid 5,000 / 3,500 / 2,000 when the sprint ends. Bankruptcy wipes the week's
     points. Off the podium that is only this week's progress, so it is ignored. On the

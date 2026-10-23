@@ -466,6 +466,26 @@ test('loanCycle expects the cheaper of losing or finishing each point of the lev
   assert.equal(A.loanCycle(0, 0, 1000, 2, 3), null);
 });
 
+test('levelLoan pays when the level-up reward beats the XP loss and an hour of interest', () => {
+  // 10,000 borrowed, 2,000 XP left at 3 credits each, 15,000 for the level-up.
+  const plan = A.levelLoan(10_000, 15_000, 2000, 3);
+  assert.equal(plan.cost, 2000 * 3 + 10_000 * 0.08);
+  assert.equal(plan.value, 15_000 - plan.cost);
+  // An expensive level does not pay, whatever the loan.
+  assert.ok(A.levelLoan(10_000, 15_000, 10_000, 2).value < 0);
+  assert.equal(A.levelLoan(10_000, 15_000, 2000, null), null);
+  assert.equal(A.levelLoan(0, 15_000, 2000, 3), null);
+});
+
+test('loanRenewDue waits ten minutes from the loan, well inside its free hour', () => {
+  const takenAt = 1_000_000;
+  assert.equal(A.loanRenewDue({ takenAt }, takenAt + 9 * 60_000), false);
+  assert.equal(A.loanRenewDue({ takenAt }, takenAt + A.LOAN_RENEW_MS), true);
+  assert.ok(A.LOAN_RENEW_MS < 60 * 60_000);
+  // Without a start time it is repaid as soon as it can be.
+  assert.equal(A.loanRenewDue({ debt: 500 }, takenAt), true);
+});
+
 test('questGame and questKind read the standup quest text', () => {
   const spins = { key: 'q1', text: 'Zatoč si 25× Skeleton Slots' };
   const wager = { key: 'q2', text: 'Protoč 2 500 kreditů' };

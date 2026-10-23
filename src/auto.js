@@ -158,6 +158,32 @@
     return { amount, cost, value: amount - cost };
   }
 
+  // The shark's interest: nothing in the first hour, then this share of the
+  // principal for every full hour since the loan was taken, compounded. A
+  // partial repayment does not lower it, only a full one closes the loan.
+  const LOAN_RATE = 0.08;
+  // A level loan is repaid in full once it is this old and the credits cover
+  // it, then taken again if it still pays, so each loan starts a new free hour
+  // and none reaches its first interest tick while the grind keeps up.
+  const LOAN_RENEW_MS = 10 * 60 * 1000;
+
+  // Whether a level loan is old enough to be repaid and renewed. One without a
+  // start time is repaid as soon as the credits cover it.
+  function loanRenewDue(loan, now = Date.now()) {
+    return !(loan?.takenAt > 0) || now - loan.takenAt >= LOAN_RENEW_MS;
+  }
+
+  // Expected value of a loan that bankrolls the grinder to the next level: the
+  // level-up reward less the expected loss on the XP left in the level and one
+  // hour of interest, kept for a grind that falls behind and cannot repay
+  // before the first tick. xpPrice is credits per XP point, null when not
+  // measured yet, and then there is no plan.
+  function levelLoan(amount, reward, xpLeft, xpPrice) {
+    if (!(amount > 0) || !(xpLeft > 0) || xpPrice === null) return null;
+    const cost = xpLeft * xpPrice + amount * LOAN_RATE;
+    return { amount, reward, cost, value: reward - cost };
+  }
+
   // The wheel of fortune is free once an hour; null means never spun. A player
   // snapshot from before the wheel existed has no field and is not ready. It is
   // spun WHEEL_GRACE_MS late: right at wheelNextAt the server can still refuse.
@@ -1152,6 +1178,9 @@
     loanSprintSafe,
     loanAmount,
     loanCycle,
+    LOAN_RENEW_MS,
+    loanRenewDue,
+    levelLoan,
     wheelReady,
     grindPlan,
     AUTO_RESERVE_SDS,

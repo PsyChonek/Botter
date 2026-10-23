@@ -41,6 +41,7 @@
     repayDebt: true,
     autoBankrupt: true,
     loanCycle: true,
+    levelLoan: true,
     loanTrick: true,
     standup: true,
     achievementHunt: true,
@@ -1684,7 +1685,9 @@
   }
 
   async function repayStep() {
-    if (!settings.repayDebt || bankruptPlanned()) return false;
+    // A level loan is repaid only in full (levelLoanStep): a part would cut
+    // the grinder's bankroll and save no interest, which runs on the principal.
+    if (!settings.repayDebt || bankruptPlanned() || levelLoanOpen()) return false;
     const amount = A.repayAmount(player, settings.reserve);
     if (amount < 1 || Date.now() - (claimTried.repay ?? 0) < CRASH_POLL_MS) return false;
     claimTried.repay = Date.now();
@@ -1696,6 +1699,56 @@
       stats.free.loan = (stats.free.loan ?? 0) - amount;
       saveStats();
     }
+    return true;
+  }
+
+  // Whether the open loan is a level loan the bot took (levelLoanStep).
+  const levelLoanOpen = () => !!player?.loan && stats.flags.levelLoan === true;
+
+  // A loan that bankrolls the grinder to the next level when the level-up
+  // reward beats the expected loss on the XP left and an hour of interest
+  // (BotterAuto.levelLoan), so an upgraded game levels at a profit on borrowed
+  // credits. It is taken only when the grinder runs next and the loan lets it
+  // bet more. Interest starts after the first hour and runs on the whole
+  // principal, so once the loan is 10 minutes old it is repaid in full as soon
+  // as the credits cover it, and taken again if it still pays, which starts a
+  // new free hour each time. The bankruptcy cycle's loan is not one: it is
+  // dropped, not repaid.
+  async function levelLoanStep() {
+    if (!player.loan && stats.flags.levelLoan) {
+      stats.flags.levelLoan = false;
+      saveStats();
+    }
+    if (levelLoanOpen()) {
+      const debt = player.loan.debt ?? 0;
+      if (bankruptPlanned() || player.credits < debt || !A.loanRenewDue(player.loan)) return false;
+      if (Date.now() - (claimTried.levelLoan ?? 0) < CRASH_POLL_MS) return false;
+      claimTried.levelLoan = Date.now();
+      setStatus('statusLevelLoanRepay', [credits(debt)]);
+      const res = await api('/api/loan/repay', { amount: debt });
+      if (!res.ok) log.warn('level_loan_repay_failed', { debt, status: res.status, error: res.data?.error });
+      else log.info('level_loan_repaid', { debt, credits: player.credits });
+      return true;
+    }
+    if (!settings.levelLoan || !settings.autoGames || player.loan) return false;
+    if (player.loanBlockedUntil > Date.now() || (settings.loanTrick && !stats.flags.cleanDone)) return false;
+    if ((settings.autoWork && workAvailable()) || savingFor() || learningBlaze()) return false;
+    if (Date.now() - (claimTried.levelLoanTake ?? 0) < CRASH_POLL_MS) return false;
+    claimTried.levelLoanTake = Date.now();
+    const amount = A.loanAmount(player.loanLimit);
+    const plan = A.levelLoan(amount, G.levelReward(player.level + 1), G.xpAhead(player, 1), xpPrice());
+    if (!plan || plan.value <= 0) return false;
+    const bet = grindChoice(true, amount).plan?.bet ?? 0;
+    if (bet <= (grindChoice().plan?.bet ?? 0)) return false;
+    setStatus('statusLevelLoan', [credits(amount)]);
+    const res = await api('/api/loan/take', { amount });
+    if (!res.ok) {
+      log.warn('level_loan_failed', { amount, status: res.status, error: res.data?.error });
+      return true;
+    }
+    stats.flags.levelLoan = true;
+    saveStats();
+    log.info('level_loan', { ...plan, bet });
     return true;
   }
 
@@ -1926,9 +1979,12 @@
   const autoBetSize = () => !Number(settings.grindBet);
 
   // Most each game may bet with the auto size, from the credits above the
-  // reserve less what a loan still owes: borrowed credits are not a bankroll.
-  function autoCaps(games, reserve) {
-    const bankroll = player.credits - reserve - (player.loan?.debt ?? 0);
+  // reserve less what a loan still owes: borrowed credits are not a bankroll,
+  // except a level loan's, which is taken to be ground. extra is credits a
+  // level loan not taken yet would add.
+  function autoCaps(games, reserve, extra = 0) {
+    const owed = levelLoanOpen() ? 0 : (player.loan?.debt ?? 0);
+    const bankroll = player.credits + extra - reserve - owed;
     const variances = O.variances(games, player.upgrades, blazeMode());
     return Object.fromEntries(games.map((game) => [game, A.autoBetCap(variances[game], bankroll)]));
   }
@@ -1947,9 +2003,11 @@
   // gambled meanwhile. Not past a planned bankruptcy, which wipes the savings,
   // nor before the XP rate is measured, which only grinding measures. A goal
   // the verdict skips (a Blaze-first one) is bought when the credits are there,
-  // but the grinder does not wait for it.
+  // but the grinder does not wait for it. Nor while a level loan is open: the
+  // shop sells nothing until it is repaid.
   function savingFor() {
-    if (!settings.saveForUpgrades || !settings.autoMode || bankruptPlanned() || levelMargin() === null) return null;
+    if (!settings.saveForUpgrades || !settings.autoMode || bankruptPlanned() || levelLoanOpen()) return null;
+    if (levelMargin() === null) return null;
     const goal = reviewShop()?.goal;
     return goal && !goal.reason ? goal : null;
   }
@@ -2277,7 +2335,8 @@
   // allow, and a game too swingy for the credits gives way to the next cheapest.
   // Before a Hackathon weekend the grinder holds (BotterAuto.grindHold), and on
   // it the daily limit is the pooled weekend budget (BotterAuto.grindBudget).
-  function grindChoice(saving = true) {
+  // extra is credits a level loan not taken yet would add (levelLoanStep).
+  function grindChoice(saving = true, extra = 0) {
     const now = Date.now();
     const event = A.weekendEvent(now);
     const { levels, candidates, edges } = grindModel();
@@ -2287,13 +2346,13 @@
     const learning = learningBlaze();
     const auto = !learning && autoBetSize();
     const wanted = learning ? G.BET_LEVELS[0] : auto ? Infinity : Number(settings.grindBet);
-    const bet = A.grindBet({ ...limit, xpBudget: budget }, player.credits, lost, levels, wanted);
+    const bet = A.grindBet({ ...limit, xpBudget: budget }, player.credits + extra, lost, levels, wanted);
     if (learning) return { lost, levels, candidates, edges, plan: bet ? { game: 'blaze', bet } : null };
     // On a Konec kvartálu weekend the bonus on wins lowers each game's loss by its own amount.
     const bonus = winsBonusOn(now) ? A.WINS_BONUS : 0;
     const pickEdges = A.bonusEdges(edges, O.gains(candidates, player.upgrades, blazeMode()), bonus);
     const plan = auto
-      ? A.autoGrindPlan(candidates, bet, player.level, GRIND_UNLOCKS, pickEdges, autoCaps(candidates, limit.reserve), levels)
+      ? A.autoGrindPlan(candidates, bet, player.level, GRIND_UNLOCKS, pickEdges, autoCaps(candidates, limit.reserve, extra), levels)
       : A.grindPlan(candidates, bet, player.level, GRIND_UNLOCKS, pickEdges);
     return { lost, levels, candidates, edges, plan };
   }
@@ -2391,6 +2450,7 @@
     if (await rotateStep(true)) return;
     if (await repayStep()) return;
     if (await loanTrickStep()) return;
+    if (await levelLoanStep()) return;
     if (await loanCycleStep()) return;
     if (await buyStep()) return;
     if (await leaderboardStep()) return;
