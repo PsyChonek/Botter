@@ -483,13 +483,10 @@
     }
   },
   "statusLevelLoanRepay": {
-    "message": "Splácím $P1$ z půjčky na level (dluh $P2$) dřív, než naskočí úrok...",
+    "message": "Splácím celou půjčku na level $P1$ dřív, než naskočí úrok...",
     "placeholders": {
       "p1": {
         "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
       }
     }
   },
@@ -591,7 +588,7 @@
     "message": "Vzít největší půjčku, když se vyplatí ji utratit a smazat bankrotem (jednou týdně)"
   },
   "optionsLevelLoan": {
-    "message": "Půjčit si na grind dalšího levelu, když jeho odměna převýší očekávanou ztrátu, a po 10 minutách do ní splácet každý kredit, jakmile přijde, aby nenaskočil úrok"
+    "message": "Půjčit si na grind dalšího levelu, když jeho odměna převýší očekávanou ztrátu, a po 10 minutách ji splatit celou, jakmile na to kredity stačí, aby nenaskočil úrok"
   },
   "optionsLoanTrick": {
     "message": "Vzít jednorázový achievement +500 za čistou půjčku"

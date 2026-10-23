@@ -486,14 +486,16 @@ test('loanRenewDue waits ten minutes from the loan, well inside its free hour', 
   assert.equal(A.loanRenewDue({ debt: 500 }, takenAt), true);
 });
 
-test('levelLoanRepay pays every credit above the reserve once the loan is ten minutes old', () => {
+test('levelLoanRepay pays the whole debt once the loan is ten minutes old and covered, never a part', () => {
   const takenAt = 1_000_000;
-  const player = { credits: 30_000, loan: { debt: 57_500, takenAt } };
+  const due = takenAt + A.LOAN_RENEW_MS;
+  const player = { credits: 80_000, loan: { debt: 57_500, takenAt } };
   assert.equal(A.levelLoanRepay(player, 100, takenAt + 9 * 60_000), 0);
-  // In part, before the credits cover the whole debt.
-  assert.equal(A.levelLoanRepay(player, 100, takenAt + A.LOAN_RENEW_MS), 29_900);
-  assert.equal(A.levelLoanRepay({ ...player, credits: 80_000 }, 100, takenAt + A.LOAN_RENEW_MS), 57_500);
-  assert.equal(A.levelLoanRepay({ ...player, credits: 100 }, 100, takenAt + A.LOAN_RENEW_MS), 0);
+  assert.equal(A.levelLoanRepay(player, 100, due), 57_500);
+  // Not covered above the reserve: wait, the grinder keeps the credits.
+  assert.equal(A.levelLoanRepay({ ...player, credits: 57_550 }, 100, due), 0);
+  assert.equal(A.levelLoanRepay({ ...player, credits: 30_000 }, 0, due), 0);
+  assert.equal(A.levelLoanRepay({ credits: 80_000, loan: null }, 0, due), 0);
 });
 
 test('questGame and questKind read the standup quest text', () => {

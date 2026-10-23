@@ -259,13 +259,13 @@ progress shows at `chrome://on-device-internals`.
     upgrade being saved for, Blaze not being learned), the bot takes the biggest loan
     when the next level-up reward (1,000 per level) beats the expected loss on the XP
     left in the level plus one hour of interest, and the loan lets the grinder bet
-    more. Its credits count as the grinder's bankroll for 10 minutes. After that every
-    credit above the reserve goes to the loan as it comes in (a refused repayment
-    waits a minute), and the loan no longer counts as bankroll, so the grinder cannot
-    lose what is owed. A grind that fell behind closes it from level-up and work pay;
-    in part it only keeps the credits from being bet, the interest still runs on the
-    principal. Once closed it is taken again if it still pays, so each loan starts a
-    new free hour. Taken before the loan cycle, whose loan is never
+    more. Its credits count as the grinder's bankroll. Once the loan is 10 minutes old
+    it is repaid in full on the first step the credits above the reserve cover it
+    (never in part, which would only cut the bankroll; a refused repayment waits a
+    minute), then taken again if it still pays, so each loan starts a new free hour.
+    While it waits, `level_loan_wait` logs the debt, the credits and the minutes to
+    the next interest tick once a minute. A grind that falls behind keeps the loan
+    until a level-up or work pay covers it, and only then pays interest. Taken before the loan cycle, whose loan is never
     repaid. The shop sells nothing while it is open, so no upgrade is saved for then.
   - **Sprint**: story points are the XP earned since Monday 9:00, and the top three
     are paid 5,000 / 3,500 / 2,000 when the sprint ends. Bankruptcy wipes the week's

@@ -483,13 +483,10 @@
     }
   },
   "statusLevelLoanRepay": {
-    "message": "Repaying $P1$ of the level loan (owing $P2$) before any interest...",
+    "message": "Repaying the $P1$ level loan in full before any interest...",
     "placeholders": {
       "p1": {
         "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
       }
     }
   },
@@ -591,7 +588,7 @@
     "message": "Take the biggest loan when dropping it by bankruptcy is expected to pay (once a week)"
   },
   "optionsLevelLoan": {
-    "message": "Borrow to grind the next level when its reward beats the expected loss, and after 10 minutes repay every credit into it as it comes in, so no interest hour is hit"
+    "message": "Borrow to grind the next level when its reward beats the expected loss, and after 10 minutes repay it in full as soon as the credits cover it, so no interest hour is hit"
   },
   "optionsLoanTrick": {
     "message": "Take the one-time +500 clean-loan achievement"

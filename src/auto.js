@@ -162,10 +162,10 @@
   // principal for every full hour since the loan was taken, compounded. A
   // partial repayment does not lower it, only a full one closes the loan.
   const LOAN_RATE = 0.08;
-  // A level loan is ground on for this long, then repaid from every credit
-  // above the reserve as it comes in until it is closed, and taken again if it
-  // still pays, so each loan starts a new free hour and the grinder cannot lose
-  // what the shark is owed before the first interest tick.
+  const LOAN_HOUR_MS = 60 * 60 * 1000;
+  // A level loan is repaid in full once it is this old and the credits cover
+  // it, then taken again if it still pays, so each loan starts a new free hour
+  // and none reaches its first interest tick while the grind keeps up.
   const LOAN_RENEW_MS = 10 * 60 * 1000;
 
   // Whether a level loan is old enough to be repaid and renewed. One without a
@@ -174,10 +174,14 @@
     return !(loan?.takenAt > 0) || now - loan.takenAt >= LOAN_RENEW_MS;
   }
 
-  // Credits to pay on a level loan now: nothing in its first 10 minutes, then
-  // all the credits above the reserve, up to the debt.
+  // Credits to pay on a level loan now: the whole debt once the loan is 10
+  // minutes old and the credits above the reserve cover it, else nothing. Never
+  // a part, which would cut the grinder's bankroll and save no interest, since
+  // the interest runs on the principal.
   function levelLoanRepay(player, reserve, now = Date.now()) {
-    return loanRenewDue(player?.loan, now) ? repayAmount(player, reserve) : 0;
+    const debt = player?.loan?.debt ?? 0;
+    if (!(debt > 0) || !loanRenewDue(player.loan, now)) return 0;
+    return player.credits - reserve >= debt ? debt : 0;
   }
 
   // Expected value of a loan that bankrolls the grinder to the next level: the
@@ -1185,6 +1189,7 @@
     loanSprintSafe,
     loanAmount,
     loanCycle,
+    LOAN_HOUR_MS,
     LOAN_RENEW_MS,
     loanRenewDue,
     levelLoanRepay,
