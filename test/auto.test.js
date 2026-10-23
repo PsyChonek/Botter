@@ -1109,3 +1109,24 @@ test('huntPlan spins Kniha mrtvého kódu for its free spins and five books', ()
   assert.equal(A.questGame({ key: 'rounds_x', text: 'Zatoč 20× Knihou mrtvého kódu' }), 'egypt');
   assert.equal(A.questGame({ key: 'spins_egypt', text: 'Zatoč 20×' }), 'egypt');
 });
+
+test('levelCost pays while the XP left loses no more than the level-up reward', () => {
+  // 2,000 XP at 0.05 XP a credit is 40,000 wagered, 1,200 lost at a 3 % edge.
+  assert.deepEqual(A.levelCost(2000, 0.05, 0.03, 1500), { cost: 1200, reward: 1500, pays: true });
+  assert.equal(A.levelCost(2000, 0.05, 0.03, 1000).pays, false);
+  // Before the rate is measured the grinder plays on to measure it.
+  assert.equal(A.levelCost(2000, null, 0.03, 1000).pays, true);
+  // A paying edge costs nothing.
+  assert.equal(A.levelCost(2000, 0.05, -0.01, 0).cost, 0);
+});
+
+test('pricedEdge takes the measured loss only once it is clearly worse than the model', () => {
+  assert.equal(A.pricedEdge(0.03, null, 1), 0.03);
+  // 100 rounds losing 10 %: the standard error is 0.1, so nothing is clear yet.
+  assert.equal(A.pricedEdge(0.03, { rounds: 100, wagered: 10_000, net: -1000 }, 1), 0.03);
+  // 40,000 rounds losing 10 %: the bound is 10 % less 2 x 0.5 %.
+  const edge = A.pricedEdge(0.03, { rounds: 40_000, wagered: 4_000_000, net: -400_000 }, 1);
+  assert.ok(Math.abs(edge - 0.09) < 1e-9);
+  // A lucky measurement never lowers the model's edge.
+  assert.equal(A.pricedEdge(0.03, { rounds: 40_000, wagered: 4_000_000, net: 40_000 }, 1), 0.03);
+});

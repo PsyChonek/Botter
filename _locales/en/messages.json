@@ -590,6 +590,9 @@
   "optionsLevelLoan": {
     "message": "Borrow to grind the next level when its reward beats the expected loss, and after 10 minutes repay it in full as soon as the credits cover it, so no interest hour is hit"
   },
+  "optionsGrindPays": {
+    "message": "Grind XP only while the next level-up reward covers the expected loss on the XP left in the level"
+  },
   "optionsLoanTrick": {
     "message": "Take the one-time +500 clean-loan achievement"
   },
@@ -714,6 +717,17 @@
     "placeholders": {
       "p1": {
         "content": "$1"
+      }
+    }
+  },
+  "statusLevelUnpaid": {
+    "message": "XP grinding paused: the rest of this level is expected to lose $P1$ and its level-up pays $P2$. Work and free credits go on.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
       }
     }
   },

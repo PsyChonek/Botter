@@ -590,6 +590,9 @@
   "optionsLevelLoan": {
     "message": "Půjčit si na grind dalšího levelu, když jeho odměna převýší očekávanou ztrátu, a po 10 minutách ji splatit celou, jakmile na to kredity stačí, aby nenaskočil úrok"
   },
+  "optionsGrindPays": {
+    "message": "Farmit XP jen dokud odměna za další level pokryje očekávanou ztrátu na zbývajících XP levelu"
+  },
   "optionsLoanTrick": {
     "message": "Vzít jednorázový achievement +500 za čistou půjčku"
   },
@@ -714,6 +717,17 @@
     "placeholders": {
       "p1": {
         "content": "$1"
+      }
+    }
+  },
+  "statusLevelUnpaid": {
+    "message": "Farmení XP stojí: zbytek levelu má prodělat $P1$ a odměna za level je $P2$. Práce a volné kredity běží dál.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
       }
     }
   },

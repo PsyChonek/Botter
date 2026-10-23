@@ -181,7 +181,18 @@ progress shows at `chrome://on-device-internals`.
   grinder waits. The panel shows each game's XP per credit and loss per XP
   measured from its tracked rounds, for information only. Near a limit the grinder
   steps down to a smaller bet; under a daily budget it never bets more than what is
-  left of it.
+  left of it. With **Grind only while the level pays** (`grindPays`, Auto tab, on by
+  default) the grinder holds while the XP left in the level is expected to lose more
+  than the next level-up reward (`levelCost` in `src/auto.js`): the XP over the plain
+  XP rate (the Hackathon +50 % counted while it is on) times the game's edge. The
+  edge is the model's, or the loss measured at the game's current upgrades
+  (`stats.combos`) once that is worse than the model by more than two standard
+  errors, then its lower bound (`pricedEdge`). The XP curve grows as level^1.35 and
+  the reward only linearly, so at about 1 credit per XP leveling stops paying near
+  level 38. A held account logs `grind_level_unpaid`, says so in the status, works its
+  energy without waiting for the grinder, and rotation skips it until it levels up
+  some other way (work XP). A planned bankruptcy wipes the credits anyway, so the
+  grinder does not hold then. Before the XP rate is measured it grinds to measure it.
 - **Daily standup** (Dnešní standup, settings Auto tab, on by default): three quests a
   day in `player.quests`, such as spinning a game 25 times, wagering 2,500 credits or
   finishing 10 rounds ahead. The server tracks the progress and pays each reward (about

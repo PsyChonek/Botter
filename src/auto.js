@@ -265,6 +265,30 @@
     return edge !== null && rate > 0 ? edge / rate : null;
   }
 
+  // A game's edge measured at its current upgrades replaces the model's once it
+  // is worse by more than this many standard errors of the measurement.
+  const MEASURED_SIGMAS = 2;
+
+  // Loss per credit staked to price a level's XP with: the modelled edge, or
+  // when the rounds played at the current upgrades (row, like games) lose more
+  // than MEASURED_SIGMAS standard errors above it, the lower bound of the
+  // measured loss at that many. variance is per credit staked
+  // (BotterOdds.variances), and each round counts as one of equal bets.
+  function pricedEdge(edge, row, variance) {
+    if (!(row?.rounds > 0) || !(row.wagered > 0)) return edge;
+    const measured = -row.net / row.wagered;
+    return Math.max(edge, measured - MEASURED_SIGMAS * Math.sqrt(Math.max(1, variance) / row.rounds));
+  }
+
+  // What grinding the XP left in this level is expected to lose at edge and
+  // rate (XP per credit wagered), against the reward the level-up pays. The
+  // level pays when the loss is no more than the reward, and also before the
+  // rate is measured (rate null), which only grinding measures.
+  function levelCost(xpLeft, rate, edge, reward) {
+    const cost = rate > 0 && xpLeft > 0 ? Math.round((xpLeft / rate) * Math.max(0, edge)) : null;
+    return { cost, reward, pays: cost === null || cost <= reward };
+  }
+
   // Unlocked game with the lowest simulated house edge (edges, from BotterOdds
   // at the current upgrades), or null. A game without a model is never picked.
   function cheapestGame(games, level, unlocks, edges = {}) {
@@ -1210,6 +1234,9 @@
     finalGame,
     pooledXpRate,
     planXpRate,
+    HACKATHON_XP,
+    pricedEdge,
+    levelCost,
     levelUpCushion,
     UPGRADE_HORIZON_LEVELS,
     upgradeVerdict,
