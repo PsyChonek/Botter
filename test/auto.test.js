@@ -486,6 +486,16 @@ test('loanRenewDue waits ten minutes from the loan, well inside its free hour', 
   assert.equal(A.loanRenewDue({ debt: 500 }, takenAt), true);
 });
 
+test('levelLoanRepay pays every credit above the reserve once the loan is ten minutes old', () => {
+  const takenAt = 1_000_000;
+  const player = { credits: 30_000, loan: { debt: 57_500, takenAt } };
+  assert.equal(A.levelLoanRepay(player, 100, takenAt + 9 * 60_000), 0);
+  // In part, before the credits cover the whole debt.
+  assert.equal(A.levelLoanRepay(player, 100, takenAt + A.LOAN_RENEW_MS), 29_900);
+  assert.equal(A.levelLoanRepay({ ...player, credits: 80_000 }, 100, takenAt + A.LOAN_RENEW_MS), 57_500);
+  assert.equal(A.levelLoanRepay({ ...player, credits: 100 }, 100, takenAt + A.LOAN_RENEW_MS), 0);
+});
+
 test('questGame and questKind read the standup quest text', () => {
   const spins = { key: 'q1', text: 'Zatoč si 25× Skeleton Slots' };
   const wager = { key: 'q2', text: 'Protoč 2 500 kreditů' };
