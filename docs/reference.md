@@ -33,6 +33,14 @@ The full description of every feature, model and setting. The short version is t
   is retried up to 6 times; 10 accepted in a row trim 50 ms. Refusals are logged as
   `work_speed_learned`. Off, the bot keeps the human delays and the remembered minimum
   (`stats.dwell`), which only grows.
+- **Gap between work starts** (`learnStart` / `onStartRejected` in `src/content.js`):
+  the server refuses a ticket picked too soon after the previous one started with
+  429 "Zpomal trochu.". The least gap is learned under `work:start` in the same table,
+  in both speed modes, with the same steps as the submit wait: a refused pick raises it
+  just past the refused gap and is retried as soon as that has passed, 10 accepted in
+  a row trim 50 ms. Refusals are logged as `work_start_learned`. Before this the bot
+  clicked the next card at once and retried a refusal after a fixed 3 s, so about
+  every other start failed.
 - **Unloadable accounts**: a logged-in account whose profile (`/api/me`) fails three
   times in a row is set aside for 30 minutes (`brokenUntil` on its saved record), and
   the page switches back to the account it came from, else home, else any other saved

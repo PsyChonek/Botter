@@ -215,6 +215,8 @@
   let cardClickedAt = 0; // local time the bot last picked a ticket card
   let fastTick = null; // pending fast work poll (WORK_FAST_TICK_MS)
   let submitTries = 0; // submits of the current task the server rejected
+  let startGap = null; // ms since the last started task when the bot picked a card
+  let startTries = 0; // picks in a row the server refused as too soon
   let lastType = null;
   let workRun = false; // energy went above WORK_MIN_ENERGY and is being worked down
   let bjStake = 0; // stake of the open blackjack hand, to book doubles
@@ -432,6 +434,18 @@
     if (refused) log.info('work_speed_learned', { type, openMs, wait: A.speedWait(speed, workKey(type), 0, MAX_WORK_DWELL_MS) });
   }
 
+  // The server refuses a ticket started too soon after the previous one (429
+  // "Zpomal trochu."), so the least gap between starts is learned the same way,
+  // under work:start, in both speed modes.
+  const START_KEY = 'work:start';
+  const startWait = () => A.speedWait(speed, START_KEY, 0, MAX_WORK_DWELL_MS);
+  function learnStart(refused) {
+    if (startGap === null) return;
+    speed = A.workSpeedLearn(speed, START_KEY, startGap, refused, startTries);
+    saveSpeed();
+    if (refused) log.info('work_start_learned', { gap: startGap, wait: startWait(), tries: startTries + 1 });
+  }
+
   // ---------- network: speed, server responses, rate limits ----------
 
   // Every /api/ response the page sees (the app's and the bot's) counted per
@@ -574,7 +588,7 @@
   });
 
   // Every /api/ response the page sees, from the app or from the bot.
-  function onResponse({ path, ok, request, data, uid }) {
+  function onResponse({ path, ok, status, request, data, uid }) {
     if (uid) useAccount(uid);
     const before = player?.credits;
     if (data?.player) {
@@ -589,6 +603,7 @@
     }
     if (!ok) {
       if (path === '/api/work/submit') onSubmitRejected(request?.id, data);
+      if (path === '/api/work/start' && status === 429) onStartRejected();
       return;
     }
     const lock = G.animationLockMs(path, data);
@@ -612,6 +627,9 @@
     if (path === '/api/hotfix/spin' && stats.hotfixTest && !stats.hotfixTest.done) stats.hotfixTest.spins += 1;
 
     if (path === '/api/work/start' && data.task) {
+      learnStart(false);
+      startGap = null;
+      startTries = 0;
       task = data.task;
       taskOpenedAt = Date.now();
       submitTries = 0;
@@ -873,6 +891,15 @@
       return;
     }
     answeredTaskId = null;
+  }
+
+  // A pick refused as too soon raises the learned gap and may be retried as
+  // soon as that gap has passed, instead of after CARD_WAIT_MS.
+  function onStartRejected() {
+    learnStart(true);
+    if (startGap !== null) startTries += 1;
+    startGap = null;
+    cardClickedAt = 0;
   }
 
   // Every AI call is billed, even when its answer turns out unusable.
@@ -1395,10 +1422,14 @@
     // Fast polling sees the lobby again before the picked ticket arrives.
     if (Date.now() - cardClickedAt < CARD_WAIT_MS && taskOpenedAt < cardClickedAt) return;
     setStatus('statusStarting');
+    if (Date.now() - taskOpenedAt < startWait()) return;
     await sleep(workPause());
     if (!workOn()) return;
     lastType = type;
     cardClickedAt = Date.now();
+    // A gap since a start long ago says nothing about the server's limit.
+    const gap = cardClickedAt - taskOpenedAt;
+    startGap = taskOpenedAt && gap <= MAX_WORK_DWELL_MS ? gap : null;
     card.click();
   }
 
