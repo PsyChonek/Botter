@@ -1022,7 +1022,10 @@ test('rateLimitWait waits on a 429, Retry-After or a speed error and nothing els
   assert.equal(A.rateLimitWait({ ok: false, status: 503, retryAfter: 'Mon, 19 Oct 2026 10:00:03 GMT', data: {} }, 0, Date.parse('2026-10-19T10:00:00Z')), 3000);
   assert.equal(A.rateLimitWait({ ok: false, status: 400, data: { error: 'Moc rychle, počkej na animaci.', retryAfterMs: 1200 } }), 1200);
   assert.equal(A.rateLimitWait({ ok: false, status: 429, data: {} }, 2), 4000);
-  assert.equal(A.rateLimitWait({ ok: false, status: 429, retryAfter: '600', data: {} }), 30_000);
+  assert.equal(A.rateLimitWait({ ok: false, status: 429, data: { retryAfterMs: 90_000 } }), 30_000);
+  // The casino's "Zpomal trochu." hint is milliseconds left, not seconds.
+  assert.equal(A.rateLimitWait({ ok: false, status: 429, data: { error: 'Zpomal trochu.', retryAfter: 233 } }), 250);
+  assert.equal(A.rateLimitWait({ ok: false, status: 429, retryAfter: '600', data: {} }), 600);
 });
 
 test('nextDeployAt is the next 9:00 in Prague', () => {
@@ -1087,6 +1090,33 @@ test('speedLearn waits just past what the server refused and keeps probing short
   assert.equal(A.speedWait(other, '/api/cases/open', 0, 32_000), 0);
   assert.equal(A.speedWait(A.speedLearn({}, '/api/hotfix/free', 0, 40_000, true), '/api/hotfix/free', 0, 32_000), 32_000);
   assert.deepEqual([0, 1, 2].map(A.speedRetryWait), [150, 300, 600]);
+});
+
+test('speedLearn probes the refused wait again less and less often', () => {
+  const path = '/api/roulette/spin';
+  const accept = (speed, n) => {
+    for (let i = 0; i < n; i++) speed = A.speedLearn(speed, path, 0, A.speedWait(speed, path, 0, 32_000), false);
+    return speed;
+  };
+  let speed = A.speedLearn({}, path, 0, 3800, true);
+  assert.equal(A.speedWait(speed, path, 0, 32_000), 3950);
+  // Down to one step above the refused wait as before.
+  speed = accept(speed, 20);
+  assert.equal(A.speedWait(speed, path, 0, 32_000), 3850);
+  // Refused once more at 3800: the next try there waits for 20 accepted, then 40.
+  speed = A.speedLearn(speed, path, 0, 3800, true);
+  speed = accept(speed, 20);
+  assert.equal(A.speedWait(speed, path, 0, 32_000), 3850);
+  speed = accept(speed, 19);
+  assert.equal(A.speedWait(speed, path, 0, 32_000), 3850);
+  speed = accept(speed, 1);
+  assert.equal(A.speedWait(speed, path, 0, 32_000), 3800);
+  // Accepted there, the server got faster: trims are plain again.
+  speed = accept(speed, 10);
+  assert.equal(A.speedWait(speed, path, 0, 32_000), 3750);
+  // The probe never grows past its cap.
+  for (let i = 0; i < 20; i++) speed = A.speedLearn(speed, path, 0, 3800, true);
+  assert.equal(speed[path].probe, 640);
 });
 
 test('workSpeedLearn steps past a refused submit by a doubling step and trims after accepted ones', () => {

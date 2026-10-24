@@ -99,8 +99,11 @@ progress shows at `chrome://on-device-internals`.
   Forbes triggers and free spins), plus a learned extra that starts at 0 and may go
   negative down to no wait. A first attempt the server refuses ("počkej na animaci")
   raises the extra to 150 ms past the wait it refused, and every 10 accepted in a row
-  trim 50 ms, so the bot settles just above the server's lock and keeps probing for a
-  shorter one. A refused request is retried after 150 ms, 300 ms, 600 ms and so on (6
+  trim 50 ms, so the bot settles just above the server's lock. Trimming back down to
+  a wait that was refused waits for 20 accepted instead, then 40, 80 and so on up to
+  640 with each refusal (since 2026-10-25; before, it walked into a refusal every
+  ~30 rounds forever). Accepted at or below that wait, the server got faster and trims
+  are plain again. Work submit waits and the start gap use the same rule. A refused request is retried after 150 ms, 300 ms, 600 ms and so on (6
   times) instead of the 30 s the server asks for, and only first attempts teach the
   wait, so one long animation does not slow every later round. A step that played
   runs again at once instead of on the next tick. The learned waits sit in the page's
@@ -110,7 +113,9 @@ progress shows at `chrome://on-device-internals`.
 - **Rate limits** (`api` in `src/content.js`, `rateLimitWait` in `src/auto.js`): a bot
   request the server turns away for going too fast (a 429, a `Retry-After` header, or
   an error text about speed) waits what the server asks (`Retry-After`, the body's
-  `retryAfterMs` / `retryAfter`, else 1 s, 2 s, 4 s, at most 30 s) and is sent again,
+  `retryAfterMs` / `retryAfter`, else 1 s, 2 s, 4 s, at most 30 s; the casino puts
+  milliseconds in the seconds fields, so a number above 30 is read as ms, since
+  2026-10-25 when "Zpomal trochu." with 233 cost every work start 30 s) and is sent again,
   up to 3 times, logged as `rate_limit_retry` and finally `rate_limited`. A game
   request's wait also holds the next game request of every tab. Before this, such a
   rejection counted as a failed round and paused that step for 10 minutes. The log

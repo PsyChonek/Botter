@@ -1115,7 +1115,10 @@
   // Retry-After header or an error text about speed counts. The wait is the
   // Retry-After header (seconds or a date), else the body's retryAfterMs /
   // retryAfter (seconds), else doubling from 1 s, at most RATE_LIMIT_MAX_MS.
+  // The casino sends milliseconds left in those seconds fields ("Zpomal
+  // trochu." with 233), so a number past the cap in seconds is read as ms.
   const RATE_LIMIT_MAX_MS = 30_000;
+  const hintMs = (n) => (n > RATE_LIMIT_MAX_MS / 1000 ? n : n * 1000);
   const RATE_LIMIT_TEXT = /rate|too.?(fast|many|soon)|slow|cooldown|throttl|rychl|počkej|zpomal|animac/i;
   function rateLimitWait(res, attempt = 0, now = Date.now()) {
     if (!res || res.ok || !res.status) return null;
@@ -1124,10 +1127,10 @@
     let wait = NaN;
     if (res.retryAfter) {
       const seconds = Number(res.retryAfter);
-      wait = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(res.retryAfter) - now;
+      wait = Number.isFinite(seconds) ? hintMs(seconds) : Date.parse(res.retryAfter) - now;
     }
     if (!(wait >= 0) && Number.isFinite(Number(res.data?.retryAfterMs))) wait = Number(res.data.retryAfterMs);
-    if (!(wait >= 0) && Number.isFinite(Number(res.data?.retryAfter))) wait = Number(res.data.retryAfter) * 1000;
+    if (!(wait >= 0) && Number.isFinite(Number(res.data?.retryAfter))) wait = hintMs(Number(res.data.retryAfter));
     if (!(wait >= 0)) wait = 1000 * 2 ** attempt;
     return Math.min(RATE_LIMIT_MAX_MS, Math.max(250, wait));
   }
@@ -1138,10 +1141,15 @@
   // learned extra per path, which may be negative down to no wait at all. A
   // refused request (the server's "počkej na animaci") raises the extra to just
   // past the wait it refused; SPEED_PROBE accepted in a row trim it, so it
-  // keeps probing for a shorter one. speed: { [path]: { extra, streak } }.
+  // keeps probing for a shorter one. The server's limit rarely moves, so a trim
+  // down to the last refused extra (floor) waits for probe accepted instead,
+  // which doubles with each refusal up to SPEED_PROBE_MAX: once the fastest
+  // wait is found it is tested again only now and then.
+  // speed: { [path]: { extra, streak, floor?, probe? } }.
   const SPEED_STEP_UP_MS = 150;
   const SPEED_STEP_DOWN_MS = 50;
   const SPEED_PROBE = 10;
+  const SPEED_PROBE_MAX = 640;
   const SPEED_RETRIES = 6;
 
   // Milliseconds to wait after a response on path whose animation takes lock ms.
@@ -1152,12 +1160,23 @@
   // The table after a game request sent waited ms after a response on path
   // (whose animation took lock ms) was refused or accepted.
   function speedLearn(speed, path, lock, waited, refused) {
+    if (refused) return speedRefused(speed, path, waited - lock, waited - lock + SPEED_STEP_UP_MS);
     const row = speed?.[path] ?? { extra: 0, streak: 0 };
-    let next;
-    if (refused) next = { extra: Math.max(row.extra, waited - lock + SPEED_STEP_UP_MS), streak: 0 };
-    else if (row.streak + 1 < SPEED_PROBE) next = { ...row, streak: row.streak + 1 };
-    else next = { extra: Math.max(-lock, row.extra - SPEED_STEP_DOWN_MS), streak: 0 };
-    return { ...speed, [path]: next };
+    const extra = Math.max(-lock, row.extra - SPEED_STEP_DOWN_MS);
+    const crossing = row.floor !== undefined && extra <= row.floor;
+    if (row.streak + 1 < (crossing ? row.probe : SPEED_PROBE)) return { ...speed, [path]: { ...row, streak: row.streak + 1 } };
+    // Past the floor the server has sped up, so trims are plain again.
+    const { floor, probe, ...rest } = row;
+    return { ...speed, [path]: crossing ? { ...rest, extra, streak: 0 } : { ...row, extra, streak: 0 } };
+  }
+
+  // The table after a request at extra was refused: the wait rises to at least
+  // up, and trimming back to extra waits twice as long as last time.
+  function speedRefused(speed, key, extra, up) {
+    const row = speed?.[key] ?? { extra: 0, streak: 0 };
+    const probe = Math.min(SPEED_PROBE_MAX, (row.probe ?? SPEED_PROBE / 2) * 2);
+    const floor = Math.max(row.floor ?? extra, extra);
+    return { ...speed, [key]: { extra: Math.max(row.extra, up), streak: 0, floor, probe } };
   }
 
   // Wait before retrying a refused game request at max speed: doubling from
@@ -1172,8 +1191,7 @@
   // trim it like a game wait.
   function workSpeedLearn(speed, key, openMs, refused, tries = 0) {
     if (!refused) return speedLearn(speed, key, 0, openMs, false);
-    const row = speed?.[key] ?? { extra: 0, streak: 0 };
-    return { ...speed, [key]: { extra: Math.max(row.extra, openMs + speedRetryWait(tries)), streak: 0 } };
+    return speedRefused(speed, key, openMs, openMs + speedRetryWait(tries));
   }
 
   // This week's event: { key, startAt, endAt, active }. A week runs from
