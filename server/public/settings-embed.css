@@ -1,6 +1,29 @@
-/* The extension's settings page inside the dashboard's Settings tab: the tab
-   already names it, so its own title row goes, and it uses the wider frame. */
+/* The extension's settings page inside the dashboard's Settings tab, laid
+   out like the Overview: its cards sit straight on the page in a grid with the
+   dashboard's card style. The frame grows to fit it (app.js), so only the
+   page scrolls; the tab already names it, so its title row goes, and its own
+   tabs become a second-level row of pills. */
+html { overflow: hidden; }
+html, body { background: transparent; }
+body { font-size: 15px; }
 .title-row { display: none; }
-.bar { padding: 4px 20px 0; }
-.tabs { margin: 0 auto; max-width: 720px; }
-main { max-width: 760px; padding: 20px 20px 40px; }
+.bar { position: static; padding: 0; background: transparent; border: 0; }
+.tabs { margin: 0; gap: 6px; flex-wrap: wrap; }
+[role='tab'] {
+  flex: none;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+}
+[role='tab'][aria-selected='true'] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+main { max-width: none; margin: 0; padding: 20px 0 4px; }
+[role='tabpanel']:not([hidden]) {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr));
+  gap: 20px;
+  align-items: start;
+}
+.card { margin: 0; padding: 18px 20px; border-radius: 12px; }
+/* Profit holds wide tables, one card per row. */
+#panel-profit:not([hidden]) { grid-template-columns: minmax(0, 1fr); }

@@ -279,6 +279,20 @@ $('signin').addEventListener('submit', async (event) => {
 
 const loadSettings = () => ($('settings').src = `/ext/options.html?lang=${I18n.lang}`);
 
+// The settings frame takes the height of its page, which changes with its
+// tabs and open sections, so the dashboard scrolls once instead of twice.
+let settingsObserver = null;
+$('settings').addEventListener('load', () => {
+  const frame = $('settings');
+  const doc = frame.contentDocument;
+  if (!doc) return;
+  const fit = () => (frame.style.height = `${Math.ceil(doc.body.getBoundingClientRect().height)}px`);
+  settingsObserver?.disconnect();
+  settingsObserver = new frame.contentWindow.ResizeObserver(fit);
+  settingsObserver.observe(doc.body);
+  fit();
+});
+
 function relabel() {
   apply();
   setConnected(connected);

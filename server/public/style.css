@@ -209,14 +209,13 @@ main { max-width: 1280px; margin: 0 auto; padding: 20px 24px 40px; }
 .overview { grid-template-columns: minmax(340px, 480px) minmax(0, 1fr); }
 .accounts { grid-template-columns: minmax(0, 1fr) minmax(280px, 380px); }
 
+/* Sized to its content by app.js, so the page is the only thing that scrolls. */
 .settings {
   display: block;
   width: 100%;
-  height: calc(100vh - 300px);
-  min-height: 560px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
+  height: 600px;
+  border: 0;
+  background: transparent;
 }
 
 /* ---------- accounts ---------- */
@@ -291,7 +290,6 @@ td.action { text-align: right; white-space: nowrap; }
   .tabs { margin: 12px 16px 0; }
   main { padding: 16px 16px 32px; }
   .card { padding: 16px; }
-  .settings { height: calc(100vh - 220px); }
   .conn #conn-text { display: none; }
 }
 
