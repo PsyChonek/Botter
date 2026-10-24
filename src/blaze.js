@@ -21,7 +21,7 @@
   const LUCKY_CUT = [0, 3.4, 5.6, 7.2, 8.5, 9.6];
   const LUCKY_SEVEN = [0, 0.1, 0.2, 0.3, 0.4, 0.5];
   const WILD_BOOST = [0, 0.1, 0.2, 0.3, 0.4, 0.5];
-  const SCATTER_PAYS = [2, 3, 4, 5, 6, 7].map((three, i) => ({ 3: three, 4: 10 + 2 * i, 5: 50 + 5 * i }));
+  const SCATTER_PAYS = [2.7, 3.6, 4.5, 5.4, 6.3, 7.2].map((three, i) => ({ 3: three, 4: 10 + 2 * i, 5: 50 + 5 * i }));
   const LINE_COUNT = LINES.length;
   const SCATTER_MODES = ['symbols', 'reels'];
 
@@ -49,8 +49,10 @@
     return stars;
   }
 
+  // A wild expands over its reel, except a star, which stays and pays (since
+  // 2026-10-24).
   function expand(grid) {
-    return grid.map((reel) => (reel.includes('wild') ? reel.map(() => 'wild') : reel));
+    return grid.map((reel) => (reel.includes('wild') ? reel.map((symbol) => (symbol === 'star' ? 'star' : 'wild')) : reel));
   }
 
   // Win in credits for one spin. grid is reels x rows before wild expansion.
