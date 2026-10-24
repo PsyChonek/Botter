@@ -14,10 +14,9 @@ services:
       DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:?Set DASHBOARD_PASSWORD (12+ characters)}
       TRUST_PROXY: ${TRUST_PROXY:-0}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      BOT_LOCALE: ${BOT_LOCALE:-cs}
     volumes:
       - botter-data:/data
-    # Chromium needs more shared memory than Docker's 64 MB default.
-    shm_size: 1gb
     init: true
 
   # Pulls the git checkout this file lives in and rebuilds botter from source

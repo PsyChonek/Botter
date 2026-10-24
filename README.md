@@ -102,41 +102,51 @@ to **Enabled**, relaunch and press **Download the model** again. Progress shows 
 
 ## Run in Docker
 
-The container runs headless Chromium with Botter loaded and serves a dashboard on
-port 8080. Sign in there to watch the casino tab live, click and type into it (log in to
-the casino, press Start or Auto), open the Botter settings in a tab, and follow the bot's
-status and activity log.
+The container runs Botter with no browser: the extension's own scripts (`page-hook.js`,
+`content.js` and the game modules) run in Node against the casino API, and a small
+dashboard on port 8080 controls them. Work tickets go straight to `/api/work/start` and
+`/api/work/submit`, games always go through the API, and the Supabase session is
+refreshed by the server.
 
 ```sh
 cp .env.example .env        # set DASHBOARD_PASSWORD, 12+ characters
 docker compose up -d --build
 ```
 
-Then open `http://<host>:8080`. Or without compose:
+Open `http://<host>:8080`, sign in, then:
 
-```sh
-docker build -t botter .
-docker run -d --name botter -p 8080:8080 --shm-size 1g --init \
-  -e DASHBOARD_PASSWORD=... -v botter-data:/data botter
-```
+1. **Load a backup.** In the extension's Data tab, export with *Include API keys and
+   saved logins* on, and load the file on the dashboard. That brings the accounts with
+   their sessions, the answer bank, stats, settings and keys. E-mail accounts can also be
+   added with the sign-in form; the password is never stored.
+2. **Stop using those accounts in Chrome.** Each refresh rotates the session's refresh
+   token, so the extension and the container on one login log each other out.
+3. Turn on **Auto** (or Work / Games). The dashboard shows the status line, the account
+   playing, every saved account and the bot's log.
 
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `DASHBOARD_USER` | `admin` | Dashboard user name. |
 | `DASHBOARD_PASSWORD` | (required) | Dashboard password, at least 12 characters. |
+| `BOT_LOCALE` | `cs` | Language of the bot's status line (`cs` or `en`). |
 | `TRUST_PROXY` | `0` | `1` behind a reverse proxy: trusts `X-Forwarded-For/-Proto/-Host` for the client IP, the `Secure` cookie and the origin check. |
-| `CASINO_URL` | casino address | The page the casino tab opens. |
-| `LOG_LEVEL` | `info` | Server log level, JSON lines on stdout. |
+| `CASINO_URL` | casino address | Casino the bot plays. |
+| `LOG_LEVEL` | `info` | Server log level, JSON lines on stdout next to the bot's own. |
+| `UPDATE_BRANCH`, `UPDATE_INTERVAL` | `master`, `300` | Branch the updater follows and how often it checks, in seconds. |
 
-- The Chromium profile lives in the `/data` volume, so casino sessions, saved accounts,
-  the answer bank, stats and settings survive restarts and image upgrades.
-- Gemini Nano does not run in the container. Pick Claude or OpenRouter on the AI tab of
-  the settings, or rely on the bank and the random guess.
-- Dashboard sessions are kept in memory: restarting the container signs you out, the
-  bot itself carries on from the saved profile. Failed sign-ins are limited to 10 per IP
-  per 15 minutes.
-- Put it behind HTTPS (a reverse proxy with `TRUST_PROXY=1`) before exposing it beyond
-  your own network. The dashboard controls a logged-in browser.
+- Storage lives in `/data/storage.json` (the `botter-data` volume): settings, bank,
+  stats, accounts and the page's localStorage survive restarts and upgrades.
+- Gemini Nano does not exist in Node. Pick Claude or OpenRouter on the dashboard, or
+  rely on the bank and the random guess.
+- The game-screen mode (`playOnScreen`) and the on-page panel are off in the container.
+- **Updates from git:** the `updater` service polls `origin`, fast-forwards the checkout
+  and runs `docker compose up -d --build botter` when the branch moves. It mounts the
+  Docker socket, which is root on the host, and builds whatever lands on the branch, so
+  push access to the repo is code execution on that machine. Remove the service to
+  update by hand instead.
+- Dashboard sessions are kept in memory: a restart signs you out, the bot carries on.
+  Failed sign-ins are limited to 10 per IP per 15 minutes. Put it behind HTTPS (reverse
+  proxy, `TRUST_PROXY=1`) before exposing it beyond your own network.
 - `GET /health` answers without a login for uptime checks.
 
 Server tests: `cd server && npm test`.

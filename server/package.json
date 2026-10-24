@@ -2,7 +2,7 @@
   "name": "botter-server",
   "version": "0.1.0",
   "private": true,
-  "description": "Runs the Botter extension in headless Chromium and serves a login-protected dashboard to set it up and watch it.",
+  "description": "Runs the Botter extension scripts headless against the casino API and serves a login-protected dashboard.",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -10,9 +10,5 @@
   "scripts": {
     "start": "node src/index.mjs",
     "test": "node --test test/*.test.mjs"
-  },
-  "dependencies": {
-    "playwright-core": "1.64.0",
-    "ws": "8.21.3"
   }
 }

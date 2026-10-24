@@ -2,107 +2,108 @@ const { t, apply, toggle } = window.I18n;
 const $ = (id) => document.getElementById(id);
 
 const ACTIVITY_SHOWN = 200;
-const canvas = $('screen');
-const ctx = canvas.getContext('2d');
-let ws = null;
-let state = { tabs: [], viewport: { width: 1280, height: 800 } };
-let panel = null;
+let report = null;
 let connected = false;
-let retry = 500;
 
-function sendMessage(message) {
-  if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
+const number = (value) => (typeof value === 'number' ? new Intl.NumberFormat(I18n.lang).format(Math.round(value)) : '-');
+
+async function post(path, body) {
+  const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (res.status === 401) location.assign('/login');
+  return { ok: res.ok, status: res.status, data: await res.json().catch(() => ({})) };
 }
 
-// ---------- connection ----------
+// ---------- live updates ----------
 
 function connect() {
-  const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
-  ws = new WebSocket(`${scheme}://${location.host}/ws`);
-  ws.addEventListener('open', () => {
-    connected = true;
-    retry = 500;
-    renderConn();
+  const source = new EventSource('/api/events');
+  source.addEventListener('open', () => setConnected(true));
+  source.addEventListener('report', (event) => {
+    report = JSON.parse(event.data);
+    render();
   });
-  ws.addEventListener('message', (event) => handle(JSON.parse(event.data)));
-  ws.addEventListener('close', async () => {
-    connected = false;
-    renderConn();
-    // A failed upgrade looks the same as a dropped socket; ask the page itself
-    // whether the session is still good before retrying.
+  source.addEventListener('activity', (event) => {
+    for (const item of JSON.parse(event.data)) addActivity(item);
+  });
+  source.addEventListener('error', async () => {
+    setConnected(false);
+    // EventSource retries by itself; a signed-out session never comes back.
     const res = await fetch('/', { redirect: 'manual' }).catch(() => null);
-    if (res?.type === 'opaqueredirect') return location.assign('/login');
-    setTimeout(connect, retry);
-    retry = Math.min(retry * 2, 10_000);
+    if (res?.type === 'opaqueredirect') location.assign('/login');
   });
 }
 
-function handle(message) {
-  if (message.type === 'state') {
-    state = message;
-    renderTabs();
-  } else if (message.type === 'frame') drawFrame(message);
-  else if (message.type === 'panel') {
-    panel = message.panel;
-    renderPanel();
-  } else if (message.type === 'activity') {
-    for (const item of message.items ?? [message.item]) addActivity(item);
-  }
+function setConnected(value) {
+  connected = value;
+  $('conn').textContent = t(connected ? 'connected' : 'disconnected');
+  $('conn').classList.toggle('ok', connected);
 }
 
 // ---------- rendering ----------
 
-function renderConn() {
-  const el = $('conn');
-  el.textContent = t(connected ? 'connected' : 'disconnected');
-  el.classList.toggle('ok', connected);
+function render() {
+  $('status').textContent = report?.status || t('statusNone');
+  const player = report?.player;
+  $('fact-account').textContent = player?.login ?? t('notLoggedIn');
+  $('fact-level').textContent = number(player?.level);
+  $('fact-credits').textContent = number(player?.credits);
+  $('fact-energy').textContent = player ? `${player.energy} / ${player.maxEnergy}` : '-';
+  $('fact-bank').textContent = number(report?.bank);
+  const answers = report?.answers;
+  $('fact-answers').textContent = answers
+    ? ['bank', 'ai', 'guess'].map((key) => `${t(`source_${key}`)} ${answers[key].correct}/${answers[key].total}`).join(', ')
+    : '-';
+  $('fact-work').textContent = report?.work ? `${number(report.work.tickets)} (${number(report.work.net)})` : '-';
+  $('fact-games').textContent = number(report?.gamesNet);
+
+  for (const button of document.querySelectorAll('[data-toggle]')) {
+    const on = !!report?.settings?.[button.dataset.toggle];
+    button.setAttribute('aria-pressed', String(on));
+    button.classList.toggle('on', on);
+  }
+  const solver = report?.settings?.aiSolver;
+  if (solver && document.activeElement !== $('solver-kind') && !$('solver-kind').dataset.touched) $('solver-kind').value = solver;
+
+  const problems = report?.bundle?.problems ?? [];
+  $('bundle').hidden = !problems.length;
+  $('bundle').textContent = problems.length ? `${t('bundleStale')}: ${problems.join('; ')}` : '';
+
+  renderAccounts(report?.accounts ?? []);
 }
 
-function renderPanel() {
-  $('status').textContent = panel?.status || t('statusNone');
-  $('fact-account').textContent = panel?.account || '-';
-  $('fact-auto').textContent = panel?.auto || '-';
-  $('fact-work').textContent = panel?.work || '-';
-  $('fact-games').textContent = panel?.games || '-';
-}
-
-function renderTabs() {
-  const list = $('tabs');
-  list.replaceChildren(
-    ...state.tabs.map((tab) => {
-      const item = document.createElement('div');
-      item.className = 'tab';
-      item.setAttribute('role', 'listitem');
-      const select = document.createElement('button');
-      select.type = 'button';
-      select.textContent = tab.title || tab.url;
-      select.title = tab.url;
-      if (tab.current) select.setAttribute('aria-current', 'page');
-      select.addEventListener('click', () => sendMessage({ type: 'select', id: tab.id }));
-      const close = document.createElement('button');
-      close.type = 'button';
-      close.className = 'close';
-      close.textContent = 'x';
-      close.setAttribute('aria-label', `${t('closeTab')}: ${select.textContent}`);
-      close.addEventListener('click', () => sendMessage({ type: 'close', id: tab.id }));
-      item.append(select, close);
-      return item;
+function renderAccounts(accounts) {
+  $('accounts-empty').hidden = accounts.length > 0;
+  $('accounts').hidden = accounts.length === 0;
+  $('accounts').tBodies[0].replaceChildren(
+    ...accounts.map((account) => {
+      const row = document.createElement('tr');
+      const cells = [account.login, number(account.level), number(account.credits), account.energy ?? '-'];
+      for (const value of cells) {
+        const cell = document.createElement('td');
+        cell.textContent = value;
+        row.append(cell);
+      }
+      const action = document.createElement('td');
+      if (account.current) {
+        action.textContent = t('current');
+      } else if (!account.session) {
+        action.textContent = t('noSession');
+        action.className = 'muted';
+      } else {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = t('use');
+        button.setAttribute('aria-label', `${t('use')}: ${account.login}`);
+        button.addEventListener('click', async () => {
+          button.disabled = true;
+          await post('/api/account/switch', { id: account.id });
+        });
+        action.append(button);
+      }
+      row.append(action);
+      return row;
     }),
   );
-  const current = state.tabs.find((tab) => tab.current);
-  if (current && document.activeElement !== $('url')) $('url').value = current.url;
-}
-
-function drawFrame({ data, width, height }) {
-  const image = new Image();
-  image.onload = () => {
-    if (canvas.width !== width || canvas.height !== height) {
-      canvas.width = width;
-      canvas.height = height;
-    }
-    ctx.drawImage(image, 0, 0, width, height);
-  };
-  image.src = `data:image/jpeg;base64,${data}`;
 }
 
 function addActivity(item) {
@@ -126,89 +127,76 @@ function addActivity(item) {
   while (list.children.length > ACTIVITY_SHOWN) list.lastElementChild.remove();
 }
 
-// ---------- input on the screen ----------
-
-const BUTTONS = ['left', 'middle', 'right'];
-
-function point(event) {
-  const rect = canvas.getBoundingClientRect();
-  const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
-  const y = ((event.clientY - rect.top) / rect.height) * canvas.height;
-  return { x: Math.max(0, Math.round(x)), y: Math.max(0, Math.round(y)) };
-}
-
-let pendingMove = null;
-canvas.addEventListener('pointermove', (event) => {
-  if (!pendingMove) requestAnimationFrame(() => {
-    sendMessage({ type: 'input', event: { kind: 'move', ...pendingMove } });
-    pendingMove = null;
-  });
-  pendingMove = point(event);
-});
-canvas.addEventListener('pointerdown', (event) => {
-  canvas.focus();
-  canvas.setPointerCapture(event.pointerId);
-  sendMessage({ type: 'input', event: { kind: 'down', button: BUTTONS[event.button] ?? 'left', ...point(event) } });
-});
-canvas.addEventListener('pointerup', (event) => {
-  sendMessage({ type: 'input', event: { kind: 'up', button: BUTTONS[event.button] ?? 'left', ...point(event) } });
-});
-canvas.addEventListener('contextmenu', (event) => event.preventDefault());
-canvas.addEventListener(
-  'wheel',
-  (event) => {
-    event.preventDefault();
-    sendMessage({ type: 'input', event: { kind: 'wheel', dx: event.deltaX, dy: event.deltaY, ...point(event) } });
-  },
-  { passive: false },
-);
-
-const isPaste = (event) => (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v';
-canvas.addEventListener('keydown', (event) => {
-  if (isPaste(event)) return;
-  event.preventDefault();
-  sendMessage({ type: 'input', event: { kind: 'keydown', key: event.key } });
-});
-canvas.addEventListener('keyup', (event) => {
-  if (isPaste(event)) return;
-  event.preventDefault();
-  sendMessage({ type: 'input', event: { kind: 'keyup', key: event.key } });
-});
-document.addEventListener('paste', (event) => {
-  if (document.activeElement !== canvas) return;
-  const text = event.clipboardData?.getData('text');
-  if (text) sendMessage({ type: 'input', event: { kind: 'text', text } });
-  event.preventDefault();
-});
-
 // ---------- controls ----------
 
-for (const button of document.querySelectorAll('[data-open]')) {
-  button.addEventListener('click', () => sendMessage({ type: 'open', target: button.dataset.open }));
+for (const button of document.querySelectorAll('[data-toggle]')) {
+  button.addEventListener('click', async () => {
+    const on = button.getAttribute('aria-pressed') !== 'true';
+    button.setAttribute('aria-pressed', String(on));
+    await post('/api/toggle', { [button.dataset.toggle]: on });
+  });
 }
-for (const button of document.querySelectorAll('[data-nav]')) {
-  button.addEventListener('click', () => sendMessage({ type: 'nav', action: button.dataset.nav }));
-}
-$('nav').addEventListener('submit', (event) => {
+
+$('signin').addEventListener('submit', async (event) => {
   event.preventDefault();
-  let url = $('url').value.trim();
-  if (!url) return;
-  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
-  sendMessage({ type: 'nav', action: 'goto', url });
-  canvas.focus();
+  const result = $('signin-result');
+  result.textContent = t('working');
+  const res = await post('/api/account/signin', { email: $('signin-email').value, password: $('signin-password').value });
+  $('signin-password').value = '';
+  result.textContent = t(res.ok ? 'signinOk' : res.data?.error === 'invalid' ? 'signinInvalid' : 'signinFailed');
 });
-$('type').addEventListener('submit', (event) => {
+
+$('solver-kind').addEventListener('change', () => ($('solver-kind').dataset.touched = '1'));
+$('solver').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const text = $('type-text').value;
-  if (!text) return;
-  sendMessage({ type: 'input', event: { kind: 'text', text } });
-  $('type-text').value = '';
+  const aiSolver = $('solver-kind').value;
+  const key = $('solver-key').value.trim();
+  const body = { aiSolver, ...(aiSolver === 'claude' && key ? { apiKey: key } : {}), ...(aiSolver === 'openrouter' && key ? { openrouterKey: key } : {}) };
+  const res = await post('/api/solver', body);
+  $('solver-key').value = '';
+  delete $('solver-kind').dataset.touched;
+  $('solver-result').textContent = t(res.ok ? 'saved' : 'saveFailed');
 });
+
+$('backup-file').addEventListener('change', async (event) => {
+  const file = event.target.files?.[0];
+  event.target.value = '';
+  if (!file) return;
+  const result = $('backup-result');
+  result.textContent = t('working');
+  let backup;
+  try {
+    backup = JSON.parse(await file.text());
+  } catch {
+    result.textContent = t('backupInvalid');
+    return;
+  }
+  const res = await post('/api/backup/import', backup);
+  if (!res.ok) {
+    result.textContent = t(res.data?.error === 'not_backup' ? 'backupInvalid' : 'backupFailed');
+    return;
+  }
+  const { counts, sessions } = res.data;
+  result.textContent = `${t('backupDone')} ${counts.accounts} / ${counts.answers} / ${counts.stats}. ${sessions ? '' : t('backupNoSessions')}`;
+});
+
+$('backup-export').addEventListener('click', async () => {
+  const secrets = $('backup-secrets').checked;
+  if (secrets && !confirm(t('backupSecretsConfirm'))) return;
+  const res = await fetch(`/api/backup/export${secrets ? '?secrets=1' : ''}`);
+  if (!res.ok) return;
+  const backup = await res.json();
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }));
+  link.download = `botter-backup-${backup.exportedAt.slice(0, 10)}.json`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+});
+
 $('lang').addEventListener('click', () => {
   toggle();
-  renderConn();
-  renderPanel();
-  renderTabs();
+  setConnected(connected);
+  render();
 });
 $('logout').addEventListener('click', async () => {
   await fetch('/api/logout', { method: 'POST' }).catch(() => {});
@@ -216,6 +204,6 @@ $('logout').addEventListener('click', async () => {
 });
 
 apply();
-renderConn();
-renderPanel();
+setConnected(false);
+render();
 connect();

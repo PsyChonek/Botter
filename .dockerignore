@@ -1,7 +1,7 @@
 .git
 .github
 **/node_modules
-server/.profile
+server/.data
 server/test
 docs
 test

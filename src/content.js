@@ -16,6 +16,10 @@
   const S = globalThis.BotterScreen;
   const B = globalThis.BotterBundle;
   const msg = (key, subs) => chrome.i18n.getMessage(key, subs) || key;
+  // Set by the Docker runner (server/src/runner.mjs), which runs this script
+  // with no casino page: work tickets go through the API instead of the app's
+  // buttons, games never use the game screen and there is no panel.
+  const HEADLESS = !!globalThis.BotterHeadless;
 
   const DEFAULT_SETTINGS = {
     enabled: false,
@@ -880,6 +884,7 @@
     const fields = { ticket: C.ticketLabel(task.id), type: task.type, code: data?.code, error: data?.error };
     if (data?.code === 'expired' || data?.code === 'already_solved') {
       log.warn('submit_rejected', fields);
+      if (HEADLESS) closeTask();
       return;
     }
     // At max speed the time at the submit teaches the wait; otherwise the
@@ -894,7 +899,7 @@
     submitTries += 1;
     log.warn('submit_rejected', { ...fields, openMs, nextDwellMs: workDwell(task), tries: submitTries });
     if (submitTries >= (settings.maxSpeed ? A.SPEED_RETRIES : MAX_SUBMIT_TRIES)) {
-      pressKey('Escape');
+      closeTask();
       return;
     }
     answeredTaskId = null;
@@ -1152,7 +1157,7 @@
   // spin there does not pull the bot back and forth.
   async function rotateStep(urgent = false) {
     if (!settings.rotateAccounts || !player || Date.now() - accountSince < ROTATE_DWELL_MS) return false;
-    if (urgent && document.querySelector('.work-screen section.task')) return false;
+    if (urgent && taskOpen()) return false;
     const now = Date.now();
     const here = dueRounds({ ...accounts[accountId], level: player.level, credits: player.credits }, now);
     if ((here.crash || here.lottery) && now - accountSince < ROUNDS_STAY_MS) return false;
@@ -1189,6 +1194,22 @@
   }
 
   // ---------- work bot ----------
+
+  // Whether a ticket is open: on the page, its task section; headless, a
+  // started task that is not answered, given up or expired yet.
+  function taskOpen() {
+    if (!HEADLESS) return !!document.querySelector('.work-screen section.task');
+    return !!task && !task.closed && task.expiresAt > Date.now();
+  }
+
+  // Leaves the open ticket: the app closes it on Escape, headless just drops it.
+  function closeTask() {
+    if (HEADLESS) {
+      if (task) task.closed = true;
+    } else {
+      pressKey('Escape');
+    }
+  }
 
   function pressKey(key) {
     window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
@@ -1234,7 +1255,7 @@
   async function solve(taskEl) {
     const current = task;
     answeredTaskId = current.id;
-    if (current.type === 'typing') return typeCode(taskEl, current);
+    if (current.type === 'typing') return HEADLESS ? typeCodeApi(current) : typeCode(taskEl, current);
     const started = Date.now();
     const { index, source } = await pickAnswer(current);
     if (index === null) {
@@ -1259,6 +1280,7 @@
     await sleep(Math.min(wait, timeLeft));
     if (!workOn() || task?.id !== current.id) return;
 
+    if (HEADLESS) return submitAnswer(current, { answer: index }, source);
     if (current.type === 'ticket') {
       await fileTicket(taskEl, current, index, source);
       return;
@@ -1275,7 +1297,7 @@
   // "Přepiš kód": the line is in the task, so it is typed out key by key at a
   // human pace (the app blocks pasting) and sent with Enter. The value is set
   // through the native setter, which React's change tracking sees as typing.
-  const setInputValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  const setInputValue = HEADLESS ? null : Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
   async function typeCode(taskEl, current) {
     const input = taskEl.querySelector('.typing-input');
     const code = String(current.code ?? '');
@@ -1303,6 +1325,31 @@
     }
     pending = { taskId: current.id, source: 'typed', openMs: Date.now() - taskOpenedAt };
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
+  }
+
+  // Headless: the answer goes to the API the way the app sends it, the index
+  // for every type but "Přepiš kód", which sends the typed line. A ticket
+  // that went through, or that the server says is over, is closed.
+  async function submitAnswer(current, fields, source) {
+    pending = { taskId: current.id, source, openMs: Date.now() - taskOpenedAt };
+    const res = await api('/api/work/submit', { id: current.id, ...fields });
+    if (res.ok || res.data?.code === 'expired' || res.data?.code === 'already_solved') current.closed = true;
+  }
+
+  // Headless "Přepiš kód": waits as long as typing the line would take, then
+  // sends it.
+  async function typeCodeApi(current) {
+    const code = String(current.code ?? '');
+    if (!code) {
+      log.warn('answer_button_missing', { ticket: C.ticketLabel(current.id), field: 'typing' });
+      closeTask();
+      return;
+    }
+    setStatus('statusTyping', [C.ticketLabel(current.id), num.format([...code].length)]);
+    const typing = settings.maxSpeed ? RENDER_MS : [...code].length * ((TYPING_MIN_MS + TYPING_MAX_MS) / 2);
+    await sleep(Math.max(workDwell(current) - (Date.now() - taskOpenedAt), typing));
+    if (!workOn() || task?.id !== current.id) return;
+    await submitAnswer(current, { text: code }, 'typed');
   }
 
   // A ticket is answered by picking one option per field, then submitting. React
@@ -1333,7 +1380,7 @@
 
   // Whether the work bot has something to do right now, so games can use the gaps.
   function workAvailable() {
-    if (document.querySelector('.work-screen section.task')) return true;
+    if (taskOpen()) return true;
     if (!player) return true;
     if (normDone()) return false;
     const now = Date.now();
@@ -1383,12 +1430,12 @@
   async function workStep() {
     if (dismissModal()) return;
 
-    const screen = document.querySelector('.work-screen');
+    const screen = HEADLESS ? null : document.querySelector('.work-screen');
     const taskEl = screen?.querySelector('section.task');
     // With no ticket open and nothing to work on, leave the user on whatever
     // screen they are on instead of pulling them back to work every tick. In
     // auto mode the status says why the grinder is idle too, not only the work.
-    if (!taskEl) {
+    if (!taskOpen()) {
       if (normDone()) {
         stopWork(...(grindIdleStatus() ?? ['statusNormDone']));
         return;
@@ -1399,6 +1446,7 @@
       }
     }
 
+    if (HEADLESS) return apiWorkStep();
     if (!screen) {
       setStatus('statusOpening');
       document.querySelectorAll('nav.views button')[1]?.click();
@@ -1443,6 +1491,30 @@
     const gap = cardClickedAt - taskOpenedAt;
     startGap = taskOpenedAt && gap <= MAX_WORK_DWELL_MS ? gap : null;
     card.click();
+  }
+
+  // Headless work: answers the open ticket, or starts the next one with
+  // /api/work/start, keeping the same type order and start gap as the cards.
+  async function apiWorkStep() {
+    if (taskOpen()) {
+      if (answeredTaskId !== task.id) await solve(null);
+      return;
+    }
+    if (player && G.energyNow(player.work, Date.now()) < 1) {
+      setStatus('statusNoEnergy');
+      return;
+    }
+    if (Date.now() - cardClickedAt < CARD_WAIT_MS && taskOpenedAt < cardClickedAt) return;
+    setStatus('statusStarting');
+    if (Date.now() - taskOpenedAt < startWait()) return;
+    await sleep(workPause());
+    if (!workOn()) return;
+    const type = C.nextType(settings.taskType, lastType);
+    lastType = type;
+    cardClickedAt = Date.now();
+    const gap = cardClickedAt - taskOpenedAt;
+    startGap = taskOpenedAt && gap <= MAX_WORK_DWELL_MS ? gap : null;
+    await api('/api/work/start', { type });
   }
 
   // ---------- game bot ----------
@@ -1495,6 +1567,7 @@
   // the screen has no spot for (roulette's straight numbers) and Forbes spins
   // with the test switch, which only the API sends.
   const onScreen = (game, spot) =>
+    !HEADLESS &&
     settings.playOnScreen &&
     game !== 'mines' &&
     (game !== 'roulette' || G.ROULETTE_BETS.includes(spot)) &&
@@ -2579,7 +2652,7 @@
     // At max speed a step that played goes again at once instead of on the next
     // tick, and the work screen is polled faster than the tick.
     if (settings.maxSpeed && gameRequests !== sent) setTimeout(tick);
-    else if (settings.maxSpeed && workOn() && !fastTick && document.querySelector('.work-screen')) {
+    else if (settings.maxSpeed && workOn() && !fastTick && (HEADLESS ? taskOpen() : document.querySelector('.work-screen'))) {
       fastTick = setTimeout(() => {
         fastTick = null;
         tick();
@@ -3088,6 +3161,39 @@
     renderShop();
   }
 
+  // What the Docker runner's dashboard shows: the status line, the current
+  // account and every saved one, and the counters the panel shows.
+  function report() {
+    const sum = (s) => ({ correct: s.correct, total: s.correct + s.wrong });
+    return {
+      status: msg(status.key, status.subs),
+      settings: { autoMode: settings.autoMode, enabled: settings.enabled, gamesEnabled: settings.gamesEnabled, aiSolver: settings.aiSolver },
+      accountId,
+      player: player && {
+        login: player.login,
+        level: player.level,
+        credits: player.credits,
+        energy: G.energyNow(player.work, Date.now()),
+        maxEnergy: player.work?.maxEnergy ?? 20,
+      },
+      accounts: Object.entries(accounts).map(([id, saved]) => ({
+        id,
+        login: saved.login ?? id,
+        level: saved.level ?? null,
+        credits: saved.credits ?? null,
+        energy: saved.work ? G.energyNow(saved.work, Date.now()) : null,
+        session: !!saved.session,
+        brokenUntil: saved.brokenUntil ?? null,
+        current: id === accountId,
+      })),
+      bank: Object.keys(bank).length,
+      answers: { bank: sum(stats.bank), ai: sum(stats[settings.aiSolver] ?? stats.local), guess: sum(stats.guess) },
+      work: stats.work,
+      gamesNet: G.totalNet(stats.games),
+      bundle: bundle && { name: bundle.name, problems: bundle.problems ?? [] },
+    };
+  }
+
   // ---------- app bundle ----------
 
   // The casino ships as one bundle whose file name changes with every deploy.
@@ -3140,7 +3246,8 @@
     for (const data of early.splice(0)) onHookEvent(data);
     early = null;
     const ready = () => {
-      mountPanel();
+      if (HEADLESS) globalThis.BotterHeadless.report = report;
+      else mountPanel();
       trackBundle();
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready);

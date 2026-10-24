@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createAuth, readCookie } from '../src/auth.mjs';
-import { parseClientMessage } from '../src/protocol.mjs';
 
 const make = (overrides = {}) => createAuth({ user: 'admin', password: 'correct horse battery', ...overrides });
 
@@ -48,16 +47,4 @@ test('sessions expire', () => {
 test('reads one cookie out of a header', () => {
   assert.equal(readCookie('a=1; botter_session=abc%3D; b=2', 'botter_session'), 'abc=');
   assert.equal(readCookie(undefined, 'botter_session'), '');
-});
-
-test('accepts only well-formed dashboard messages', () => {
-  assert.deepEqual(parseClientMessage('{"type":"open","target":"settings"}'), { type: 'open', target: 'settings' });
-  assert.equal(parseClientMessage('{"type":"open","target":"file:///etc/passwd"}'), null);
-  assert.deepEqual(parseClientMessage(JSON.stringify({ type: 'input', event: { kind: 'down', x: 5, y: 6, button: 'left', extra: 1 } })), {
-    type: 'input',
-    event: { kind: 'down', x: 5, y: 6, button: 'left' },
-  });
-  assert.equal(parseClientMessage(JSON.stringify({ type: 'input', event: { kind: 'down', x: -1, y: 6, button: 'left' } })), null);
-  assert.equal(parseClientMessage(JSON.stringify({ type: 'select', id: '../x' })), null);
-  assert.equal(parseClientMessage('not json'), null);
 });

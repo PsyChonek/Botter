@@ -5,4 +5,4 @@ node_modules/
 botter-bank.json
 .playwright-mcp/
 .env
-server/.profile/
+server/.data/
