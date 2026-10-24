@@ -107,11 +107,13 @@ The container runs Botter with no browser: the extension's own scripts (`page-ho
 straight to `/api/work/start` and `/api/work/submit`, games always go through the API,
 and the Supabase session is refreshed by the server.
 
-The dashboard on port 8080 shows the extension's real UI: the panel `content.js` builds
-(account, status, Work and Games, auto switches, Profit, XP per game, upgrade queue,
-More), rendered on the server in a small DOM and mirrored live with every click sent
-back, and the full settings page (`options.html`, every tab) next to it. Both work as in
-Chrome, on the same storage.
+The dashboard on port 8080 has an account strip (account, status, level, credits,
+energy, Auto) and four tabs. **Overview** holds the panel `content.js` builds (Work and
+Games, auto switches, Profit, XP per game, upgrade queue, More), rendered on the server in
+a small DOM and mirrored live with every click sent back, next to the latest activity.
+**Settings** is the extension's own settings page with every tab, on the same storage.
+**Accounts** lists the saved logins with a switch and an e-mail sign-in, and **Activity**
+is the full log. One language switch covers all of it, the panel included.
 
 ```sh
 cp .env.example .env        # set DASHBOARD_PASSWORD, 12+ characters
@@ -132,7 +134,7 @@ Open `http://<host>:8080`, sign in, then:
 | --- | --- | --- |
 | `DASHBOARD_USER` | `admin` | Dashboard user name. |
 | `DASHBOARD_PASSWORD` | (required) | Dashboard password, at least 12 characters. |
-| `BOT_LOCALE` | `cs` | Language of the panel (`cs` or `en`); the settings page follows the dashboard language. |
+| `BOT_LOCALE` | `cs` | Starting language (`cs` or `en`); the dashboard's language switch overrides it and is remembered. |
 | `TRUST_PROXY` | `0` | `1` behind a reverse proxy: trusts `X-Forwarded-For/-Proto/-Host` for the client IP, the `Secure` cookie and the origin check. |
 | `CASINO_URL` | casino address | Casino the bot plays. |
 | `LOG_LEVEL` | `info` | Server log level, JSON lines on stdout next to the bot's own. |

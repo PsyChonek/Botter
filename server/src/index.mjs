@@ -26,8 +26,9 @@ const runner = new Runner({
   // Public values from the casino's own client bundle.
   supabaseUrl: env.SUPABASE_URL || 'https://xrgcdzxellfcscbybrec.supabase.co',
   supabaseKey: env.SUPABASE_KEY || 'sb_publishable_582CKqAOfQSOLdNhjZ-cOg_4-Rbq4tr',
-  locale: env.BOT_LOCALE || 'cs',
+  locale: store.get('serverLocale').serverLocale || env.BOT_LOCALE || 'cs',
 });
+const LOCALES = ['cs', 'en'];
 
 const PUBLIC = {
   '/login': ['login.html', 'text/html; charset=utf-8'],
@@ -36,6 +37,7 @@ const PUBLIC = {
   '/i18n.js': ['i18n.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['style.css', 'text/css; charset=utf-8'],
   '/chrome-shim.js': ['chrome-shim.js', 'text/javascript; charset=utf-8'],
+  '/settings-embed.css': ['settings-embed.css', 'text/css; charset=utf-8'],
 };
 
 // The settings page is the extension's own options.html, served from its
@@ -138,6 +140,20 @@ const isPath = (path) => Array.isArray(path) && path.length <= 32 && path.every(
 
 // Routes that need a signed-in session; mutations also need the same origin.
 const API = {
+  'GET /api/config': () => ({ locale: runner.locale }),
+  // The panel is rendered in one language, so switching it reboots the page context.
+  'POST /api/locale': async ({ body }) => {
+    if (!LOCALES.includes(body.locale)) return [400, { error: 'bad_request' }];
+    if (body.locale !== runner.locale) {
+      store.set({ serverLocale: body.locale });
+      await runner.setLocale(body.locale);
+    }
+    return { ok: true };
+  },
+  'POST /api/account/switch': ({ body }) => {
+    if (typeof body.id !== 'string' || body.id.length > 100) return [400, { error: 'bad_request' }];
+    return runner.switchTo(body.id) ? { ok: true } : [409, { error: 'no_session' }];
+  },
   'GET /api/storage': () => redactAll(store.get(null)),
   'POST /api/storage/set': ({ body }) => storageSet(body.items),
   'POST /api/storage/remove': ({ body }) => {
@@ -164,13 +180,14 @@ const BODY_LIMIT = { 'POST /api/storage/set': 50 * 1024 * 1024 };
 
 const streams = new Set();
 
-// The dashboard's stream carries the log and the mirrored panel;
+// The dashboard's stream carries the log, the report and the mirrored panel;
 // the settings page's (?storage=1) carries storage changes for onChanged.
 function events(req, res, url) {
   res.writeHead(200, { ...HEADERS, 'Content-Type': 'text/event-stream', Connection: 'keep-alive' });
   const storage = url.searchParams.get('storage') === '1';
   if (!storage) {
     res.write(`event: activity\ndata: ${JSON.stringify(runner.activity.slice(-200))}\n\n`);
+    res.write(`event: report\ndata: ${JSON.stringify(runner.report())}\n\n`);
     res.write(`event: panel\ndata: ${JSON.stringify(runner.panelHtml())}\n\n`);
   }
   const stream = { res, storage, token: readCookie(req.headers.cookie, COOKIE_NAME) };
@@ -193,6 +210,7 @@ function broadcast(event, data) {
 }
 
 runner.on('activity', (item) => broadcast('activity', [item]));
+setInterval(() => streams.size && broadcast('report', runner.report()), 2000);
 store.onChanged((changes) => broadcast('storage', redactChanges(changes)));
 
 let lastPanel = '';
@@ -206,10 +224,12 @@ setInterval(() => streams.size && pushPanel(), 500);
 
 // options.html with the shim loaded before its scripts, framable by the dashboard.
 function serveOptions(res) {
-  const html = readFileSync(join(extensionDir, 'src', 'options.html'), 'utf8').replace(
-    '<script src="core.js"></script>',
-    '<script src="/ext/messages.js"></script>\n    <script src="/chrome-shim.js"></script>\n    <script src="core.js"></script>',
-  );
+  const html = readFileSync(join(extensionDir, 'src', 'options.html'), 'utf8')
+    .replace('<link rel="stylesheet" href="options.css" />', '<link rel="stylesheet" href="options.css" />\n    <link rel="stylesheet" href="/settings-embed.css" />')
+    .replace(
+      '<script src="core.js"></script>',
+      '<script src="/ext/messages.js"></script>\n    <script src="/chrome-shim.js"></script>\n    <script src="core.js"></script>',
+    );
   const csp = HEADERS['Content-Security-Policy'].replace("frame-ancestors 'none'", "frame-ancestors 'self'");
   send(res, 200, html, 'text/html; charset=utf-8', { 'Content-Security-Policy': csp });
 }

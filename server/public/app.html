@@ -11,47 +11,109 @@
   <script src="/i18n.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
-<body>
-  <header class="top">
-    <h1 data-i18n="title">Botter</h1>
-    <span id="conn" class="conn" role="status" aria-live="polite"></span>
+<body class="app">
+  <header class="appbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">B</span>
+      <h1 data-i18n="title">Botter</h1>
+    </div>
+    <span id="conn" class="conn" role="status" aria-live="polite"><span class="dot" aria-hidden="true"></span><span id="conn-text"></span></span>
     <span class="grow"></span>
-    <button type="button" id="lang" class="link" data-i18n="language">English</button>
-    <button type="button" id="logout" data-i18n="logout">Sign out</button>
+    <button type="button" id="lang" class="ghost" data-i18n="language">English</button>
+    <button type="button" id="logout" class="ghost" data-i18n="logout">Sign out</button>
   </header>
 
-  <main class="layout">
-    <div class="column">
+  <section class="hero" aria-labelledby="hero-account">
+    <div class="hero-main">
+      <p class="eyebrow" data-i18n="account">Account</p>
+      <h2 id="hero-account" class="hero-account">-</h2>
+      <p id="hero-status" class="hero-status" role="status" aria-live="polite"></p>
+    </div>
+    <dl class="stats">
+      <div class="stat"><dt data-i18n="level">Level</dt><dd id="stat-level">-</dd></div>
+      <div class="stat"><dt data-i18n="credits">Credits</dt><dd id="stat-credits">-</dd></div>
+      <div class="stat energy">
+        <dt data-i18n="energy">Energy</dt>
+        <dd><span id="stat-energy">-</span><span class="meter" aria-hidden="true"><span id="energy-bar"></span></span></dd>
+      </div>
+    </dl>
+    <button type="button" id="auto" class="auto" aria-pressed="false">
+      <span class="auto-label" data-i18n="auto">Auto</span>
+      <span id="auto-state" class="auto-state"></span>
+    </button>
+  </section>
+
+  <nav class="tabs" role="tablist" data-i18n-label="sections">
+    <button type="button" role="tab" id="tab-overview" aria-controls="view-overview" aria-selected="true" data-i18n="overview">Overview</button>
+    <button type="button" role="tab" id="tab-settings" aria-controls="view-settings" aria-selected="false" tabindex="-1" data-i18n="settings">Settings</button>
+    <button type="button" role="tab" id="tab-accounts" aria-controls="view-accounts" aria-selected="false" tabindex="-1" data-i18n="accounts">Accounts</button>
+    <button type="button" role="tab" id="tab-activity" aria-controls="view-activity" aria-selected="false" tabindex="-1" data-i18n="activity">Activity</button>
+  </nav>
+
+  <main>
+    <div role="tabpanel" id="view-overview" aria-labelledby="tab-overview" class="view overview">
       <section class="card" aria-labelledby="panel-heading">
-        <h2 id="panel-heading" data-i18n="panel">Panel</h2>
+        <h2 id="panel-heading" data-i18n="panel">Bot</h2>
         <p id="panel-empty" class="muted" data-i18n="panelNone"></p>
         <div id="panel"></div>
       </section>
+      <section class="card" aria-labelledby="recent-heading">
+        <div class="card-head">
+          <h2 id="recent-heading" data-i18n="recent">Recent activity</h2>
+          <button type="button" class="link" data-goto="activity" data-i18n="showAll">Show all</button>
+        </div>
+        <p class="muted empty-activity" data-i18n="activityEmpty"></p>
+        <ol id="recent" class="log"></ol>
+      </section>
+    </div>
 
+    <div role="tabpanel" id="view-settings" aria-labelledby="tab-settings" class="view" hidden>
+      <iframe id="settings" class="settings" data-i18n-title="settings" title="Settings"></iframe>
+    </div>
+
+    <div role="tabpanel" id="view-accounts" aria-labelledby="tab-accounts" class="view accounts" hidden>
+      <section class="card" aria-labelledby="accounts-heading">
+        <h2 id="accounts-heading" data-i18n="accountsSaved">Saved accounts</h2>
+        <p id="accounts-empty" class="muted" data-i18n="accountsEmpty"></p>
+        <div class="table-wrap">
+          <table id="accounts" hidden>
+            <thead>
+              <tr>
+                <th scope="col" data-i18n="account">Account</th>
+                <th scope="col" class="num" data-i18n="level">Level</th>
+                <th scope="col" class="num" data-i18n="credits">Credits</th>
+                <th scope="col" class="num" data-i18n="energy">Energy</th>
+                <th scope="col"><span class="visually-hidden" data-i18n="actions">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
       <section class="card" aria-labelledby="signin-heading">
         <h2 id="signin-heading" data-i18n="signinHeading">Add an e-mail account</h2>
-        <form id="signin" class="stack">
+        <form id="signin" class="form">
           <label for="signin-email" data-i18n="email">E-mail</label>
           <input id="signin-email" type="email" autocomplete="off" required>
           <label for="signin-password" data-i18n="password">Password</label>
           <input id="signin-password" type="password" autocomplete="off" required>
-          <p class="muted" data-i18n="signinNote"></p>
-          <button type="submit" data-i18n="signin">Sign in</button>
-          <p id="signin-result" role="status" aria-live="polite"></p>
+          <button type="submit" class="primary" data-i18n="signin">Sign in</button>
+          <p id="signin-result" class="result" role="status" aria-live="polite"></p>
         </form>
-      </section>
-
-      <section class="card activity-card" aria-labelledby="activity-heading">
-        <h2 id="activity-heading" data-i18n="activity">Activity</h2>
-        <p id="activity-empty" class="muted" data-i18n="activityEmpty"></p>
-        <ol id="activity" class="activity"></ol>
+        <p class="muted small" data-i18n="signinNote"></p>
       </section>
     </div>
 
-    <section class="card settings-card" aria-labelledby="settings-heading">
-      <h2 id="settings-heading" data-i18n="settings">Settings</h2>
-      <iframe id="settings" class="settings" data-i18n-title="settings" title="Settings"></iframe>
-    </section>
+    <div role="tabpanel" id="view-activity" aria-labelledby="tab-activity" class="view" hidden>
+      <section class="card" aria-labelledby="activity-heading">
+        <div class="card-head">
+          <h2 id="activity-heading" data-i18n="activity">Activity</h2>
+          <label class="check"><input id="only-problems" type="checkbox"><span data-i18n="onlyProblems">Only warnings and errors</span></label>
+        </div>
+        <p class="muted empty-activity" data-i18n="activityEmpty"></p>
+        <ol id="activity" class="log"></ol>
+      </section>
+    </div>
   </main>
 </body>
 </html>

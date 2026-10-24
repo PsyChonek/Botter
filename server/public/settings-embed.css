@@ -1,0 +1,6 @@
+/* The extension's settings page inside the dashboard's Settings tab: the tab
+   already names it, so its own title row goes, and it uses the wider frame. */
+.title-row { display: none; }
+.bar { padding: 4px 20px 0; }
+.tabs { margin: 0 auto; max-width: 720px; }
+main { max-width: 760px; padding: 20px 20px 40px; }

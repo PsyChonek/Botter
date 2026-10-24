@@ -309,6 +309,22 @@ export class Runner extends EventEmitter {
     return true;
   }
 
+  // Logs the page in as a saved account the way the panel's dropdown does,
+  // so the current login is saved first.
+  switchTo(id) {
+    const select = this.page?.document.getElementById('botter-panel')?.shadowRoot?.querySelector('#account');
+    if (!select || !select.options.some((option) => option.value === id && !option.disabled)) return false;
+    select.value = id;
+    select.dispatchEvent(new this.page.window.Event('change'));
+    return true;
+  }
+
+  async setLocale(locale) {
+    this.locale = locale;
+    this.i18n = i18n(this.extensionDir, locale);
+    await this.reload();
+  }
+
   report() {
     return this.page?.window.BotterHeadless.report?.() ?? null;
   }
