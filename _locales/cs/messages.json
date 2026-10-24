@@ -720,6 +720,14 @@
       }
     }
   },
+  "statusGrindHalloween": {
+    "message": "Farmení XP čeká na halloweenský víkend (+30 % XP od $P1$). Nevyčerpané denní rozpočty z týdne půjdou do něj.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
   "statusLevelUnpaid": {
     "message": "Farmení XP stojí: zbytek levelu má prodělat $P1$ a odměna za level je $P2$. Práce a volné kredity běží dál.",
     "placeholders": {
@@ -1707,6 +1715,9 @@
   "game_egypt": {
     "message": "Kniha mrtvého kódu"
   },
+  "game_mines": {
+    "message": "Hledání bugů"
+  },
   "optionsTablesHeading": {
     "message": "Kontrola Kostek a Case opening"
   },
@@ -1742,6 +1753,18 @@
   },
   "ach_egypt_books5": {
     "message": "pět knih naráz"
+  },
+  "ach_mines_clear": {
+    "message": "všechna čistá pole v Hledání bugů"
+  },
+  "ach_mines_100x": {
+    "message": "výběr 100× sázky v Hledání bugů"
+  },
+  "ach_halloween": {
+    "message": "hra o Halloweenu"
+  },
+  "ach_big_fish": {
+    "message": "Velká ryba (výhra 10× / 25× / 50×)"
   },
   "statusEdgeBet": {
     "message": "Hra v plusu: $P1$ po $P2$, čekaný zisk $P3$ na kredit",

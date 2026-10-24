@@ -25,6 +25,8 @@
     baccarat: 'main.table-screen.baccarat',
     dice: 'main.table-screen.dice',
     egypt: 'main.table-screen.egypt',
+    // Only through the API: the board has no bet buttons the screen bot knows.
+    mines: 'main.table-screen.mines',
   };
   // Games played with the bet +/- and one button: its selector and the path it sends.
   const SPIN_PATHS = {

@@ -720,6 +720,14 @@
       }
     }
   },
+  "statusGrindHalloween": {
+    "message": "Holding XP grinding for the Halloween weekend (+30 % XP from $P1$). The daily budgets left this week go into it.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
   "statusLevelUnpaid": {
     "message": "XP grinding paused: the rest of this level is expected to lose $P1$ and its level-up pays $P2$. Work and free credits go on.",
     "placeholders": {
@@ -1707,6 +1715,9 @@
   "game_egypt": {
     "message": "Book of Dead Code"
   },
+  "game_mines": {
+    "message": "Bug Hunt"
+  },
   "optionsTablesHeading": {
     "message": "Dice and Case opening check"
   },
@@ -1742,6 +1753,18 @@
   },
   "ach_egypt_books5": {
     "message": "five books at once"
+  },
+  "ach_mines_clear": {
+    "message": "every clean Bug Hunt cell"
+  },
+  "ach_mines_100x": {
+    "message": "a 100x Bug Hunt cash-out"
+  },
+  "ach_halloween": {
+    "message": "playing on Halloween"
+  },
+  "ach_big_fish": {
+    "message": "a big win (10x / 25x / 50x)"
   },
   "statusEdgeBet": {
     "message": "Paying game: $P1$ at $P2$ a round, $P3$ expected per credit",

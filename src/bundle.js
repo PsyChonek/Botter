@@ -18,7 +18,8 @@
     ['blaze', 'paytable', 'paytable:{cherry:[5,20,80],lemon:[5,20,80],orange:[5,20,80],plum:[5,20,80],grapes:[15,50,250],melon:[15,50,250],seven:[40,200,1000]}'],
     ['blaze', 'lucky upgrade', '[0,3.4,5.6,7.2,8.5,9.6],'],
     ['blaze', 'lucky and wild upgrades', '[0,0.1,0.2,0.3,0.4,0.5],'],
-    ['blaze', 'star upgrade', '[2,3,4,5,6,7].map((e,t)=>({3:e,4:10+2*t,5:50+5*t}))'],
+    ['blaze', 'star upgrade', '[2.7,3.6,4.5,5.4,6.3,7.2].map((e,t)=>({3:e,4:10+2*t,5:50+5*t}))'],
+    ['blaze', 'star pays', 'scatterPay:{3:2.7,4:10,5:50}'],
     ['skeleton', 'weights', 'weights:[20,20,19,19,13,13,8,7,1.4,0.8]'],
     ['skeleton', 'pay scale', '4.4,'],
     ['skeleton', 'low pays', '[4,5,6,8,10,12,16,20,30,40,60]'],
@@ -76,6 +77,11 @@
     ['dice', 'pair pays', '[`Dvě různá čísla`,`padnou obě čísla`,`5:1`,`combo12`]'],
     ['dice', 'double pays', '[`Dvojice`,`číslo padne aspoň dvakrát`,`10:1`,`double1`]'],
     ['dice', 'given triple pays', '[`Konkrétní trojice`,`třikrát to samé číslo`,`180:1`,`triple1`]'],
+    ['mines', 'bug counts', '[1,3,5,10,15,20,24],'],
+    ['mines', 'board', '(25-e,t)/'],
+    ['mines', 'multiplier floor', '*100+1e-9)/100)'],
+    ['mines', 'base return', '=0.82,'],
+    ['mines', 'upgrades', '`tests`,4)+0.05/3*'],
     ['cases', 'rarity odds', '{blue:0.7992,purple:0.1598,pink:0.032,red:0.0064,gold:0.0026}'],
     ['cases', 'supplier upgrade', '=0.0202,'],
     ['cases', 'kitchen upgrade', '=0.0002;'],
@@ -87,6 +93,10 @@
       ['pink', 3, 1], ['pink', 4, 1], ['pink', 5, 1], ['red', 12, 2], ['red', 20, 1],
       ['gold', 50, 6], ['gold', 100, 3], ['gold', 250, 1],
     ].map(([rarity, value, weight]) => ['cases', `${rarity} item ${value}x`, `rarity:\`${rarity}\`,value:${value},weight:${weight}}`]),
+    ['events', 'rotation', '[`xp`,`wins`,`wheel`,`overtime`]'],
+    ['events', 'halloween weekend', '.slice(5)>=`10-28`&&'],
+    ['events', 'halloween weekend', '.slice(5)<=`11-03`'],
+    ['events', 'halloween xp', '+30 % XP ze všeho'],
     ['payroll', 'share', 'Mzdový fond · 0,5 % z každé sázky'],
     ['xp', 'big wins', '[{key:`big`,x:10,xp:15},{key:`mega`,x:25,xp:40},{key:`super`,x:50,xp:100}]'],
     ['bets', 'max bet by level', 'e>=15?1000:e>=10?400:e>=6?200:e>=3?100:40'],
@@ -100,7 +110,8 @@
     const dates = [...src.matchAll(/\{date:`(\d{4}-\d{2}-\d{2})`,changes:\[/g)].map((m) => m[1]).sort();
     const games = {};
     const soon = [];
-    for (const m of src.matchAll(/\{key:`(\w+)`,name:`[^`]*`,icon:`[^`]*`,blurb:`[^`]*`,unlock:(\d+)(,soon:)?/g)) {
+    // An icon is a text, or a getter (Skeleton Slots swaps its icon for an event).
+    for (const m of src.matchAll(/\{key:`(\w+)`,name:`[^`]*`,(?:icon:`[^`]*`|get icon\(\)\{return \w+\(\)\}),blurb:`[^`]*`,unlock:(\d+)(,soon:)?/g)) {
       games[m[1]] = Number(m[2]);
       if (m[3]) soon.push(m[1]);
     }

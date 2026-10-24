@@ -6,6 +6,7 @@
   const DICE = root.BotterDice ?? require('./dice.js');
   const CASES = root.BotterCases ?? require('./cases.js');
   const EGYPT = root.BotterEgypt ?? require('./egypt.js');
+  const MINES = root.BotterMines ?? require('./mines.js');
   const CRASH_DOUBLING_MS = 4 * 60 * 60 * 1000;
   // A round that survives until the next 9:00 deploy pays every open bet at the
   // production multiplier reached after 24 hours.
@@ -568,6 +569,7 @@
     dice: /kostk|dice/,
     cases: /case opening|bedn|beden/,
     egypt: /knih\w* mrtv|egypt/,
+    mines: /hledání bug|hledani bug|mines/,
     crash: /produkce|crash/,
   };
 
@@ -629,6 +631,12 @@
     return { bet: min, cost: left * min * house };
   }
 
+  // Hledání bugů plays the shape a quest needs: the likeliest one paying a
+  // big, mega or super win, or more than the bet for a wins quest (see
+  // BotterMines.plan). Other games bet as usual (null).
+  const MINES_QUEST_SPOTS = { big: 'x10', mega: 'x25', super: 'x50', wins: 'win' };
+  const questSpot = (kind, game) => (game === 'mines' ? (MINES_QUEST_SPOTS[kind] ?? null) : null);
+
   // Open standup quest to play next with its game and bet, or null. A quest is
   // played only when its expected loss is below its reward, on the game where
   // that loss is smallest. The bonus for all three and the standup achievement
@@ -665,7 +673,7 @@
         skipped.push({ key: quest.key, reason: 'tooCostly', cost: Math.round(plan.cost), reward: quest.reward });
         continue;
       }
-      const candidate = { quest, kind, ...plan };
+      const candidate = { quest, kind, ...plan, spot: questSpot(kind, plan.game) };
       if (!best || candidate.cost / quest.reward < best.cost / best.quest.reward) best = candidate;
     }
     return best;
@@ -700,6 +708,10 @@
     case_pen: { reward: 500 }, // three pens in a row
     egypt_free: { reward: 2000 }, // start Kniha mrtvého kódu free spins (3+ books)
     egypt_books5: { reward: 4000 }, // five books on one Kniha mrtvého kódu spin
+    mines_clear: { reward: 5000 }, // every clean Hledání bugů cell revealed, 3+ bugs
+    mines_100x: { reward: 5000 }, // cash out Hledání bugů at 100x the bet or more
+    big_fish: { reward: [500, 2000, 5000], tiers: [1, 2, 3] }, // best win so far: 10x / 25x / 50x the bet
+    halloween: { reward: 1000 }, // play on the Halloween weekend
   };
   // Per hand of the bot's strategy, from 2,000,000 simulated hands with no
   // upgrades (natural 4.76 %, five-card win 0.51 %; maxed upgrades 0.65 %).
@@ -749,11 +761,12 @@
   };
 
   // The side bet with the best value over its own loss at this bet, or null:
-  // sides is { key: { spot, chance, edge } }, only open achievements count.
+  // sides is { key: { spot, chance, edge, reward? } }, only open achievements
+  // count, and reward (default the first tier's) is what a hit unlocks.
   function bestSide(sides, open, bet) {
     return Object.entries(sides)
       .filter(([key]) => open(key))
-      .map(([key, side]) => ({ key, ...side, value: side.chance * achievementReward(key, 0) }))
+      .map(([key, side]) => ({ key, ...side, value: side.chance * (side.reward ?? achievementReward(key, 0)) }))
       .reduce((a, b) => (a && a.value - bet * a.edge >= b.value - bet * b.edge ? a : b), null);
   }
 
@@ -763,7 +776,9 @@
   // tie or pair bet per baccarat hand (whichever pays more), a sum, triple or
   // Malá bet per Kostky roll (the same way), a gold knife, the burning Fabia
   // and a third pen in a row per case (the pens counted as three in a row),
-  // three and five books per Kniha mrtvého kódu spin,
+  // three and five books per Kniha mrtvého kódu spin, a cleared board, a
+  // 100x cash-out or a 50x win per Hledání bugů round (whichever pays most), any round on
+  // the Halloween weekend,
   // any round at night, and the next rounds-played tier spread over the rounds
   // it still needs (finishing it costs those rounds, so a round is worth the
   // reward over that count). A round is played when that beats its expected
@@ -778,6 +793,8 @@
 
     const shared = [];
     if (open('night_owl') && nightHours(now)) shared.push({ key: 'night_owl', value: achievementReward('night_owl', 0) });
+    const event = weekendEvent(now);
+    if (open('halloween') && event.active && event.key === 'halloween') shared.push({ key: 'halloween', value: achievementReward('halloween', 0) });
     const tier = achievementTier(player, 'regular');
     // The client shows counter progress from achProgress; totalSpins is the same count.
     const played = player.achProgress?.regular ?? player.totalSpins ?? Infinity;
@@ -820,6 +837,25 @@
         if (open('case_knife')) own.push({ key: 'case_knife', value: CASES.chance('gold', upgrades) * achievementReward('case_knife', 0) });
         if (open('case_car')) own.push({ key: 'case_car', value: CASES.chance('car', upgrades) * achievementReward('case_car', 0) });
         if (open('case_pen')) own.push({ key: 'case_pen', value: CASES.chance('pen', upgrades) ** 3 * achievementReward('case_pen', 0) });
+      }
+      if (game === 'mines') {
+        // One shape a round: 24 bugs and the one clean cell clears the board 1
+        // in 25, a 100x shape hits about 1 in 115 to 170, and a 50x win, about
+        // 1 in 65, unlocks every Velká ryba tier still open at once.
+        const upgrades = player.upgrades?.mines;
+        const fish = achievementTier(player, 'big_fish');
+        const fishLeft = fish === null ? 0 : HUNT_ACHIEVEMENTS.big_fish.reward.slice(fish).reduce((sum, r) => sum + r, 0);
+        const sides = {};
+        for (const [key, target, reward] of [['mines_clear', 'clear'], ['mines_100x', 'x100'], ['big_fish', 'x50', fishLeft]]) {
+          const shape = MINES.plan(upgrades, bet, target);
+          if (shape) sides[key] = { spot: target, chance: shape.chance, edge: 1 - shape.ev, reward };
+        }
+        const side = bestSide(sides, open, bet);
+        if (side) {
+          own.push({ key: side.key, value: side.value });
+          spot = side.spot;
+          spotEdge = side.edge;
+        }
       }
       if (game === 'egypt') {
         const upgrades = player.upgrades?.egypt;
@@ -1033,8 +1069,18 @@
   // Weekend events, one per weekend from Friday 17:00 to Monday 9:00 (Prague
   // time, when the sprint ends), in this order from the week of 2026-10-05:
   // Hackathon +50 % XP, Konec kvartálu +50 % on wins, Teambuilding double
-  // wheel, Placené přesčasy double work pay and XP. Same rule as the client.
+  // wheel, Placené přesčasy double work pay and XP. A weekend whose Friday
+  // falls from 28 October to 3 November is Halloween instead: +30 % XP from
+  // everything, a wheel with no empty Porada and an achievement for playing.
+  // Same rule as the client.
   const WEEKEND_EVENTS = ['xp', 'wins', 'wheel', 'overtime'];
+  const HALLOWEEN_FROM = '10-28';
+  const HALLOWEEN_TO = '11-03';
+  // Extra XP from everything on the weekends that give it.
+  const EVENT_XP = { xp: HACKATHON_XP, halloween: 0.3 };
+  // Whether the event gives extra XP, and how much while it is on.
+  const xpEvent = (event) => (EVENT_XP[event?.key] ?? 0) > 0;
+  const eventXp = (event) => (event?.active ? (EVENT_XP[event.key] ?? 0) : 0);
   const WEEKEND_EPOCH = Date.parse('2026-10-05T12:00:00Z');
   const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
   const pragueDay = (ms) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Prague' }).format(ms);
@@ -1138,33 +1184,36 @@
     const monday = addDays(day, -((new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7));
     const weeks = Math.round((Date.parse(`${monday}T12:00:00Z`) - WEEKEND_EPOCH) / WEEK_MS);
     const n = WEEKEND_EVENTS.length;
+    const friday = addDays(monday, 4).slice(5);
     const startAt = pragueAt(addDays(monday, 4), 17);
     const endAt = pragueAt(addDays(monday, 7), 9);
-    return { key: WEEKEND_EVENTS[((weeks % n) + n) % n], startAt, endAt, active: now >= startAt && now < endAt };
+    const key = friday >= HALLOWEEN_FROM && friday <= HALLOWEEN_TO ? 'halloween' : WEEKEND_EVENTS[((weeks % n) + n) % n];
+    return { key, startAt, endAt, active: now >= startAt && now < endAt };
   }
 
-  // Before a weekend that pays work more (Placené přesčasy, Hackathon), work
+  // Before a weekend that pays work more (Placené přesčasy, Hackathon, Halloween), work
   // waits while the energy it would spend refills to no more than the cap by
   // the start, so the start finds a full bar to work at the bonus. energyMs is
   // one point's refill time.
   function workHold(energy, maxEnergy, event, now, energyMs) {
-    if ((event?.key !== 'overtime' && event?.key !== 'xp') || now >= event.startAt) return false;
+    if ((event?.key !== 'overtime' && !xpEvent(event)) || now >= event.startAt) return false;
     return energy + (event.startAt - now) / energyMs <= maxEnergy;
   }
 
   // A Hackathon weekend gives +50 % XP for everything, so XP bought with losing
-  // rounds costs a third less then. In the week before it XP grinding holds.
-  const grindHold = (event, now) => event.key === 'xp' && now < event.startAt;
+  // rounds costs a third less then (Halloween's +30 % about a quarter less). In
+  // the week before such a weekend XP grinding holds.
+  const grindHold = (event, now) => xpEvent(event) && now < event.startAt;
 
   const daysBetween = (from, to) => Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
 
-  // Daily-limit budget and the loss counted against it. On a Hackathon weekend
+  // Daily-limit budget and the loss counted against it. On an XP weekend
   // the budgets held back during the week (grind.pool.held, credits per day)
   // and one for every weekend day are pooled against the weekend's loss
   // (grind.pool.net); the start day's own budget is already in held if it was
   // held. grind: the account's stats.grind.
   function grindBudget(grind, xpBudget, event, now) {
-    if (!(event.active && event.key === 'xp')) {
+    if (!(event.active && xpEvent(event))) {
       return { budget: xpBudget, lost: Math.max(0, -(grind.day === dayKey(now) ? grind.net : 0)) };
     }
     const pool = grind.pool?.startAt === event.startAt ? grind.pool : { held: {}, net: 0 };
@@ -1235,6 +1284,8 @@
     pooledXpRate,
     planXpRate,
     HACKATHON_XP,
+    xpEvent,
+    eventXp,
     pricedEdge,
     levelCost,
     levelUpCushion,

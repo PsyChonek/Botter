@@ -13,6 +13,7 @@
     blaze: { unlock: 1, path: '/api/slot/spin' },
     skeleton: { unlock: 5, path: '/api/skeleton/spin' },
     slotingi: { unlock: 7, path: '/api/slotingi/spin' },
+    mines: { unlock: 9 },
     blackjack: { unlock: 10 },
     hotfix: { unlock: 13, path: '/api/hotfix/spin' },
     roulette: { unlock: 15 },
@@ -38,6 +39,9 @@
     '/api/cases/open': 'cases',
     '/api/dice/roll': 'dice',
     '/api/egypt/spin': 'egypt',
+    '/api/mines/start': 'mines',
+    '/api/mines/reveal': 'mines',
+    '/api/mines/cashout': 'mines',
     '/api/blackjack/deal': 'blackjack',
     '/api/blackjack/action': 'blackjack',
     '/api/lottery/buy': 'lottery',
@@ -51,6 +55,7 @@
     crash: { sla: [3, 4000, 2.2] },
     skeleton: { team: [4, 4000, 1.8], wild: [4, 5000, 1.8], deploy: [3, 6000, 2] },
     slotingi: { crown: [3, 6000, 2], gulas: [4, 5000, 1.8], mint: [3, 8000, 2.2] },
+    mines: { tests: [4, 6000, 1.8], duck: [3, 9000, 2] },
     blackjack: { ties: [4, 8000, 1.8], bjpay: [2, 10000, 2], soft17: [1, 6000, 1], double: [1, 4000, 1], hint: [1, 3000, 1] },
     hotfix: { oncall: [3, 9000, 2], fix: [3, 8000, 2], review: [4, 7000, 1.8] },
     roulette: { zeros: [2, 15000, 2.5] },
@@ -59,7 +64,7 @@
     cases: { supplier: [3, 10000, 2], kitchen: [2, 20000, 2] },
     egypt: { archeo: [3, 15000, 2], cleanup: [4, 12000, 1.8], deadline: [2, 25000, 2] },
   };
-  const SHOP_UNLOCK = { global: 1, blaze: 1, crash: 3, skeleton: 5, slotingi: 7, blackjack: 10, hotfix: 13, roulette: 15, cases: 17, baccarat: 20, dice: 25, egypt: 30 };
+  const SHOP_UNLOCK = { global: 1, blaze: 1, crash: 3, skeleton: 5, slotingi: 7, mines: 9, blackjack: 10, hotfix: 13, roulette: 15, cases: 17, baccarat: 20, dice: 25, egypt: 30 };
 
   // Next level of an upgrade: its price and the player level it needs.
   function upgradeOffer(upgrades, game, key) {
@@ -85,7 +90,7 @@
   // it to pay back.
   const UPGRADE_PLAN = [
     'blaze:star', 'skeleton:team', 'blaze:lucky', 'blaze:wild', 'skeleton:wild', 'slotingi:gulas', 'skeleton:deploy',
-    'slotingi:crown', 'roulette:zeros', 'dice:house', 'dice:insure', 'baccarat:push', 'baccarat:cut', 'blackjack:ties', 'blackjack:bjpay',
+    'slotingi:crown', 'mines:tests', 'mines:duck', 'roulette:zeros', 'dice:house', 'dice:insure', 'baccarat:push', 'baccarat:cut', 'blackjack:ties', 'blackjack:bjpay',
     'hotfix:review', 'hotfix:oncall', 'hotfix:fix', 'cases:supplier', 'cases:kitchen',
     'egypt:deadline', 'egypt:archeo', 'egypt:cleanup',
   ].map((entry) => {
@@ -197,14 +202,20 @@
   // the app bundle).
   const ROULETTE_SPIN_MS = 4200;
 
+  // Hledání bugů waits this long after each of its responses before the app
+  // sends the next click (350 ms plus 40 in the app bundle).
+  const MINES_STEP_MS = 390;
+
   // How long the app animates a game response before it lets the player act.
   // The server turns game requests away ("počkej na animaci") until then, so
   // the bot waits as long: every roulette spin, and on Forbes z Chánova a spin
   // that triggers free spins (the pick shows once it has animated) and the free
-  // spins (the next spin once they have). Other responses give 0.
+  // spins (the next spin once they have), and every Hledání bugů click. Other
+  // responses give 0.
   function animationLockMs(path, data) {
     const A = HOTFIX_ANIM;
     if (path === '/api/roulette/spin') return ROULETTE_SPIN_MS;
+    if (path.startsWith('/api/mines/')) return MINES_STEP_MS;
     if (path === '/api/hotfix/spin') return data?.outcome?.trigger ? hotfixRoundMs(data.outcome.round) + A.incident : 0;
     if (path !== '/api/hotfix/free' || !data?.free) return 0;
     const rounds = data.free.rounds.reduce((ms, round) => ms + hotfixRoundMs(round) + A.freeGap, 0);
@@ -228,6 +239,10 @@
       wagered = request?.price ?? 0;
     } else if (path === '/api/hotfix/free') {
       // Free spins finish the spin that triggered them and pay its win with theirs.
+      rounds = 0;
+      wagered = 0;
+    } else if (path === '/api/mines/reveal' || path === '/api/mines/cashout') {
+      // The bet went with the start; a reveal or the cash-out only pays.
       rounds = 0;
       wagered = 0;
     } else if (path === '/api/blackjack/action') {

@@ -19,7 +19,7 @@
     },
     {
       "matches": ["https://skeleton-casino.jrezab.cz/*"],
-      "js": ["src/core.js", "src/games.js", "src/blackjack.js", "src/baccarat.js", "src/dice.js", "src/cases.js", "src/egypt.js", "src/blaze.js", "src/screen.js", "src/odds-table.js", "src/odds.js", "src/bundle.js", "src/auto.js", "src/content.js"],
+      "js": ["src/core.js", "src/games.js", "src/blackjack.js", "src/baccarat.js", "src/dice.js", "src/cases.js", "src/egypt.js", "src/mines.js", "src/blaze.js", "src/screen.js", "src/odds-table.js", "src/odds.js", "src/bundle.js", "src/auto.js", "src/content.js"],
       "run_at": "document_start"
     }
   ],

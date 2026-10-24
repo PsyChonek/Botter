@@ -802,8 +802,11 @@ test('weekendEvent follows the client rotation from Friday 17:00 to Monday 9:00 
   assert.equal(at('2026-10-12T06:59:00Z').active, true);
   assert.deepEqual(
     ['2026-10-17', '2026-10-24', '2026-10-31', '2026-11-07'].map((day) => at(`${day}T12:00:00Z`).key),
-    ['wins', 'wheel', 'overtime', 'xp'],
+    ['wins', 'wheel', 'halloween', 'xp'],
   );
+  // Halloween takes the weekend whose Friday is 28 October to 3 November.
+  assert.equal(at('2027-10-30T12:00:00Z').key, 'halloween');
+  assert.notEqual(at('2026-10-24T12:00:00Z').key, 'halloween');
   // Winter time: 17:00 Prague is 16:00 UTC.
   assert.equal(new Date(at('2026-10-31T12:00:00Z').startAt).toISOString(), '2026-10-30T16:00:00.000Z');
 });
@@ -1129,4 +1132,59 @@ test('pricedEdge takes the measured loss only once it is clearly worse than the 
   assert.ok(Math.abs(edge - 0.09) < 1e-9);
   // A lucky measurement never lowers the model's edge.
   assert.equal(A.pricedEdge(0.03, { rounds: 40_000, wagered: 4_000_000, net: 40_000 }, 1), 0.03);
+});
+
+test('huntPlan clears a Hledání bugů board, then goes for 100x', () => {
+  const ctx = huntCtx({ level: 9, unlocks: { mines: 9 }, edges: { mines: 0.18 } });
+  const plan = A.huntPlan(hunter({ achievements: { regular: { tier: 3 } } }), ctx);
+  assert.equal(plan.game, 'mines');
+  assert.deepEqual(plan.targets, ['mines_clear']);
+  assert.equal(plan.spot, 'clear');
+  assert.ok(Math.abs(plan.value - 5000 / 25) < 1e-9);
+  // Velká ryba's three tiers (7,500) at about 1 in 65 beat 5,000 at about 1 in 170.
+  const cleared = A.huntPlan(hunter({ achievements: { regular: { tier: 3 }, mines_clear: { tier: 1 } } }), ctx);
+  assert.equal(cleared.spot, 'x50');
+  assert.deepEqual(cleared.targets, ['big_fish']);
+  const fished = A.huntPlan(hunter({ achievements: { regular: { tier: 3 }, mines_clear: { tier: 1 }, big_fish: { tier: 3 } } }), ctx);
+  assert.equal(fished.spot, 'x100');
+  assert.deepEqual(fished.targets, ['mines_100x']);
+  assert.equal(A.questGame({ key: 'rounds_x', text: 'Odehraj 10 her Hledání bugů' }), 'mines');
+});
+
+test('huntPlan plays a round on the Halloween weekend for Koledník', () => {
+  const now = Date.parse('2026-10-31T12:00:00Z');
+  const ctx = huntCtx({ now, unlocks: { blaze: 1 }, edges: { blaze: 0.3 } });
+  const plan = A.huntPlan(hunter({ achievements: { regular: { tier: 3 } } }), ctx);
+  assert.ok(plan.targets.includes('halloween'));
+  const done = A.huntPlan(hunter({ achievements: { regular: { tier: 3 }, halloween: { tier: 1 } } }), ctx);
+  assert.equal(done, null);
+});
+
+test('Halloween is an XP weekend: grinding and work hold for it and pool the budget', () => {
+  const tuesday = Date.parse('2026-10-27T10:00:00Z');
+  const event = A.weekendEvent(tuesday);
+  assert.equal(event.key, 'halloween');
+  assert.equal(A.xpEvent(event), true);
+  assert.equal(A.eventXp(event), 0);
+  assert.equal(A.eventXp(A.weekendEvent(Date.parse('2026-10-31T12:00:00Z'))), 0.3);
+  assert.equal(A.grindHold(event, tuesday), true);
+  assert.equal(A.workHold(10, 20, event, event.startAt - 5 * 120_000, 120_000), true);
+  const sunday = Date.parse('2026-11-01T12:00:00Z');
+  const grind = { day: A.dayKey(sunday), net: 0, pool: { startAt: event.startAt, held: { '2026-10-28': 400 }, net: -100 } };
+  assert.deepEqual(A.grindBudget(grind, 1000, A.weekendEvent(sunday), sunday), { budget: 3400, lost: 100 });
+});
+
+test('standupPlan plays a big win quest on Hledání bugů in its 10x shape', () => {
+  const ctx = {
+    level: 9,
+    unlocks: { blaze: 1, mines: 9 },
+    edges: { blaze: 0.3, mines: 0.18 },
+    bigs: { blaze: [0.02, 0.004, 0.001], mines: [0.08, 0.032, 0.016] },
+    levels: [20],
+  };
+  const plan = A.standupPlan([{ key: 'big_win', text: 'Tref BIG WIN', progress: 0, target: 1, reward: 800 }], ctx);
+  assert.equal(plan.game, 'mines');
+  assert.equal(plan.spot, 'x10');
+  const blaze = A.standupPlan([{ key: 'spins_blaze', text: 'Zatoč 10× Blaze', progress: 0, target: 10, reward: 800 }], ctx);
+  assert.equal(blaze.spot, null);
 });

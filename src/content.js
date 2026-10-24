@@ -9,6 +9,7 @@
   const BAC = globalThis.BotterBaccarat;
   const DICE = globalThis.BotterDice;
   const CASES = globalThis.BotterCases;
+  const M = globalThis.BotterMines;
   const A = globalThis.BotterAuto;
   const O = globalThis.BotterOdds;
   const Z = globalThis.BotterBlaze;
@@ -669,7 +670,7 @@
           const own = (data.player.upgrades ?? player?.upgrades)?.cases;
           CASES.addOpen((stats.cases ??= {}), O.combo('cases', { cases: own }), request, data, delta.net);
         }
-        if (!hackathonOn()) G.addDelta(stats.plainXp, delta);
+        if (!xpEventBonus()) G.addDelta(stats.plainXp, delta);
         bookGrind(delta.net);
         checkWinsLimit(delta, data);
         saveStats();
@@ -829,10 +830,13 @@
 
   // On a Konec kvartálu weekend every round that ends ahead gets a bonus until
   // the weekend limit is reached. A winning round without one means it has been.
+  // The bonus is for slot wins, so a Hledání bugů win without one proves
+  // nothing; one with a bonus is logged, since it would make its long shots pay.
   function checkWinsLimit(delta, data) {
     const event = A.weekendEvent();
     if (!event.active || event.key !== 'wins' || stats.flags.winsCapped === event.startAt) return;
-    if (data.eventBonus > 0 || !(delta.net > 0) || delta.game === 'lottery') return;
+    if (delta.game === 'mines' && data.eventBonus > 0) log.info('mines_wins_bonus', { net: delta.net, bonus: data.eventBonus });
+    if (data.eventBonus > 0 || !(delta.net > 0) || delta.game === 'lottery' || delta.game === 'mines') return;
     stats.flags.winsCapped = event.startAt;
     log.info('wins_limit_reached', { game: delta.game, net: delta.net });
   }
@@ -1368,7 +1372,7 @@
     const left = grindPausedUntil - Date.now();
     if (left > 0) return ['statusGrindPaused', [grindError ?? '-', String(Math.ceil(left / 60_000))]];
     const event = A.weekendEvent();
-    if (A.grindHold(event, Date.now())) return ['statusGrindHackathon', [eventStart.format(event.startAt)]];
+    if (A.grindHold(event, Date.now())) return [event.key === 'halloween' ? 'statusGrindHalloween' : 'statusGrindHackathon', [eventStart.format(event.startAt)]];
     const { held } = grindChoice();
     if (held) return ['statusLevelUnpaid', [credits(held.cost), credits(held.reward)]];
     const goal = grindHeldFor();
@@ -1492,6 +1496,7 @@
   // with the test switch, which only the API sends.
   const onScreen = (game, spot) =>
     settings.playOnScreen &&
+    game !== 'mines' &&
     (game !== 'roulette' || G.ROULETTE_BETS.includes(spot)) &&
     (game !== 'hotfix' || !settings.hotfixForce);
 
@@ -1515,7 +1520,33 @@
     }
     if (game === 'dice') return api('/api/dice/roll', { bets: { [DICE.SPOTS.includes(spot) ? spot : DICE.BEST_SPOT]: bet } });
     if (game === 'hotfix') return playHotfix(bet);
+    if (game === 'mines') return playMines(bet, spot);
     return api(G.GAMES[game].path, { bet });
+  }
+
+  // One Hledání bugů round in the shape spot asks for (BotterMines.plan: null
+  // for the grinder's, else a quest or achievement target): start with its bug
+  // count, reveal random cells until it has its clean cells or hits a bug, then
+  // cash out unless the board cleared itself. A round left open (player.mines,
+  // by the bot or by hand) is finished first: cashed out when it has clean
+  // cells, else one cell is revealed, which returns the same as any shape.
+  const MINES_SPOTS = ['win', 'x10', 'x25', 'x50', 'x100', 'clear'];
+  async function playMines(bet, spot) {
+    const open = player.mines && !player.mines.done ? player.mines : null;
+    if (open?.revealed?.length) return api('/api/mines/cashout', {});
+    const shape = open ? { bugs: open.mines, reveals: 1 } : M.plan(player.upgrades?.mines, bet, MINES_SPOTS.includes(spot) ? spot : null);
+    if (!shape) return { ok: false, status: 0, data: { error: 'no_shape' } };
+    let res = open ? { ok: true, data: { game: open, player } } : await api('/api/mines/start', { bet, mines: shape.bugs });
+    for (const cell of M.pickCells(shape.reveals)) {
+      const game = res.data?.game;
+      if (!res.ok || !game || game.done || game.revealed.length >= shape.reveals) break;
+      res = await api('/api/mines/reveal', { cell });
+    }
+    const game = res.data?.game;
+    if (res.ok && game && !game.done && game.revealed.length > 0) res = await api('/api/mines/cashout', {});
+    const end = res.data?.game;
+    if (res.ok && end?.done) log.debug('mines_round', { spot, bugs: end.mines, revealed: end.revealed?.length, boom: end.boom !== undefined, payout: end.payout ?? 0 });
+    return res;
   }
 
   // One Forbes z Chánova spin. Four or more incidents leave free spins pending
@@ -1964,10 +1995,10 @@
     return limit.grindLimit === 'balance' ? Math.max(limit.reserve, limit.grindMinBalance) : limit.reserve;
   }
 
-  // Whether a Hackathon weekend (+50 % XP) is on now.
-  function hackathonOn(now = Date.now()) {
-    const event = A.weekendEvent(now);
-    return event.active && event.key === 'xp';
+  // Extra XP from a weekend that gives it (Hackathon +50 %, Halloween +30 %)
+  // while it is on, else 0.
+  function xpEventBonus(now = Date.now()) {
+    return A.eventXp(A.weekendEvent(now));
   }
 
   // XP per credit to plan upgrades and the leveling cushion with (BotterAuto.planXpRate).
@@ -2303,9 +2334,9 @@
       if (skipped.length) log.info('standup_skipped', { skipped });
     }
     if (!plan) return false;
-    const { quest, game, bet } = plan;
+    const { quest, game, bet, spot } = plan;
     setStatus('statusStandup', [quest.text, msg(`game_${game}`), credits(bet), num.format(quest.progress), num.format(quest.target)]);
-    const res = await playRound(game, bet);
+    const res = await playRound(game, bet, spot ?? settings.rouletteBet);
     if (!res.ok) {
       log.warn('standup_failed', { quest: quest.key, game, bet, status: res.status, error: res.data?.error });
       claimTried.standup = Date.now();
@@ -2397,7 +2428,7 @@
   // at the current upgrades once that is clearly worse (BotterAuto.pricedEdge).
   function levelValue(game, edge, now = Date.now()) {
     const plain = planXpRate();
-    const rate = plain === null ? null : plain * (hackathonOn(now) ? 1 + A.HACKATHON_XP : 1);
+    const rate = plain === null ? null : plain * (1 + xpEventBonus(now));
     const combo = O.combo(game, player.upgrades);
     const row = combo === null ? null : stats.combos[game]?.[combo];
     const variance = O.variances([game], player.upgrades, blazeMode())[game];
@@ -2415,7 +2446,7 @@
   function bookGrind(net) {
     if (stats.grind.day === A.dayKey()) stats.grind.net += net;
     const event = A.weekendEvent();
-    if (event.active && event.key === 'xp') hackathonPool(event).net += net;
+    if (event.active && A.xpEvent(event)) hackathonPool(event).net += net;
   }
 
   async function grindStep() {
