@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="Botter dashboard: watch and control the bot">
+  <title>Botter dashboard</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/i18n.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <h1 data-i18n="title">Botter</h1>
+    <span id="conn" class="conn" role="status" aria-live="polite"></span>
+    <span class="grow"></span>
+    <button type="button" id="lang" class="link" data-i18n="language">English</button>
+    <button type="button" id="logout" data-i18n="logout">Sign out</button>
+  </header>
+
+  <main class="layout">
+    <section class="card status-card" aria-labelledby="status-heading">
+      <h2 id="status-heading" data-i18n="status">Bot status</h2>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <dl class="facts">
+        <dt data-i18n="account">Account</dt><dd id="fact-account"></dd>
+        <dt data-i18n="auto">Auto</dt><dd id="fact-auto"></dd>
+        <dt data-i18n="work">Work</dt><dd id="fact-work"></dd>
+        <dt data-i18n="games">Games</dt><dd id="fact-games"></dd>
+      </dl>
+    </section>
+
+    <section class="card browser" aria-labelledby="tabs-heading">
+      <h2 id="tabs-heading" class="visually-hidden" data-i18n="tabs">Tabs</h2>
+      <div class="toolbar">
+        <div id="tabs" class="tabs" role="list"></div>
+        <button type="button" data-open="casino" data-i18n="openCasino">+ Casino</button>
+        <button type="button" data-open="settings" data-i18n="openSettings">+ Botter settings</button>
+      </div>
+      <form id="nav" class="toolbar">
+        <button type="button" data-nav="back" data-i18n-label="back" aria-label="Back">&lt;</button>
+        <button type="button" data-nav="forward" data-i18n-label="forward" aria-label="Forward">&gt;</button>
+        <button type="button" data-nav="reload" data-i18n-label="reload" aria-label="Reload">R</button>
+        <label for="url" class="visually-hidden" data-i18n="address">Address</label>
+        <input id="url" class="grow" inputmode="url" autocomplete="off" spellcheck="false">
+        <button type="submit" data-i18n="go">Go</button>
+      </form>
+      <div class="screen-wrap">
+        <canvas id="screen" width="1280" height="800" tabindex="0" data-i18n-label="screen" aria-label="Browser screen"></canvas>
+      </div>
+      <p class="hint" data-i18n="screenHint"></p>
+      <form id="type" class="toolbar">
+        <label for="type-text" class="visually-hidden" data-i18n="typeText">Type text</label>
+        <input id="type-text" class="grow" autocomplete="off" data-i18n-placeholder="typeTextPlaceholder">
+        <button type="submit" data-i18n="send">Type</button>
+      </form>
+    </section>
+
+    <section class="card activity-card" aria-labelledby="activity-heading">
+      <h2 id="activity-heading" data-i18n="activity">Activity</h2>
+      <p id="activity-empty" class="muted" data-i18n="activityEmpty"></p>
+      <ol id="activity" class="activity"></ol>
+    </section>
+  </main>
+</body>
+</html>

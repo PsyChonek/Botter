@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="Botter dashboard sign in">
+  <title>Botter - sign in</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/i18n.js" defer></script>
+  <script src="/login.js" defer></script>
+</head>
+<body class="center">
+  <main class="card login">
+    <h1 data-i18n="title">Botter</h1>
+    <h2 data-i18n="loginHeading">Sign in</h2>
+    <form id="login" novalidate>
+      <label for="user" data-i18n="user">User</label>
+      <input id="user" name="user" autocomplete="username" required>
+      <label for="password" data-i18n="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+      <p id="error" class="error" role="alert" aria-live="assertive"></p>
+      <button type="submit" data-i18n="signIn">Sign in</button>
+    </form>
+    <button type="button" id="lang" class="link" data-i18n="language">English</button>
+  </main>
+</body>
+</html>

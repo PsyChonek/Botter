@@ -100,6 +100,47 @@ to **Enabled**, relaunch and press **Download the model** again. Progress shows 
 `chrome://on-device-internals`.
 </details>
 
+## Run in Docker
+
+The container runs headless Chromium with Botter loaded and serves a dashboard on
+port 8080. Sign in there to watch the casino tab live, click and type into it (log in to
+the casino, press Start or Auto), open the Botter settings in a tab, and follow the bot's
+status and activity log.
+
+```sh
+cp .env.example .env        # set DASHBOARD_PASSWORD, 12+ characters
+docker compose up -d --build
+```
+
+Then open `http://<host>:8080`. Or without compose:
+
+```sh
+docker build -t botter .
+docker run -d --name botter -p 8080:8080 --shm-size 1g --init \
+  -e DASHBOARD_PASSWORD=... -v botter-data:/data botter
+```
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `DASHBOARD_USER` | `admin` | Dashboard user name. |
+| `DASHBOARD_PASSWORD` | (required) | Dashboard password, at least 12 characters. |
+| `TRUST_PROXY` | `0` | `1` behind a reverse proxy: trusts `X-Forwarded-For/-Proto/-Host` for the client IP, the `Secure` cookie and the origin check. |
+| `CASINO_URL` | casino address | The page the casino tab opens. |
+| `LOG_LEVEL` | `info` | Server log level, JSON lines on stdout. |
+
+- The Chromium profile lives in the `/data` volume, so casino sessions, saved accounts,
+  the answer bank, stats and settings survive restarts and image upgrades.
+- Gemini Nano does not run in the container. Pick Claude or OpenRouter on the AI tab of
+  the settings, or rely on the bank and the random guess.
+- Dashboard sessions are kept in memory: restarting the container signs you out, the
+  bot itself carries on from the saved profile. Failed sign-ins are limited to 10 per IP
+  per 15 minutes.
+- Put it behind HTTPS (a reverse proxy with `TRUST_PROXY=1`) before exposing it beyond
+  your own network. The dashboard controls a logged-in browser.
+- `GET /health` answers without a login for uptime checks.
+
+Server tests: `cd server && npm test`.
+
 ## Good to know
 
 - **Never use the casino's Log out to switch accounts.** It revokes every session of that

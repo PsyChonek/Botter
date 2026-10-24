@@ -1,0 +1,14 @@
+.git
+.github
+**/node_modules
+server/.profile
+server/test
+docs
+test
+scripts
+*.zip
+*.crx
+*.pem
+botter-bank.json
+.env
+.env.*
