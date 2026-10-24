@@ -1,3 +1,7 @@
+# Fixed project name, so the updater (which sees the repo at /repo) rebuilds
+# this same stack instead of starting a second one.
+name: botter
+
 services:
   botter:
     build: .
@@ -15,6 +19,20 @@ services:
     # Chromium needs more shared memory than Docker's 64 MB default.
     shm_size: 1gb
     init: true
+
+  # Pulls the git checkout this file lives in and rebuilds botter from source
+  # when the branch moves. Needs the Docker socket to run the rebuild.
+  updater:
+    image: docker:29-cli
+    restart: unless-stopped
+    working_dir: /repo
+    entrypoint: ["sh", "/repo/scripts/auto-update.sh"]
+    environment:
+      UPDATE_BRANCH: ${UPDATE_BRANCH:-master}
+      UPDATE_INTERVAL: ${UPDATE_INTERVAL:-300}
+    volumes:
+      - .:/repo
+      - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
   botter-data:
