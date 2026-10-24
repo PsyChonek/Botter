@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import vm from 'node:vm';
+import { createDom } from './dom.mjs';
 import { memoryStorage } from './store.mjs';
 import { log } from './log.mjs';
 
@@ -38,12 +39,6 @@ const WEB_GLOBALS = {
   crypto: globalThis.crypto,
   performance,
 };
-
-class StubEvent {
-  constructor(type, init = {}) {
-    Object.assign(this, init, { type });
-  }
-}
 
 // chrome.i18n.getMessage: $name$ placeholders resolve to their content, then
 // $1..$9 to the substitutions.
@@ -88,6 +83,17 @@ export class Runner extends EventEmitter {
     this.solve = null;
     this.refreshTimer = null;
     this.bundleSrc = null;
+    this.reloadTimer = null;
+    // A login that arrives while no one is logged in (a backup imported in
+    // the settings) is used at once instead of on the next restart.
+    store.onChanged((changes) => {
+      if (this.readSession() || this.reloadTimer) return;
+      if (!Object.entries(changes).some(([key, change]) => key.startsWith(ACCOUNT_PREFIX) && change.newValue?.session)) return;
+      this.reloadTimer = setTimeout(() => {
+        this.reloadTimer = null;
+        if (!this.readSession()) this.reload();
+      }, 1000);
+    });
   }
 
   async start() {
@@ -210,6 +216,7 @@ export class Runner extends EventEmitter {
     const listeners = { message: new Set() };
     const unsubscribers = [];
     const casino = this.casinoUrl;
+    const dom = createDom(this.bundleSrc);
 
     const window = {
       ...WEB_GLOBALS,
@@ -239,16 +246,10 @@ export class Runner extends EventEmitter {
           for (const fn of listeners.message) fn({ source: global, origin, data: copy });
         });
       },
-      document: {
-        readyState: 'complete',
-        addEventListener: () => {},
-        getElementById: () => null,
-        querySelectorAll: () => [],
-        // Only the bundle check asks for an element that exists headless.
-        querySelector: (selector) => (selector.includes('/assets/index-') && this.bundleSrc ? { src: this.bundleSrc } : null),
-      },
-      Event: StubEvent,
-      KeyboardEvent: StubEvent,
+      document: dom.document,
+      Option: dom.window.Option,
+      Event: dom.window.Event,
+      KeyboardEvent: dom.window.KeyboardEvent ?? dom.window.Event,
       chrome: {
         i18n: this.i18n,
         storage: this.chromeStorage((fn) => unsubscribers.push(this.store.onChanged((changes, area) => alive && fn(changes, area)))),
@@ -265,6 +266,7 @@ export class Runner extends EventEmitter {
 
     this.page = {
       window,
+      document: dom.document,
       dispose: () => {
         alive = false;
         timers.clearAll();
@@ -282,6 +284,29 @@ export class Runner extends EventEmitter {
   async reload() {
     this.disposePage();
     await this.bootPage();
+  }
+
+  // The panel content.js built, as HTML for the dashboard to mirror.
+  panelHtml() {
+    return this.page?.document.getElementById('botter-panel')?.shadowRoot?.innerHTML ?? '';
+  }
+
+  // Replays one dashboard interaction on the panel. path is the list of
+  // element-child indexes from the panel's shadow root to the target.
+  panelEvent({ path, type, value, open }) {
+    let element = this.page?.document.getElementById('botter-panel')?.shadowRoot;
+    for (const index of path) element = element?.children[index];
+    if (!element || element === this.page.document) return false;
+    const { Event } = this.page.window;
+    if (type === 'click') element.click();
+    else if (type === 'change') {
+      element.value = value;
+      element.dispatchEvent(new Event('change'));
+    } else if (type === 'toggle') {
+      element.open = open;
+      element.dispatchEvent(new Event('toggle'));
+    } else return false;
+    return true;
   }
 
   report() {
@@ -385,17 +410,6 @@ export class Runner extends EventEmitter {
     const current = this.readSession();
     if (current) this.localStorage.removeItem(current.key);
     this.saveSession(data);
-    await this.reload();
-    return { ok: true };
-  }
-
-  // Logs the page in as a saved account, like the panel's account switch.
-  async switchTo(id) {
-    const saved = this.store.get(ACCOUNT_PREFIX + id)[ACCOUNT_PREFIX + id];
-    if (!saved?.session) return { error: 'no_session' };
-    const current = this.readSession();
-    if (current) this.localStorage.removeItem(current.key);
-    this.localStorage.setItem(saved.storageKey ?? this.storageKey(), saved.session);
     await this.reload();
     return { ok: true };
   }

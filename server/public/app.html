@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
-  <meta name="description" content="Botter dashboard: control the bot and follow what it does">
+  <meta name="description" content="Botter dashboard: the bot's panel, its settings and its log">
   <title>Botter dashboard</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/style.css">
@@ -22,46 +22,15 @@
 
   <main class="layout">
     <div class="column">
-      <section class="card" aria-labelledby="status-heading">
-        <h2 id="status-heading" data-i18n="status">Bot status</h2>
-        <p id="status" class="status" role="status" aria-live="polite"></p>
-        <div class="toggles" role="group" data-i18n-label="controls">
-          <button type="button" class="toggle" data-toggle="autoMode" aria-pressed="false" data-i18n="auto">Auto</button>
-          <button type="button" class="toggle" data-toggle="enabled" aria-pressed="false" data-i18n="work">Work</button>
-          <button type="button" class="toggle" data-toggle="gamesEnabled" aria-pressed="false" data-i18n="games">Games</button>
-        </div>
-        <dl class="facts">
-          <dt data-i18n="account">Account</dt><dd id="fact-account"></dd>
-          <dt data-i18n="level">Level</dt><dd id="fact-level"></dd>
-          <dt data-i18n="credits">Credits</dt><dd id="fact-credits"></dd>
-          <dt data-i18n="energy">Energy</dt><dd id="fact-energy"></dd>
-          <dt data-i18n="bank">Answer bank</dt><dd id="fact-bank"></dd>
-          <dt data-i18n="answers">Answers right</dt><dd id="fact-answers"></dd>
-          <dt data-i18n="workDone">Tickets</dt><dd id="fact-work"></dd>
-          <dt data-i18n="gamesNet">Games net</dt><dd id="fact-games"></dd>
-        </dl>
-        <p id="bundle" class="warn" hidden></p>
+      <section class="card" aria-labelledby="panel-heading">
+        <h2 id="panel-heading" data-i18n="panel">Panel</h2>
+        <p id="panel-empty" class="muted" data-i18n="panelNone"></p>
+        <div id="panel"></div>
       </section>
 
-      <section class="card" aria-labelledby="accounts-heading">
-        <h2 id="accounts-heading" data-i18n="accounts">Casino accounts</h2>
-        <p id="accounts-empty" class="muted" data-i18n="accountsEmpty"></p>
-        <div class="table-wrap">
-          <table id="accounts" hidden>
-            <thead>
-              <tr>
-                <th scope="col" data-i18n="account">Account</th>
-                <th scope="col" data-i18n="level">Level</th>
-                <th scope="col" data-i18n="credits">Credits</th>
-                <th scope="col" data-i18n="energy">Energy</th>
-                <th scope="col"><span class="visually-hidden" data-i18n="actions">Actions</span></th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
+      <section class="card" aria-labelledby="signin-heading">
+        <h2 id="signin-heading" data-i18n="signinHeading">Add an e-mail account</h2>
         <form id="signin" class="stack">
-          <h3 data-i18n="signinHeading">Add an e-mail login</h3>
           <label for="signin-email" data-i18n="email">E-mail</label>
           <input id="signin-email" type="email" autocomplete="off" required>
           <label for="signin-password" data-i18n="password">Password</label>
@@ -71,38 +40,6 @@
           <p id="signin-result" role="status" aria-live="polite"></p>
         </form>
       </section>
-    </div>
-
-    <div class="column">
-      <section class="card" aria-labelledby="backup-heading">
-        <h2 id="backup-heading" data-i18n="backup">Backup</h2>
-        <p class="muted" data-i18n="backupNote"></p>
-        <label for="backup-file" data-i18n="backupImport">Load a backup</label>
-        <input id="backup-file" type="file" accept="application/json,.json">
-        <p id="backup-result" role="status" aria-live="polite"></p>
-        <div class="row">
-          <input id="backup-secrets" type="checkbox">
-          <label for="backup-secrets" data-i18n="backupSecrets">Include logins and API keys</label>
-        </div>
-        <button type="button" id="backup-export" data-i18n="backupExport">Download a backup</button>
-      </section>
-
-      <section class="card" aria-labelledby="ai-heading">
-        <h2 id="ai-heading" data-i18n="ai">AI for unknown tickets</h2>
-        <form id="solver" class="stack">
-          <label for="solver-kind" data-i18n="solver">Solver</label>
-          <select id="solver-kind">
-            <option value="claude">Claude</option>
-            <option value="openrouter">OpenRouter</option>
-            <option value="off" data-i18n="solverOff">Off</option>
-            <option value="local" data-i18n="solverLocal">Gemini Nano</option>
-          </select>
-          <label for="solver-key" data-i18n="solverKey">API key</label>
-          <input id="solver-key" type="password" autocomplete="off" data-i18n-placeholder="solverKeyPlaceholder">
-          <button type="submit" data-i18n="save">Save</button>
-          <p id="solver-result" role="status" aria-live="polite"></p>
-        </form>
-      </section>
 
       <section class="card activity-card" aria-labelledby="activity-heading">
         <h2 id="activity-heading" data-i18n="activity">Activity</h2>
@@ -110,6 +47,11 @@
         <ol id="activity" class="activity"></ol>
       </section>
     </div>
+
+    <section class="card settings-card" aria-labelledby="settings-heading">
+      <h2 id="settings-heading" data-i18n="settings">Settings</h2>
+      <iframe id="settings" class="settings" data-i18n-title="settings" title="Settings"></iframe>
+    </section>
   </main>
 </body>
 </html>

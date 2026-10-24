@@ -106,7 +106,7 @@ button.link { border: none; background: none; text-decoration: underline; paddin
   display: grid;
   gap: 16px;
   padding: 16px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) minmax(0, 440px);
   align-items: start;
   max-width: 1200px;
   margin: 0 auto;
@@ -115,30 +115,15 @@ button.link { border: none; background: none; text-decoration: underline; paddin
 
 @media (max-width: 860px) {
   .layout { grid-template-columns: minmax(0, 1fr); }
+  .settings-card { position: static; }
 }
 
-h3 { font-size: 0.95rem; margin: 12px 0 4px; }
-.status { font-weight: 600; margin: 0 0 12px; }
-.warn { color: var(--warn); }
-.facts { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 12px 0 0; }
-.facts dt { color: var(--muted); }
-.facts dd { margin: 0; overflow-wrap: anywhere; }
-
-.toggles { display: flex; flex-wrap: wrap; gap: 8px; }
-.toggle { min-width: 88px; font-weight: 600; }
-.toggle[aria-pressed='true'] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.settings-card { position: sticky; top: 16px; }
+.settings { display: block; width: 100%; height: calc(100vh - 120px); min-height: 480px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); }
+#panel { display: block; }
 
 .stack { display: grid; gap: 6px; }
-.stack input, .stack select { width: 100%; }
-select { font: inherit; color: inherit; min-height: 36px; border-radius: 6px; border: 1px solid var(--border); background: var(--card); padding: 4px 8px; }
-.row { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
-.row input[type='checkbox'] { min-height: auto; width: 20px; height: 20px; }
-input[type='file'] { width: 100%; border: none; padding: 4px 0; }
-
-.table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-th, td { text-align: left; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--border); }
-th { color: var(--muted); font-weight: 600; }
+.stack input { width: 100%; }
 
 .activity-card { max-height: 60vh; overflow: auto; }
 .activity { list-style: none; margin: 0; padding: 0; font-size: 0.85rem; }

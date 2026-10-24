@@ -1,9 +1,7 @@
 // Dashboard server: login page, the dashboard, a JSON API to control the bot,
 // a server-sent event stream of its status and log, and /health.
 import { createServer } from 'node:http';
-import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createAuth, readCookie, COOKIE_NAME } from './auth.mjs';
@@ -11,7 +9,6 @@ import { log } from './log.mjs';
 import { Runner } from './runner.mjs';
 import { Store } from './store.mjs';
 
-const require = createRequire(import.meta.url);
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const env = process.env;
 const port = Number(env.PORT || 8080);
@@ -19,8 +16,6 @@ const trustProxy = env.TRUST_PROXY === '1';
 const extensionDir = resolve(env.EXTENSION_DIR || join(root, '..'));
 const dataDir = resolve(env.DATA_DIR || join(root, '.data'));
 
-const Core = require(join(extensionDir, 'src', 'core.js'));
-const Backup = require(join(extensionDir, 'src', 'backup.js'));
 
 const auth = createAuth({ user: env.DASHBOARD_USER || 'admin', password: env.DASHBOARD_PASSWORD });
 const store = new Store(join(dataDir, 'storage.json'));
@@ -40,18 +35,24 @@ const PUBLIC = {
   '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
   '/i18n.js': ['i18n.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['style.css', 'text/css; charset=utf-8'],
+  '/chrome-shim.js': ['chrome-shim.js', 'text/javascript; charset=utf-8'],
 };
+
+// The settings page is the extension's own options.html, served from its
+// src folder with chrome.storage and chrome.i18n shimmed over this API.
+const EXT_FILE = /^\/ext\/([\w-]+\.(?:js|css))$/;
+const EXT_TYPES = { js: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8' };
+// Saved logins never leave the server: the settings page sees this instead,
+// and a write that sends it back keeps the stored session.
+const SESSION_MARK = '[kept on the server]';
 
 const HEADERS = {
   'Content-Security-Policy':
-    "default-src 'self'; img-src 'self' data:; connect-src 'self'; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+    "default-src 'self'; img-src 'self' data:; connect-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
   'Cache-Control': 'no-store',
 };
-
-const SOLVERS = ['local', 'claude', 'openrouter', 'off'];
-const TOGGLES = ['autoMode', 'enabled', 'gamesEnabled'];
 
 function clientIp(req) {
   if (trustProxy) {
@@ -102,63 +103,54 @@ function sessionCookie(req, token, maxAge) {
   return `${COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure}`;
 }
 
-// One id per install, like the extension's, so a backup exported here and
-// imported back does not add its stats twice.
-function installId() {
-  const { installId: id } = store.get('installId');
-  if (id) return id;
-  const created = randomUUID();
-  store.set({ installId: created });
-  return created;
+const isAccountKey = (key) => key.startsWith('account:');
+
+function redact(key, value) {
+  return isAccountKey(key) && value?.session ? { ...value, session: SESSION_MARK } : value;
 }
 
-async function importBackup(backup) {
-  if (!Backup.isBackup(backup)) return { error: 'not_backup' };
+function redactAll(items) {
+  return Object.fromEntries(Object.entries(items).map(([key, value]) => [key, redact(key, value)]));
+}
+
+function redactChanges(changes) {
+  return Object.fromEntries(
+    Object.entries(changes).map(([key, change]) => [key, { oldValue: redact(key, change.oldValue), newValue: redact(key, change.newValue) }]),
+  );
+}
+
+function storageSet(items) {
+  if (!items || typeof items !== 'object' || Array.isArray(items)) return [400, { error: 'bad_request' }];
   const stored = store.get(null);
-  const { set, counts, statsSkipped } = Backup.importBackup(stored, backup, { install: installId(), isBankEntry: Core.isBankEntry });
-  // A login in the file that is newer than the one here replaces it: the
-  // older refresh token has most likely been revoked.
-  for (const [id, incoming] of Object.entries(backup.accounts ?? {})) {
-    const key = `account:${id}`;
-    const local = set[key] ?? stored[key];
-    if (local && incoming?.session && Core.isNewerSession(incoming.session, local.session)) {
-      set[key] = { ...local, session: incoming.session, storageKey: incoming.storageKey ?? local.storageKey };
+  const set = { ...items };
+  for (const [key, value] of Object.entries(set)) {
+    if (isAccountKey(key) && value?.session === SESSION_MARK) {
+      set[key] = { ...value, session: stored[key]?.session, storageKey: stored[key]?.storageKey };
+      if (!set[key].session) delete set[key].session;
     }
   }
   store.set(set);
-  await runner.reload();
-  const sessions = Object.values(backup.accounts ?? {}).filter((saved) => saved?.session).length;
-  return { ok: true, counts, statsSkipped, sessions };
+  return { ok: true };
 }
 
-function settingsPatch(patch) {
-  const { settings = {} } = store.get('settings');
-  store.set({ settings: { ...settings, ...patch } });
-}
+// Every dashboard event path is a short list of child indexes.
+const isPath = (path) => Array.isArray(path) && path.length <= 32 && path.every((i) => Number.isInteger(i) && i >= 0 && i < 1000);
 
 // Routes that need a signed-in session; mutations also need the same origin.
 const API = {
-  'POST /api/toggle': ({ body }) => {
-    const patch = Object.fromEntries(TOGGLES.filter((key) => typeof body[key] === 'boolean').map((key) => [key, body[key]]));
-    if (!Object.keys(patch).length) return [400, { error: 'bad_request' }];
-    settingsPatch(patch);
-    log.info('toggle', patch);
+  'GET /api/storage': () => redactAll(store.get(null)),
+  'POST /api/storage/set': ({ body }) => storageSet(body.items),
+  'POST /api/storage/remove': ({ body }) => {
+    if (!Array.isArray(body.keys) || !body.keys.every((key) => typeof key === 'string')) return [400, { error: 'bad_request' }];
+    store.remove(body.keys);
     return { ok: true };
   },
-  'POST /api/solver': ({ body }) => {
-    if (!SOLVERS.includes(body.aiSolver)) return [400, { error: 'bad_request' }];
-    settingsPatch({ aiSolver: body.aiSolver });
-    const keys = {};
-    if (typeof body.apiKey === 'string' && body.apiKey.trim()) keys.apiKey = body.apiKey.trim();
-    if (typeof body.openrouterKey === 'string' && body.openrouterKey.trim()) keys.openrouterKey = body.openrouterKey.trim();
-    store.set(keys);
-    log.info('solver', { aiSolver: body.aiSolver, keys: Object.keys(keys) });
-    return { ok: true };
-  },
-  'POST /api/account/switch': async ({ body }) => {
-    if (typeof body.id !== 'string') return [400, { error: 'bad_request' }];
-    const result = await runner.switchTo(body.id);
-    return result.error ? [409, result] : result;
+  'POST /api/panel/event': ({ body }) => {
+    if (!isPath(body.path) || !['click', 'change', 'toggle'].includes(body.type)) return [400, { error: 'bad_request' }];
+    if (body.type === 'change' && (typeof body.value !== 'string' || body.value.length > 1000)) return [400, { error: 'bad_request' }];
+    const done = runner.panelEvent({ path: body.path, type: body.type, value: body.value, open: !!body.open });
+    setImmediate(pushPanel);
+    return done ? { ok: true } : [404, { error: 'not_found' }];
   },
   'POST /api/account/signin': async ({ body }) => {
     if (typeof body.email !== 'string' || typeof body.password !== 'string' || !body.email || !body.password) return [400, { error: 'bad_request' }];
@@ -166,28 +158,22 @@ const API = {
     log.info('casino_signin', { ok: !result.error });
     return result.error ? [401, result] : result;
   },
-  'POST /api/backup/import': async ({ body }) => {
-    const result = await importBackup(body);
-    log.info('backup_import', { ok: !result.error, counts: result.counts, sessions: result.sessions });
-    return result.error ? [400, result] : result;
-  },
-  'GET /api/backup/export': ({ url }) => {
-    const secrets = url.searchParams.get('secrets') === '1';
-    const backup = Backup.buildBackup(store.get(null), { secrets, id: randomUUID(), source: installId() });
-    log.info('backup_export', { secrets });
-    return backup;
-  },
 };
 
-const BODY_LIMIT = { 'POST /api/backup/import': 50 * 1024 * 1024 };
+const BODY_LIMIT = { 'POST /api/storage/set': 50 * 1024 * 1024 };
 
 const streams = new Set();
 
-function events(req, res) {
+// The dashboard's stream carries the log and the mirrored panel;
+// the settings page's (?storage=1) carries storage changes for onChanged.
+function events(req, res, url) {
   res.writeHead(200, { ...HEADERS, 'Content-Type': 'text/event-stream', Connection: 'keep-alive' });
-  res.write(`event: activity\ndata: ${JSON.stringify(runner.activity.slice(-200))}\n\n`);
-  res.write(`event: report\ndata: ${JSON.stringify(runner.report())}\n\n`);
-  const stream = { res, token: readCookie(req.headers.cookie, COOKIE_NAME) };
+  const storage = url.searchParams.get('storage') === '1';
+  if (!storage) {
+    res.write(`event: activity\ndata: ${JSON.stringify(runner.activity.slice(-200))}\n\n`);
+    res.write(`event: panel\ndata: ${JSON.stringify(runner.panelHtml())}\n\n`);
+  }
+  const stream = { res, storage, token: readCookie(req.headers.cookie, COOKIE_NAME) };
   streams.add(stream);
   req.on('close', () => streams.delete(stream));
 }
@@ -195,6 +181,7 @@ function events(req, res) {
 function broadcast(event, data) {
   const line = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const stream of streams) {
+    if (stream.storage !== (event === 'storage')) continue;
     // A session that signed out stops receiving.
     if (!auth.valid(stream.token)) {
       stream.res.end();
@@ -206,7 +193,33 @@ function broadcast(event, data) {
 }
 
 runner.on('activity', (item) => broadcast('activity', [item]));
-setInterval(() => streams.size && broadcast('report', runner.report()), 2000);
+store.onChanged((changes) => broadcast('storage', redactChanges(changes)));
+
+let lastPanel = '';
+function pushPanel() {
+  const html = runner.panelHtml();
+  if (html === lastPanel) return;
+  lastPanel = html;
+  broadcast('panel', html);
+}
+setInterval(() => streams.size && pushPanel(), 500);
+
+// options.html with the shim loaded before its scripts, framable by the dashboard.
+function serveOptions(res) {
+  const html = readFileSync(join(extensionDir, 'src', 'options.html'), 'utf8').replace(
+    '<script src="core.js"></script>',
+    '<script src="/ext/messages.js"></script>\n    <script src="/chrome-shim.js"></script>\n    <script src="core.js"></script>',
+  );
+  const csp = HEADERS['Content-Security-Policy'].replace("frame-ancestors 'none'", "frame-ancestors 'self'");
+  send(res, 200, html, 'text/html; charset=utf-8', { 'Content-Security-Policy': csp });
+}
+
+// The extension's messages for the shim's chrome.i18n, every locale.
+function serveMessages(res) {
+  const tables = {};
+  for (const lang of ['en', 'cs']) tables[lang] = JSON.parse(readFileSync(join(extensionDir, '_locales', lang, 'messages.json'), 'utf8'));
+  send(res, 200, `window.BotterMessages = ${JSON.stringify(tables)};`, 'text/javascript; charset=utf-8');
+}
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
@@ -218,6 +231,15 @@ const server = createServer(async (req, res) => {
       return serveFile(res, 'app.html', 'text/html; charset=utf-8');
     }
     if (req.method === 'GET' && PUBLIC[url.pathname]) return serveFile(res, ...PUBLIC[url.pathname]);
+    if (req.method === 'GET' && url.pathname.startsWith('/ext/')) {
+      if (!authed(req)) return send(res, 401, { error: 'unauthorized' });
+      if (url.pathname === '/ext/options.html') return serveOptions(res);
+      if (url.pathname === '/ext/messages.js') return serveMessages(res);
+      const name = url.pathname.match(EXT_FILE)?.[1];
+      const file = name && join(extensionDir, 'src', name);
+      if (file && existsSync(file)) return send(res, 200, readFileSync(file), EXT_TYPES[name.split('.').pop()]);
+      return send(res, 404, { error: 'not_found' });
+    }
 
     if (route === 'POST /api/login') {
       if (!sameOrigin(req)) return send(res, 403, { error: 'forbidden' });
@@ -239,7 +261,7 @@ const server = createServer(async (req, res) => {
 
     if (route === 'GET /api/events' || API[route]) {
       if (!authed(req)) return send(res, 401, { error: 'unauthorized' });
-      if (route === 'GET /api/events') return events(req, res);
+      if (route === 'GET /api/events') return events(req, res, url);
       if (req.method !== 'GET' && !sameOrigin(req)) return send(res, 403, { error: 'forbidden' });
       const body = req.method === 'POST' ? await readJson(req, BODY_LIMIT[route] ?? 16 * 1024) : {};
       const result = await API[route]({ body, url });

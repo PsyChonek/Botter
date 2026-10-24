@@ -1,6 +1,6 @@
 # Botter in a container with no browser: the extension's own scripts run in
 # Node against the casino API, and a login-protected dashboard on port 8080
-# controls them. No dependencies, nothing to install.
+# shows their panel and settings page.
 FROM node:22-alpine
 
 ENV NODE_ENV=production \
@@ -9,7 +9,8 @@ ENV NODE_ENV=production \
     DATA_DIR=/data
 
 WORKDIR /app/server
-COPY server/package.json ./
+COPY server/package.json server/package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 COPY server/src ./src
 COPY server/public ./public
 COPY manifest.json /app/extension/

@@ -18,7 +18,7 @@
   const msg = (key, subs) => chrome.i18n.getMessage(key, subs) || key;
   // Set by the Docker runner (server/src/runner.mjs), which runs this script
   // with no casino page: work tickets go through the API instead of the app's
-  // buttons, games never use the game screen and there is no panel.
+  // buttons and games never use the game screen.
   const HEADLESS = !!globalThis.BotterHeadless;
 
   const DEFAULT_SETTINGS = {
@@ -170,6 +170,7 @@
   const ACCOUNT_PREFIX = 'account:';
   const SWITCH_KEY = 'botter-switch'; // sessionStorage: { from, to } of a switch in progress
   const ACCOUNT_SAVE_MS = 30_000;
+  const PLAYER_REFRESH_MS = 60_000; // headless only, while the bot is stopped
   const ROTATE_DWELL_MS = 60_000;
   // Another account is worth a switch (a page reload) only above this much energy.
   const ROTATE_MIN_ENERGY = 15;
@@ -3246,13 +3247,22 @@
     for (const data of early.splice(0)) onHookEvent(data);
     early = null;
     const ready = () => {
+      // Headless, the panel is built in the runner's DOM and mirrored to its dashboard.
       if (HEADLESS) globalThis.BotterHeadless.report = report;
-      else mountPanel();
+      mountPanel();
       trackBundle();
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready);
     else ready();
     setInterval(tick, TICK_MS);
+    // The casino app loads the player itself; headless there is no app, so
+    // the panel gets it here and keeps it fresh while the bot is stopped.
+    if (HEADLESS) {
+      api('/api/me');
+      setInterval(() => {
+        if (!busy && !switching && !workOn() && !gamesOn()) api('/api/me');
+      }, PLAYER_REFRESH_MS);
+    }
     setInterval(() => {
       if (!netDirty) return;
       netDirty = false;

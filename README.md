@@ -103,10 +103,15 @@ to **Enabled**, relaunch and press **Download the model** again. Progress shows 
 ## Run in Docker
 
 The container runs Botter with no browser: the extension's own scripts (`page-hook.js`,
-`content.js` and the game modules) run in Node against the casino API, and a small
-dashboard on port 8080 controls them. Work tickets go straight to `/api/work/start` and
-`/api/work/submit`, games always go through the API, and the Supabase session is
-refreshed by the server.
+`content.js` and the game modules) run in Node against the casino API. Work tickets go
+straight to `/api/work/start` and `/api/work/submit`, games always go through the API,
+and the Supabase session is refreshed by the server.
+
+The dashboard on port 8080 shows the extension's real UI: the panel `content.js` builds
+(account, status, Work and Games, auto switches, Profit, XP per game, upgrade queue,
+More), rendered on the server in a small DOM and mirrored live with every click sent
+back, and the full settings page (`options.html`, every tab) next to it. Both work as in
+Chrome, on the same storage.
 
 ```sh
 cp .env.example .env        # set DASHBOARD_PASSWORD, 12+ characters
@@ -115,20 +120,19 @@ docker compose up -d --build
 
 Open `http://<host>:8080`, sign in, then:
 
-1. **Load a backup.** In the extension's Data tab, export with *Include API keys and
-   saved logins* on, and load the file on the dashboard. That brings the accounts with
-   their sessions, the answer bank, stats, settings and keys. E-mail accounts can also be
-   added with the sign-in form; the password is never stored.
+1. **Load a backup.** In Chrome, export from the Data tab with *Include API keys and
+   saved logins* on, then import that file in the dashboard's Settings, Data tab. That
+   brings the accounts with their sessions, the answer bank, stats, settings and keys.
+   E-mail accounts can also be added with the sign-in form; the password is never stored.
 2. **Stop using those accounts in Chrome.** Each refresh rotates the session's refresh
    token, so the extension and the container on one login log each other out.
-3. Turn on **Auto** (or Work / Games). The dashboard shows the status line, the account
-   playing, every saved account and the bot's log.
+3. Turn on **Auto** (or Work / Games) in the panel and follow it there and in the log.
 
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `DASHBOARD_USER` | `admin` | Dashboard user name. |
 | `DASHBOARD_PASSWORD` | (required) | Dashboard password, at least 12 characters. |
-| `BOT_LOCALE` | `cs` | Language of the bot's status line (`cs` or `en`). |
+| `BOT_LOCALE` | `cs` | Language of the panel (`cs` or `en`); the settings page follows the dashboard language. |
 | `TRUST_PROXY` | `0` | `1` behind a reverse proxy: trusts `X-Forwarded-For/-Proto/-Host` for the client IP, the `Secure` cookie and the origin check. |
 | `CASINO_URL` | casino address | Casino the bot plays. |
 | `LOG_LEVEL` | `info` | Server log level, JSON lines on stdout next to the bot's own. |
@@ -138,7 +142,9 @@ Open `http://<host>:8080`, sign in, then:
   stats, accounts and the page's localStorage survive restarts and upgrades.
 - Gemini Nano does not exist in Node. Pick Claude or OpenRouter on the dashboard, or
   rely on the bank and the random guess.
-- The game-screen mode (`playOnScreen`) and the on-page panel are off in the container.
+- The game-screen mode (`playOnScreen`) is off in the container, and the panel's Add
+  button is hidden: add accounts with the sign-in form or a backup.
+- Saved logins never reach the browser: the settings page sees a placeholder.
 - **Updates from git:** the `updater` service polls `origin`, fast-forwards the checkout
   and runs `docker compose up -d --build botter` when the branch moves. It mounts the
   Docker socket, which is root on the host, and builds whatever lands on the branch, so

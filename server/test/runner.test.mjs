@@ -105,3 +105,22 @@ test('refreshes a session about to expire and files it under the account', async
     casino.server.close();
   }
 });
+
+test('builds the real panel and replays clicks on it', async () => {
+  const casino = await fakeCasino();
+  const { runner, store, cleanup } = setup(casino, session(3600));
+  try {
+    store.set({ settings: { ...store.get('settings').settings, enabled: false } });
+    await runner.start();
+    await until(() => runner.panelHtml().includes('tester'));
+    const root = runner.page.document.getElementById('botter-panel').shadowRoot;
+    const button = root.querySelector('.work-toggle');
+    const path = [];
+    for (let node = button; node !== root; node = node.parentNode) path.unshift([...node.parentNode.children].indexOf(node));
+    assert.equal(runner.panelEvent({ path, type: 'click' }), true);
+    await until(() => store.get('settings').settings.enabled === true);
+  } finally {
+    cleanup();
+    casino.server.close();
+  }
+});

@@ -10,5 +10,8 @@
   "scripts": {
     "start": "node src/index.mjs",
     "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "linkedom": "0.18.12"
   }
 }
