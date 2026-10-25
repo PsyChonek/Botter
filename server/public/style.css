@@ -15,6 +15,15 @@
   --warn: #8a5a00;
   --focus: #1a5fd0;
   --radius: 12px;
+  /* Chart lines, one per account in a fixed order (checked for color-blind separation). */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #6250d6;
+  --series-8: #e34948;
   color-scheme: light dark;
 }
 
@@ -33,6 +42,14 @@
     --neg: #ff8f7a;
     --warn: #ffcc66;
     --focus: #d4ff6a;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
   }
 }
 
@@ -235,6 +252,45 @@ td.action { text-align: right; white-space: nowrap; }
 .form button { margin-top: 8px; }
 .result { min-height: 1.5em; margin: 4px 0 0; }
 
+/* ---------- progress ---------- */
+
+.progress { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.progress .range, .progress > p { grid-column: 1 / -1; margin: 0; }
+.range { display: flex; flex-wrap: wrap; gap: 6px; }
+.range button { min-height: 34px; padding: 4px 14px; }
+.range button[aria-pressed='true'] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.chart { position: relative; margin: 0 0 8px; border-radius: 8px; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart .grid { stroke: var(--border); stroke-width: 1; }
+.chart .axis { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .line.total { stroke-dasharray: 6 4; }
+.chart .end { stroke: var(--card); stroke-width: 2; }
+.chart .cross { stroke: var(--muted); stroke-width: 1; }
+.tip {
+  position: absolute;
+  top: 8px;
+  z-index: 1;
+  min-width: 140px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.15);
+  font-size: 0.85rem;
+  pointer-events: none;
+}
+.tip-time { color: var(--muted); font-size: 0.8rem; margin-bottom: 4px; }
+.tip-row { display: flex; align-items: center; gap: 8px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tip-row span:last-child { color: var(--muted); }
+.key { display: inline-block; flex: none; width: 14px; height: 3px; border-radius: 2px; margin-right: 8px; vertical-align: middle; }
+.tip .key { margin-right: 0; }
+.chart-table td, .chart-table th { padding: 6px 12px 6px 0; }
+.chart-table td:first-child { white-space: nowrap; }
+.chart-table tr.total td { font-weight: 700; }
+.chart-table .pos { color: var(--pos); }
+.chart-table .neg { color: var(--neg); }
+
 /* ---------- activity ---------- */
 
 .check { display: inline-flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--muted); }
@@ -280,7 +336,7 @@ td.action { text-align: right; white-space: nowrap; }
 @media (max-width: 980px) {
   .hero { grid-template-columns: minmax(0, 1fr) auto; }
   .stats { grid-column: 1 / -1; grid-row: 2; }
-  .overview, .accounts { grid-template-columns: minmax(0, 1fr); }
+  .overview, .accounts, .progress { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 600px) {

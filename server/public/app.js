@@ -30,6 +30,7 @@ function selectTab(name, focus = false) {
   }
   if (focus) tab.focus();
   const key = tab.id.slice(4);
+  watchHistory(key === 'progress');
   if (location.hash.slice(1) !== key) history.replaceState(null, '', key === 'overview' ? location.pathname : `#${key}`);
 }
 
@@ -196,6 +197,262 @@ function badge(text, on = false) {
   return span;
 }
 
+// ---------- progress charts ----------
+
+// Every account's level and credits over time, from /api/history, drawn as one
+// line per account plus the sum of all of them. Colors follow the account's
+// place in the history, so a range change never repaints a line.
+const SVG = 'http://www.w3.org/2000/svg';
+const SERIES_MAX = 8;
+const DAY_MS = 24 * 3600_000;
+const HISTORY_EVERY_MS = 60_000;
+const CHART = { height: 240, left: 56, right: 16, top: 12, bottom: 28 };
+let progress = null;
+let rangeDays = 7;
+let historyTimer = null;
+
+const compact = (value) => new Intl.NumberFormat(I18n.lang, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+const signed = (value) => (value > 0 ? `+${number(value)}` : number(value));
+
+function svg(name, attrs = {}) {
+  const element = document.createElementNS(SVG, name);
+  for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, value);
+  return element;
+}
+
+// Round steps for an axis: 1, 2 or 5 times a power of ten.
+function ticks(min, max, count = 4) {
+  if (min === max) [min, max] = [min - 1, max + 1];
+  const raw = (max - min) / count;
+  const power = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 5, 10].map((m) => m * power).find((s) => s >= raw);
+  const out = [];
+  for (let value = Math.floor(min / step) * step; value <= max + step / 2; value += step) out.push(value);
+  if (out.at(-1) < max) out.push(out.at(-1) + step);
+  return out;
+}
+
+// Lines for one measure (0 level, 1 credits): accounts, then their sum.
+function seriesOf(index) {
+  const from = rangeDays ? Date.now() - rangeDays * DAY_MS : 0;
+  const samples = progress.samples.filter((sample) => sample.t >= from);
+  const ids = Object.keys(progress.names).slice(0, SERIES_MAX);
+  const series = ids.map((id, slot) => ({
+    name: progress.names[id],
+    color: `var(--series-${slot + 1})`,
+    points: samples.filter((sample) => sample.v[id]).map((sample) => [sample.t, sample.v[id][index]]),
+  }));
+  if (ids.length > 1) {
+    series.push({
+      name: t('total'),
+      color: 'var(--fg)',
+      total: true,
+      points: samples.map((sample) => [sample.t, Object.values(sample.v).reduce((sum, value) => sum + value[index], 0)]),
+    });
+  }
+  return series.filter((line) => line.points.length);
+}
+
+// The value a line had at a time: its last point at or before it.
+function valueAt(points, time) {
+  let value = null;
+  for (const [t0, v] of points) {
+    if (t0 > time) break;
+    value = v;
+  }
+  return value;
+}
+
+function timeLabel(time, span) {
+  const options = span <= 2 * DAY_MS ? { hour: '2-digit', minute: '2-digit' } : { day: 'numeric', month: 'numeric' };
+  return new Date(time).toLocaleString(I18n.lang, options);
+}
+
+function drawChart(box, series, format) {
+  box.replaceChildren();
+  if (!series.length) return;
+  const width = Math.max(box.clientWidth, 280);
+  const { height, left, right, top, bottom } = CHART;
+  const times = [...new Set(series.flatMap((line) => line.points.map(([time]) => time)))].sort((a, b) => a - b);
+  const values = series.flatMap((line) => line.points.map(([, value]) => value));
+  let [t0, t1] = [times[0], times.at(-1)];
+  if (t0 === t1) [t0, t1] = [t0 - 3600_000, t1 + 3600_000];
+  const yTicks = ticks(Math.min(...values), Math.max(...values));
+  const [y0, y1] = [yTicks[0], yTicks.at(-1)];
+  const x = (time) => left + ((time - t0) / (t1 - t0)) * (width - left - right);
+  const y = (value) => top + (1 - (value - y0) / (y1 - y0)) * (height - top - bottom);
+
+  const chart = svg('svg', { viewBox: `0 0 ${width} ${height}`, width, height, 'aria-hidden': 'true' });
+  for (const value of yTicks) {
+    chart.append(svg('line', { x1: left, x2: width - right, y1: y(value), y2: y(value), class: 'grid' }));
+    const label = svg('text', { x: left - 8, y: y(value), class: 'axis', 'text-anchor': 'end', 'dominant-baseline': 'middle' });
+    label.textContent = format(value);
+    chart.append(label);
+  }
+  const xCount = Math.max(2, Math.floor((width - left - right) / 110));
+  for (let i = 0; i <= xCount; i++) {
+    const time = t0 + ((t1 - t0) * i) / xCount;
+    const anchor = i === 0 ? 'start' : i === xCount ? 'end' : 'middle';
+    const label = svg('text', { x: x(time), y: height - 8, class: 'axis', 'text-anchor': anchor });
+    label.textContent = timeLabel(time, t1 - t0);
+    chart.append(label);
+  }
+  // Credits and levels move in jumps, so each line holds its value until the next sample.
+  for (const line of series) {
+    const d = line.points.map(([time, value], i) => (i ? `H${x(time)}V${y(value)}` : `M${x(time)},${y(value)}`)).join('');
+    chart.append(svg('path', { d, class: line.total ? 'line total' : 'line', style: `stroke:${line.color}` }));
+    const [lastT, lastV] = line.points.at(-1);
+    chart.append(svg('circle', { cx: x(lastT), cy: y(lastV), r: 4, class: 'end', style: `fill:${line.color}` }));
+  }
+
+  const cross = svg('line', { y1: top, y2: height - bottom, class: 'cross', visibility: 'hidden' });
+  const dots = series.map((line) => svg('circle', { r: 4, class: 'end', style: `fill:${line.color}`, visibility: 'hidden' }));
+  chart.append(cross, ...dots);
+  const tip = document.createElement('div');
+  tip.className = 'tip';
+  tip.hidden = true;
+  box.append(chart, tip);
+
+  let shown = -1;
+  const show = (index) => {
+    shown = Math.max(0, Math.min(times.length - 1, index));
+    const time = times[shown];
+    cross.setAttribute('x1', x(time));
+    cross.setAttribute('x2', x(time));
+    cross.setAttribute('visibility', 'visible');
+    const head = document.createElement('div');
+    head.className = 'tip-time';
+    head.textContent = new Date(time).toLocaleString(I18n.lang, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const rows = series.map((line, i) => {
+      const value = valueAt(line.points, time);
+      dots[i].setAttribute('visibility', value === null ? 'hidden' : 'visible');
+      if (value !== null) {
+        dots[i].setAttribute('cx', x(time));
+        dots[i].setAttribute('cy', y(value));
+      }
+      const row = document.createElement('div');
+      row.className = 'tip-row';
+      const key = document.createElement('span');
+      key.className = 'key';
+      key.style.background = line.color;
+      const strong = document.createElement('strong');
+      strong.textContent = value === null ? '-' : number(value);
+      const name = document.createElement('span');
+      name.textContent = line.name;
+      row.append(key, strong, name);
+      return row;
+    });
+    tip.replaceChildren(head, ...rows);
+    tip.hidden = false;
+    const px = (x(time) / width) * box.clientWidth;
+    tip.style.left = `${Math.min(px + 12, box.clientWidth - tip.offsetWidth)}px`;
+    if (px + 12 + tip.offsetWidth > box.clientWidth) tip.style.left = `${Math.max(0, px - 12 - tip.offsetWidth)}px`;
+  };
+  const hide = () => {
+    shown = -1;
+    tip.hidden = true;
+    cross.setAttribute('visibility', 'hidden');
+    for (const dot of dots) dot.setAttribute('visibility', 'hidden');
+  };
+  box.onpointermove = (event) => {
+    const rect = chart.getBoundingClientRect();
+    const time = t0 + ((((event.clientX - rect.left) / rect.width) * width - left) / (width - left - right)) * (t1 - t0);
+    let nearest = 0;
+    for (let i = 1; i < times.length; i++) if (Math.abs(times[i] - time) < Math.abs(times[nearest] - time)) nearest = i;
+    show(nearest);
+  };
+  box.onpointerleave = hide;
+  box.onblur = hide;
+  box.onfocus = () => show(times.length - 1);
+  box.onkeydown = (event) => {
+    const step = { ArrowRight: 1, ArrowLeft: -1, Home: -Infinity, End: Infinity }[event.key];
+    if (!step) return;
+    event.preventDefault();
+    show(Number.isFinite(step) ? (shown < 0 ? times.length - 1 : shown) + step : step > 0 ? times.length - 1 : 0);
+  };
+}
+
+// The legend and table in one: each line's key, where it is now and how far it moved in the range.
+function drawTable(table, series) {
+  const head = document.createElement('tr');
+  for (const [key, cls] of [['account', ''], ['now', 'num'], ['change', 'num']]) {
+    const th = document.createElement('th');
+    th.scope = 'col';
+    th.className = cls;
+    th.textContent = t(key);
+    head.append(th);
+  }
+  const rows = series.map((line) => {
+    const row = document.createElement('tr');
+    if (line.total) row.className = 'total';
+    const name = document.createElement('td');
+    const key = document.createElement('span');
+    key.className = 'key';
+    key.style.background = line.color;
+    name.append(key, document.createTextNode(line.name));
+    const first = line.points[0][1];
+    const last = line.points.at(-1)[1];
+    const change = last - first;
+    const cells = [number(last), signed(change)].map((text, i) => {
+      const cell = document.createElement('td');
+      cell.className = i && change ? `num ${change > 0 ? 'pos' : 'neg'}` : 'num';
+      cell.textContent = text;
+      return cell;
+    });
+    row.append(name, ...cells);
+    return row;
+  });
+  const thead = document.createElement('thead');
+  thead.append(head);
+  const tbody = document.createElement('tbody');
+  tbody.append(...rows);
+  table.replaceChildren(thead, tbody);
+  table.hidden = !rows.length;
+}
+
+function renderProgress() {
+  if (!progress || $('view-progress').hidden) return;
+  const credits = seriesOf(1);
+  const levels = seriesOf(0);
+  $('progress-empty').hidden = credits.length > 0;
+  for (const card of $('view-progress').querySelectorAll('.card')) card.hidden = !credits.length;
+  drawChart($('chart-credits'), credits, compact);
+  drawChart($('chart-level'), levels, number);
+  drawTable($('table-credits'), credits);
+  drawTable($('table-level'), levels);
+}
+
+async function loadHistory() {
+  const res = await fetch('/api/history').catch(() => null);
+  if (res?.status === 401) return location.assign('/login');
+  if (!res?.ok) return;
+  progress = await res.json();
+  renderProgress();
+}
+
+// Fetched while the tab is open; the server adds a sample every few minutes.
+function watchHistory(open) {
+  clearInterval(historyTimer);
+  historyTimer = null;
+  if (!open) return;
+  loadHistory();
+  historyTimer = setInterval(loadHistory, HISTORY_EVERY_MS);
+}
+
+for (const button of document.querySelectorAll('[data-range]')) {
+  button.addEventListener('click', () => {
+    rangeDays = Number(button.dataset.range);
+    for (const other of document.querySelectorAll('[data-range]')) other.setAttribute('aria-pressed', String(other === button));
+    renderProgress();
+  });
+}
+let progressWidth = 0;
+new ResizeObserver(([entry]) => {
+  if (entry.contentRect.width === progressWidth) return;
+  progressWidth = entry.contentRect.width;
+  renderProgress();
+}).observe($('view-progress'));
+
 // ---------- activity ----------
 
 function logItem(item) {
@@ -341,6 +598,7 @@ function relabel() {
   setConnected(connected);
   renderReport();
   renderActivity();
+  renderProgress();
 }
 
 // One language for everything: the server renders the panel in it too.

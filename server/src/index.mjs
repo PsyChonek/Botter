@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createAuth, readCookie, COOKIE_NAME } from './auth.mjs';
+import { History, SAMPLE_EVERY_MS } from './history.mjs';
 import { log } from './log.mjs';
 import { Runner } from './runner.mjs';
 import { Store } from './store.mjs';
@@ -19,6 +20,7 @@ const dataDir = resolve(env.DATA_DIR || join(root, '.data'));
 
 const auth = createAuth({ user: env.DASHBOARD_USER || 'admin', password: env.DASHBOARD_PASSWORD });
 const store = new Store(join(dataDir, 'storage.json'));
+const history = new History(join(dataDir, 'history.json'));
 const runner = new Runner({
   extensionDir,
   store,
@@ -154,6 +156,7 @@ const API = {
     if (typeof body.id !== 'string' || body.id.length > 100) return [400, { error: 'bad_request' }];
     return runner.switchTo(body.id) ? { ok: true } : [409, { error: 'no_session' }];
   },
+  'GET /api/history': () => history,
   'GET /api/storage': () => redactAll(store.get(null)),
   'POST /api/storage/set': ({ body }) => storageSet(body.items),
   'POST /api/storage/remove': ({ body }) => {
@@ -228,6 +231,17 @@ function pushPanel() {
   broadcast('panel', html);
 }
 setInterval(() => streams.size && pushPanel(), 500);
+
+function recordHistory() {
+  try {
+    history.record(runner.report());
+  } catch (error) {
+    log.error('history_failed', { error: error.message });
+  }
+}
+setInterval(recordHistory, SAMPLE_EVERY_MS);
+// The first sample once the page has loaded the player.
+setTimeout(recordHistory, 60_000);
 
 // options.html with the shim loaded before its scripts, framable by the dashboard.
 function serveOptions(res) {

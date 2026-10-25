@@ -46,6 +46,7 @@
 
   <nav class="tabs" role="tablist" data-i18n-label="sections">
     <button type="button" role="tab" id="tab-overview" aria-controls="view-overview" aria-selected="true" data-i18n="overview">Overview</button>
+    <button type="button" role="tab" id="tab-progress" aria-controls="view-progress" aria-selected="false" tabindex="-1" data-i18n="progress">Progress</button>
     <button type="button" role="tab" id="tab-settings" aria-controls="view-settings" aria-selected="false" tabindex="-1" data-i18n="settings">Settings</button>
     <button type="button" role="tab" id="tab-accounts" aria-controls="view-accounts" aria-selected="false" tabindex="-1" data-i18n="accounts">Accounts</button>
     <button type="button" role="tab" id="tab-activity" aria-controls="view-activity" aria-selected="false" tabindex="-1" data-i18n="activity">Activity</button>
@@ -65,6 +66,26 @@
         </div>
         <p class="muted empty-activity" data-i18n="activityEmpty"></p>
         <ol id="recent" class="log"></ol>
+      </section>
+    </div>
+
+    <div role="tabpanel" id="view-progress" aria-labelledby="tab-progress" class="view progress" hidden>
+      <div class="range" role="group" data-i18n-label="range">
+        <button type="button" data-range="1" aria-pressed="false" data-i18n="range1">24 h</button>
+        <button type="button" data-range="7" aria-pressed="true" data-i18n="range7">7 days</button>
+        <button type="button" data-range="30" aria-pressed="false" data-i18n="range30">30 days</button>
+        <button type="button" data-range="0" aria-pressed="false" data-i18n="rangeAll">All</button>
+      </div>
+      <p id="progress-empty" class="muted" data-i18n="progressEmpty"></p>
+      <section class="card" aria-labelledby="credits-heading">
+        <h2 id="credits-heading" data-i18n="creditsChart">Credits</h2>
+        <div id="chart-credits" class="chart" tabindex="0" role="img" data-i18n-label="creditsChart"></div>
+        <div class="table-wrap"><table id="table-credits" class="chart-table"></table></div>
+      </section>
+      <section class="card" aria-labelledby="level-heading">
+        <h2 id="level-heading" data-i18n="levelChart">Level</h2>
+        <div id="chart-level" class="chart" tabindex="0" role="img" data-i18n-label="levelChart"></div>
+        <div class="table-wrap"><table id="table-level" class="chart-table"></table></div>
       </section>
     </div>
 
