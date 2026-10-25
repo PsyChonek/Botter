@@ -18,7 +18,7 @@ const extensionDir = resolve(env.EXTENSION_DIR || join(root, '..'));
 const dataDir = resolve(env.DATA_DIR || join(root, '.data'));
 
 
-const auth = createAuth({ user: env.DASHBOARD_USER || 'admin', password: env.DASHBOARD_PASSWORD });
+const auth = createAuth({ user: env.DASHBOARD_USER || 'admin', password: env.DASHBOARD_PASSWORD, file: join(dataDir, 'sessions.json') });
 const store = new Store(join(dataDir, 'storage.json'));
 const history = new History(join(dataDir, 'history.json'));
 const runner = new Runner({
@@ -268,7 +268,10 @@ const server = createServer(async (req, res) => {
   try {
     if (route === 'GET /health') return send(res, runner.page ? 200 : 503, { status: runner.page ? 'ok' : 'down' });
     if (route === 'GET /') {
-      if (!authed(req)) return send(res, 302, '', 'text/plain', { Location: '/login' });
+      const token = readCookie(req.headers.cookie, COOKIE_NAME);
+      if (!auth.touch(token)) return send(res, 302, '', 'text/plain', { Location: '/login' });
+      // Opening the dashboard renews the cookie along with the session.
+      res.setHeader('Set-Cookie', sessionCookie(req, token, auth.maxAgeSeconds));
       return serveFile(res, 'app.html', 'text/html; charset=utf-8');
     }
     if (req.method === 'GET' && PUBLIC[url.pathname]) return serveFile(res, ...PUBLIC[url.pathname]);

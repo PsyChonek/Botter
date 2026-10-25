@@ -1,5 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createAuth, readCookie } from '../src/auth.mjs';
 
 const make = (overrides = {}) => createAuth({ user: 'admin', password: 'correct horse battery', ...overrides });
@@ -47,4 +50,24 @@ test('sessions expire', () => {
 test('reads one cookie out of a header', () => {
   assert.equal(readCookie('a=1; botter_session=abc%3D; b=2', 'botter_session'), 'abc=');
   assert.equal(readCookie(undefined, 'botter_session'), '');
+});
+
+test('sessions survive a restart, are stored hashed and renew when used', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'botter-auth-'));
+  try {
+    const file = join(dir, 'sessions.json');
+    let clock = 0;
+    const { token } = make({ file, sessionHours: 48, now: () => clock }).login('1.2.3.4', 'admin', 'correct horse battery');
+    assert.ok(!readFileSync(file, 'utf8').includes(token), 'the raw token is never written');
+    const restarted = make({ file, sessionHours: 48, now: () => clock });
+    assert.equal(restarted.valid(token), true);
+    clock += 40 * 3_600_000;
+    assert.equal(restarted.touch(token), true);
+    clock += 40 * 3_600_000;
+    assert.equal(make({ file, sessionHours: 48, now: () => clock }).valid(token), true, 'touch extended it on disk');
+    restarted.logout(token);
+    assert.equal(make({ file, now: () => clock }).valid(token), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
