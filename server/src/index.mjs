@@ -174,6 +174,13 @@ const API = {
     log.info('casino_signin', { ok: !result.error });
     return result.error ? [401, result] : result;
   },
+  'POST /api/account/github/start': () => runner.githubStart(),
+  'POST /api/account/github/finish': async ({ body }) => {
+    if (typeof body.id !== 'string' || body.id.length > 100 || typeof body.url !== 'string' || !body.url || body.url.length > 4000) return [400, { error: 'bad_request' }];
+    const result = await runner.githubFinish(body.id, body.url);
+    log.info('casino_github_signin', { ok: !result.error });
+    return result.error ? [401, result] : result;
+  },
 };
 
 const BODY_LIMIT = { 'POST /api/storage/set': 50 * 1024 * 1024 };

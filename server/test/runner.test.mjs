@@ -3,6 +3,7 @@
 // server returns and refreshes a session that is about to run out.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -119,6 +120,33 @@ test('builds the real panel and replays clicks on it', async () => {
     for (let node = button; node !== root; node = node.parentNode) path.unshift([...node.parentNode.children].indexOf(node));
     assert.equal(runner.panelEvent({ path, type: 'click' }), true);
     await until(() => store.get('settings').settings.enabled === true);
+  } finally {
+    cleanup();
+    casino.server.close();
+  }
+});
+
+test('signs in with GitHub through PKCE from the pasted casino address', async () => {
+  const casino = await fakeCasino();
+  const { runner, cleanup } = setup(casino, undefined);
+  try {
+    await runner.start();
+    const { id, url } = runner.githubStart();
+    const authorize = new URL(url);
+    assert.equal(authorize.pathname, '/auth/v1/authorize');
+    assert.equal(authorize.searchParams.get('provider'), 'github');
+    assert.equal(authorize.searchParams.get('code_challenge_method'), 's256');
+
+    assert.deepEqual(await runner.githubFinish(id, `${casino.url}/`), { error: 'no_code' });
+    assert.deepEqual(await runner.githubFinish('unknown', `${casino.url}/?code=abcdefgh-1234-5678`), { error: 'expired' });
+    assert.deepEqual(await runner.githubFinish(id, `${casino.url}/?code=abcdefgh-1234-5678`), { ok: true });
+
+    const exchange = casino.calls.find((call) => call.path === '/auth/v1/token?grant_type=pkce');
+    assert.equal(exchange.body.auth_code, 'abcdefgh-1234-5678');
+    const challenge = createHash('sha256').update(exchange.body.code_verifier).digest('base64url');
+    assert.equal(challenge, authorize.searchParams.get('code_challenge'));
+    assert.equal(JSON.parse(runner.readSession().raw).access_token, token(1));
+    assert.deepEqual(await runner.githubFinish(id, `${casino.url}/?code=abcdefgh-1234-5678`), { error: 'expired' }, 'a flow is used once');
   } finally {
     cleanup();
     casino.server.close();

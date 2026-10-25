@@ -112,7 +112,7 @@ energy, Auto) and four tabs. **Overview** holds the panel `content.js` builds (W
 Games, auto switches, Profit, XP per game, upgrade queue, More), rendered on the server in
 a small DOM and mirrored live with every click sent back, next to the latest activity.
 **Settings** is the extension's own settings page with every tab, on the same storage.
-**Accounts** lists the saved logins with a switch and an e-mail sign-in, and **Activity**
+**Accounts** lists the saved logins with a switch, a GitHub sign-in and an e-mail sign-in, and **Activity**
 is the full log. One language switch covers all of it, the panel included.
 
 ```sh
@@ -125,7 +125,7 @@ Open `http://<host>:8080`, sign in, then:
 1. **Load a backup.** In Chrome, export from the Data tab with *Include API keys and
    saved logins* on, then import that file in the dashboard's Settings, Data tab. That
    brings the accounts with their sessions, the answer bank, stats, settings and keys.
-   E-mail accounts can also be added with the sign-in form; the password is never stored.
+   Or sign in on the Accounts tab instead (see below).
 2. **Stop using those accounts in Chrome.** Each refresh rotates the session's refresh
    token, so the extension and the container on one login log each other out.
 3. Turn on **Auto** (or Work / Games) in the panel and follow it there and in the log.
@@ -142,6 +142,12 @@ Open `http://<host>:8080`, sign in, then:
 
 - Storage lives in `/data/storage.json` (the `botter-data` volume): settings, bank,
   stats, accounts and the page's localStorage survive restarts and upgrades.
+- **Signing in an account** (new, or one whose session ran out): on the Accounts tab
+  press **Open GitHub sign-in**. GitHub sends you back to the casino with `?code=` in
+  the address bar; paste that whole address into the dashboard. The casino only lets the
+  sign-in return to its own address, so the code is carried over by hand, and it works
+  once within a few minutes. E-mail accounts use the e-mail form; the password is never
+  stored. When no one is logged in, the account strip shows a sign-in button.
 - Gemini Nano does not exist in Node. Pick Claude or OpenRouter on the dashboard, or
   rely on the bank and the random guess.
 - The game-screen mode (`playOnScreen`) is off in the container, and the panel's Add

@@ -134,6 +134,7 @@ $('auto').addEventListener('click', () => {
 function renderReport() {
   const player = report?.player;
   $('hero-account').textContent = player?.login ?? t('notLoggedIn');
+  $('hero-signin').hidden = !!player;
   $('hero-status').textContent = report?.status || t('panelNone');
   $('stat-level').textContent = number(player?.level);
   $('stat-credits').textContent = number(player?.credits);
@@ -275,6 +276,48 @@ $('signin').addEventListener('submit', async (event) => {
   const res = await post('/api/account/signin', { email: $('signin-email').value, password: $('signin-password').value });
   $('signin-password').value = '';
   result.textContent = t(res.ok ? 'signinOk' : res.data?.error === 'invalid' ? 'signinInvalid' : 'signinFailed');
+});
+
+$('hero-signin').addEventListener('click', () => {
+  selectTab('accounts');
+  $('github-start').focus();
+});
+
+// GitHub sign-in: the server hands out the authorize address, GitHub sends
+// the browser back to the casino with ?code=, and that address is pasted here.
+let githubFlow = null;
+$('github-start').addEventListener('click', async () => {
+  const result = $('github-result');
+  // Opened before the request so the browser does not treat it as a pop-up.
+  const tab = window.open('about:blank', '_blank');
+  if (tab) tab.opener = null;
+  result.textContent = t('working');
+  const res = await post('/api/account/github/start', {});
+  if (!res.ok) {
+    tab?.close();
+    result.textContent = t('signinFailed');
+    return;
+  }
+  githubFlow = res.data.id;
+  if (tab) tab.location.href = res.data.url;
+  $('github-link').href = res.data.url;
+  $('github-url').value = '';
+  $('github-finish').hidden = false;
+  result.textContent = t('githubWaiting');
+  $('github-url').focus();
+});
+
+$('github-finish').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const result = $('github-result');
+  result.textContent = t('working');
+  const res = await post('/api/account/github/finish', { id: githubFlow ?? '', url: $('github-url').value });
+  const error = res.data?.error;
+  result.textContent = t(res.ok ? 'signinOk' : error === 'no_code' ? 'githubNoCode' : error === 'expired' ? 'githubExpired' : 'githubFailed');
+  if (res.ok || error === 'expired') {
+    githubFlow = null;
+    $('github-finish').hidden = true;
+  }
 });
 
 const loadSettings = () => ($('settings').src = `/ext/options.html?lang=${I18n.lang}`);

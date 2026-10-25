@@ -28,6 +28,7 @@
       <p class="eyebrow" data-i18n="account">Account</p>
       <h2 id="hero-account" class="hero-account">-</h2>
       <p id="hero-status" class="hero-status" role="status" aria-live="polite"></p>
+      <button type="button" id="hero-signin" class="primary" data-i18n="heroSignin" hidden>Sign in to the casino</button>
     </div>
     <dl class="stats">
       <div class="stat"><dt data-i18n="level">Level</dt><dd id="stat-level">-</dd></div>
@@ -89,6 +90,18 @@
             <tbody></tbody>
           </table>
         </div>
+      </section>
+      <section class="card" aria-labelledby="github-heading">
+        <h2 id="github-heading" data-i18n="githubHeading">Sign in with GitHub</h2>
+        <p class="muted small" data-i18n="githubNote"></p>
+        <button type="button" id="github-start" class="primary" data-i18n="githubStart">Open GitHub sign-in</button>
+        <form id="github-finish" class="form" hidden>
+          <label for="github-url" data-i18n="githubUrl">Casino address after the sign-in</label>
+          <input id="github-url" type="text" inputmode="url" autocomplete="off" spellcheck="false" required>
+          <button type="submit" class="primary" data-i18n="githubFinish">Add the account</button>
+          <p class="muted small"><a id="github-link" target="_blank" rel="noopener noreferrer" data-i18n="githubLink">No tab opened? Open GitHub here.</a></p>
+        </form>
+        <p id="github-result" class="result" role="status" aria-live="polite"></p>
       </section>
       <section class="card" aria-labelledby="signin-heading">
         <h2 id="signin-heading" data-i18n="signinHeading">Add an e-mail account</h2>

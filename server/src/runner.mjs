@@ -3,6 +3,7 @@
 // service worker's solvers in another. chrome.storage and localStorage come
 // from the Store, API calls go straight to the casino with the saved session,
 // and the reload the bot does to switch accounts boots a fresh page context.
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -20,6 +21,21 @@ const REFRESH_EVERY_MS = 30_000;
 const REFRESH_AHEAD_MS = 5 * 60_000;
 const SESSION_KEY = /^sb-.+-auth-token$/;
 const ACCOUNT_PREFIX = 'account:';
+// A GitHub sign-in the dashboard started has this long to come back.
+const GITHUB_FLOW_MS = 15 * 60_000;
+const GITHUB_FLOWS_MAX = 20;
+
+// The code from what the dashboard pasted: the casino address the sign-in
+// landed on, or the code alone.
+function oauthCode(input) {
+  const text = input.trim();
+  if (/^[\w-]{16,}$/.test(text)) return text;
+  try {
+    return new URL(text).searchParams.get('code');
+  } catch {
+    return null;
+  }
+}
 
 // Web APIs the scripts use that a bare vm context does not have.
 const WEB_GLOBALS = {
@@ -84,6 +100,7 @@ export class Runner extends EventEmitter {
     this.refreshTimer = null;
     this.bundleSrc = null;
     this.reloadTimer = null;
+    this.githubFlows = new Map();
     // A login that arrives while no one is logged in (a backup imported in
     // the settings) is used at once instead of on the next restart.
     store.onChanged((changes) => {
@@ -423,10 +440,56 @@ export class Runner extends EventEmitter {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return { error: res.status === 400 ? 'invalid' : 'failed' };
+    await this.adopt(data);
+    return { ok: true };
+  }
+
+  // GitHub sign-in with PKCE. The auth server only sends people back to the
+  // casino, so the code lands in the casino's address bar (the casino ignores
+  // it) and the dashboard pastes that address into githubFinish.
+  githubStart() {
+    const now = Date.now();
+    for (const [id, flow] of this.githubFlows) if (now - flow.at > GITHUB_FLOW_MS) this.githubFlows.delete(id);
+    if (this.githubFlows.size >= GITHUB_FLOWS_MAX) this.githubFlows.delete(this.githubFlows.keys().next().value);
+    const id = randomUUID();
+    const verifier = randomBytes(32).toString('base64url');
+    this.githubFlows.set(id, { verifier, at: now });
+    const url = new URL(`${this.supabaseUrl}/auth/v1/authorize`);
+    url.search = new URLSearchParams({
+      provider: 'github',
+      redirect_to: this.casinoUrl.href,
+      code_challenge: createHash('sha256').update(verifier).digest('base64url'),
+      code_challenge_method: 's256',
+    });
+    return { id, url: url.href };
+  }
+
+  async githubFinish(id, pasted) {
+    const flow = this.githubFlows.get(id);
+    if (!flow || Date.now() - flow.at > GITHUB_FLOW_MS) return { error: 'expired' };
+    const code = oauthCode(pasted);
+    if (!code) return { error: 'no_code' };
+    this.githubFlows.delete(id);
+    const res = await fetch(`${this.supabaseUrl}/auth/v1/token?grant_type=pkce`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', apikey: this.supabaseKey },
+      body: JSON.stringify({ auth_code: code, code_verifier: flow.verifier }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      log.warn('github_signin_failed', { status: res.status, error: data.error_description ?? data.msg ?? data.error });
+      return { error: 'failed' };
+    }
+    await this.adopt(data);
+    return { ok: true };
+  }
+
+  // Logs the page in with a fresh session in place of whoever was logged in.
+  async adopt(data) {
     const current = this.readSession();
     if (current) this.localStorage.removeItem(current.key);
     this.saveSession(data);
     await this.reload();
-    return { ok: true };
   }
 }

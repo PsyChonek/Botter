@@ -159,6 +159,7 @@ body.center { min-height: 100vh; display: grid; place-items: center; padding: 16
   font-weight: 600;
   min-height: 2.4em;
 }
+#hero-signin { margin-top: 10px; }
 .stats { display: flex; gap: 28px; margin: 0; }
 .stat dt { font-size: 0.8rem; color: var(--muted); }
 .stat dd { margin: 2px 0 0; font-size: 1.3rem; font-weight: 700; font-variant-numeric: tabular-nums; }
