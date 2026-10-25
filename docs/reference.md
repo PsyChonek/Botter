@@ -102,8 +102,10 @@ progress shows at `chrome://on-device-internals`.
   trim 50 ms, so the bot settles just above the server's lock. Trimming back down to
   a wait that was refused waits for 20 accepted instead, then 40, 80 and so on up to
   640 with each refusal (since 2026-10-25; before, it walked into a refusal every
-  ~30 rounds forever). Accepted at or below that wait, the server got faster and trims
-  are plain again. Work submit waits and the start gap use the same rule. A refused request is retried after 150 ms, 300 ms, 600 ms and so on (6
+  ~30 rounds forever). Every trim at or below that wait keeps waiting for the probe, and
+  the probe never resets: until 2026-10-25 the trim onto the refused wait dropped it, so
+  each refusal started over at 20 and roulette hit the limit about every 2 minutes.
+  Work submit waits and the start gap use the same rule. A refused request is retried after 150 ms, 300 ms, 600 ms and so on (6
   times) instead of the 30 s the server asks for, and only first attempts teach the
   wait, so one long animation does not slow every later round. A step that played
   runs again at once instead of on the next tick. The learned waits sit in the page's

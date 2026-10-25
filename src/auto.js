@@ -1142,9 +1142,10 @@
   // refused request (the server's "počkej na animaci") raises the extra to just
   // past the wait it refused; SPEED_PROBE accepted in a row trim it, so it
   // keeps probing for a shorter one. The server's limit rarely moves, so a trim
-  // down to the last refused extra (floor) waits for probe accepted instead,
-  // which doubles with each refusal up to SPEED_PROBE_MAX: once the fastest
-  // wait is found it is tested again only now and then.
+  // down to or below the highest refused extra (floor) waits for probe accepted
+  // instead, which doubles with each refusal up to SPEED_PROBE_MAX: once the
+  // fastest wait is found it is tested again only now and then. The floor and
+  // probe are kept for good, since an accept at the floor can be timing jitter.
   // speed: { [path]: { extra, streak, floor?, probe? } }.
   const SPEED_STEP_UP_MS = 150;
   const SPEED_STEP_DOWN_MS = 50;
@@ -1165,9 +1166,7 @@
     const extra = Math.max(-lock, row.extra - SPEED_STEP_DOWN_MS);
     const crossing = row.floor !== undefined && extra <= row.floor;
     if (row.streak + 1 < (crossing ? row.probe : SPEED_PROBE)) return { ...speed, [path]: { ...row, streak: row.streak + 1 } };
-    // Past the floor the server has sped up, so trims are plain again.
-    const { floor, probe, ...rest } = row;
-    return { ...speed, [path]: crossing ? { ...rest, extra, streak: 0 } : { ...row, extra, streak: 0 } };
+    return { ...speed, [path]: { ...row, extra, streak: 0 } };
   }
 
   // The table after a request at extra was refused: the wait rises to at least

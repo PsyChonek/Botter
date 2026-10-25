@@ -1111,9 +1111,15 @@ test('speedLearn probes the refused wait again less and less often', () => {
   assert.equal(A.speedWait(speed, path, 0, 32_000), 3850);
   speed = accept(speed, 1);
   assert.equal(A.speedWait(speed, path, 0, 32_000), 3800);
-  // Accepted there, the server got faster: trims are plain again.
-  speed = accept(speed, 10);
+  // Below the floor every trim still waits for the probe, so the server's
+  // limit is not hit again every few dozen rounds.
+  speed = accept(speed, 19);
+  assert.equal(A.speedWait(speed, path, 0, 32_000), 3800);
+  speed = accept(speed, 1);
   assert.equal(A.speedWait(speed, path, 0, 32_000), 3750);
+  // Refused at the floor again: the probe doubles instead of starting over.
+  speed = A.speedLearn(speed, path, 0, 3800, true);
+  assert.equal(speed[path].probe, 40);
   // The probe never grows past its cap.
   for (let i = 0; i < 20; i++) speed = A.speedLearn(speed, path, 0, 3800, true);
   assert.equal(speed[path].probe, 640);
