@@ -593,6 +593,9 @@
   "optionsGrindPays": {
     "message": "Grind XP only while the next level-up reward covers the expected loss on the XP left in the level"
   },
+  "optionsGrindEventHold": {
+    "message": "Hold XP grinding in the week before an XP weekend (Hackathon, Halloween) and spend the credits on it. Off when levels matter more than credits, such as racing to a výpověď"
+  },
   "optionsLoanTrick": {
     "message": "Take the one-time +500 clean-loan achievement"
   },

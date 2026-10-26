@@ -593,6 +593,9 @@
   "optionsGrindPays": {
     "message": "Farmit XP jen dokud odměna za další level pokryje očekávanou ztrátu na zbývajících XP levelu"
   },
+  "optionsGrindEventHold": {
+    "message": "Šetřit farmení XP v týdnu před XP víkendem (Hackathon, Halloween) a utratit kredity o víkendu. Vypněte, když jsou levely důležitější než kredity, třeba při honbě za výpovědí"
+  },
   "optionsLoanTrick": {
     "message": "Vzít jednorázový achievement +500 za čistou půjčku"
   },

@@ -370,6 +370,9 @@ progress shows at `chrome://on-device-internals`.
     budget is kept, and on the weekend those budgets plus one per weekend day are
     pooled against the weekend's loss (`grindBudget`). Under the balance or no limit
     the held credits simply wait for the weekend.
+    **Hold XP grinding before XP weekends** (`grindEventHold`, Auto tab, on by default)
+    switches this hold off, for when levels are worth more than the credits saved,
+    such as racing to a výpověď.
   - Teambuilding needs nothing: the wheel is spun anyway.
 - **Settings for the rest** (settings, Auto tab): XP grinding game (cheapest
   per XP or a fixed game), bet (a fixed level, 20 by default); automatic shop purchases from

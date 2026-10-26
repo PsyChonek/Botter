@@ -48,6 +48,7 @@
     loanCycle: true,
     levelLoan: true,
     grindPays: true,
+    grindEventHold: true,
     loanTrick: true,
     standup: true,
     achievementHunt: true,
@@ -1136,6 +1137,10 @@
     await switchAccount(fallback);
   }
 
+  // Whether the grinder holds for a coming XP weekend (BotterAuto.grindHold),
+  // unless that hold is switched off (grindEventHold).
+  const eventHold = (event, now) => settings.grindEventHold && A.grindHold(event, now);
+
   // Whether a saved account could still place the smallest XP grinding bet,
   // judged from its last snapshot and today's grind loss in its stats.
   function canGrind(id, saved) {
@@ -1143,7 +1148,7 @@
     if (!settings.autoMode || !(saved.level >= unlock)) return false;
     const now = Date.now();
     const event = A.weekendEvent(now);
-    if (A.grindHold(event, now)) return false;
+    if (eventHold(event, now)) return false;
     // One whose grinder last found its level not paying (grindChoice) waits for a level-up.
     if (settings.grindPays && saved.grindHeldLevel === saved.level) return false;
     const { budget, lost } = A.grindBudget(statsCache[id]?.grind ?? EMPTY_STATS.grind, settings.xpBudget, event, now);
@@ -1420,7 +1425,7 @@
     const left = grindPausedUntil - Date.now();
     if (left > 0) return ['statusGrindPaused', [grindError ?? '-', String(Math.ceil(left / 60_000))]];
     const event = A.weekendEvent();
-    if (A.grindHold(event, Date.now())) return [event.key === 'halloween' ? 'statusGrindHalloween' : 'statusGrindHackathon', [eventStart.format(event.startAt)]];
+    if (eventHold(event, Date.now())) return [event.key === 'halloween' ? 'statusGrindHalloween' : 'statusGrindHackathon', [eventStart.format(event.startAt)]];
     const { held } = grindChoice();
     if (held) return ['statusLevelUnpaid', [credits(held.cost), credits(held.reward)]];
     const goal = grindHeldFor();
@@ -2479,7 +2484,7 @@
     const { levels, candidates, edges } = grindModel();
     const limit = grindLimits(saving);
     const { budget, lost } = A.grindBudget(stats.grind, limit.xpBudget, event, now);
-    if (A.grindHold(event, now)) return { lost, levels, candidates, edges, plan: null };
+    if (eventHold(event, now)) return { lost, levels, candidates, edges, plan: null };
     const learning = learningBlaze();
     const auto = !learning && autoBetSize();
     const wanted = learning ? G.BET_LEVELS[0] : auto ? Infinity : Number(settings.grindBet);
@@ -2536,7 +2541,7 @@
     }
     // A day held for the Hackathon keeps what is left of its budget for the weekend.
     const event = A.weekendEvent();
-    if (A.grindHold(event, Date.now()) && settings.grindLimit === 'daily') {
+    if (eventHold(event, Date.now()) && settings.grindLimit === 'daily') {
       const held = hackathonPool(event).held;
       const left = Math.max(0, settings.xpBudget - lost);
       if (held[today] !== left) {
