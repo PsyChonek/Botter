@@ -1745,7 +1745,9 @@
   function xpPrice() {
     const { candidates, edges } = grindModel();
     const game = A.cheapestGame(candidates, player.level, GRIND_UNLOCKS, edges);
-    const cost = game ? A.xpCost(game, stats.games, edges) : null;
+    // The payroll fund pays a share of every stake back (G.PAYROLL_RETURN).
+    const edge = game ? edges[game] : null;
+    const cost = edge == null ? null : A.xpCost(game, stats.games, { [game]: edge - G.PAYROLL_RETURN });
     return cost === null ? null : cost / xpBonus();
   }
 
@@ -2535,14 +2537,16 @@
   // The expected loss on the XP left in this level on a game against the
   // level-up reward (BotterAuto.levelCost): the plain XP rate, with the
   // Hackathon bonus while it is on, and the game's edge, or its loss measured
-  // at the current upgrades once that is clearly worse (BotterAuto.pricedEdge).
+  // at the current upgrades once that is clearly worse (BotterAuto.pricedEdge),
+  // less what the payroll fund pays back (G.PAYROLL_RETURN). The measured loss
+  // leaves fund wins out (they are free income), so it is compared before that.
   function levelValue(game, edge, now = Date.now()) {
     const plain = planXpRate();
     const rate = plain === null ? null : plain * (1 + xpEventBonus(now));
     const combo = O.combo(game, player.upgrades);
     const row = combo === null ? null : stats.combos[game]?.[combo];
     const variance = O.variances([game], player.upgrades, blazeMode())[game];
-    return A.levelCost(G.xpAhead(player, 1), rate, A.pricedEdge(edge, row, variance), G.levelReward(player.level + 1));
+    return A.levelCost(G.xpAhead(player, 1), rate, A.pricedEdge(edge, row, variance) - G.PAYROLL_RETURN, G.levelReward(player.level + 1));
   }
 
   // The Hackathon pool of this week's event, started over for a new one.

@@ -262,6 +262,13 @@
     };
   }
 
+  // Share of every stake the payroll fund (Mzdový fond) pays back on average.
+  // The casino adds 0.5 % of each bet to the shared fund on top (the roulette
+  // check finds no hidden cost), every credit of it drops to someone, and a
+  // bigger bet has a bigger chance, so a staked credit wins at least 0.5 %
+  // back. The fund's starting seed adds more, which is not counted.
+  const PAYROLL_RETURN = 0.005;
+
   // XP multiplier of an account's výpověď count (player.prestige), the client's
   // formula: +10 % per výpověď, at most five. XP is tracked without it, so rates
   // measured before a výpověď still hold after it.
@@ -481,6 +488,7 @@
     gameDelta,
     recordLevel,
     xpForLevel,
+    PAYROLL_RETURN,
     prestigeBonus,
     prestigeReady,
     prestigeNear,

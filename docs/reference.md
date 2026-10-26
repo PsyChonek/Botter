@@ -343,7 +343,14 @@ progress shows at `chrome://on-device-internals`.
 - **Payroll fund** (Mzdový fond, since 2026-10-15): 0.5 % of every bet goes into a
   shared fund that can drop on any bet. Every bet the bot places takes part anyway, so
   there is no separate fund mode (removed 2026-10-19); a fund win is booked as free
-  income.
+  income. The casino pays the 0.5 % on top (the roulette check shows no hidden cost),
+  every credit of the fund drops to someone and a bigger bet has a bigger chance, so a
+  staked credit wins at least 0.5 % back on average (`G.PAYROLL_RETURN`; the seed adds
+  more and is not counted). The XP price (`xpPrice`: bankruptcy, level loans, the
+  výpověď plan) and the level check of **Grind only while the level pays**
+  (`levelValue`, after the measured-loss check, which leaves fund wins out) take it off
+  the game's edge: maxed roulette 2.7 % becomes 2.2 %. By 2026-10-26 the fund had paid
+  0.65 % and 1.2 % of everything the two accounts ever wagered, pre-fund rounds included.
 - **Weekend events** (`weekendEvent` in `src/auto.js`, same rotation as the client):
   Friday 17:00 to Monday 9:00, Prague time, one per weekend from the week of
   2026-10-05: Hackathon (+50 % XP), Konec kvartálu (+50 % on the net profit of every
