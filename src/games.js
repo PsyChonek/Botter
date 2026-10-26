@@ -269,6 +269,12 @@
   const PRESTIGE_MAX = 5;
   const prestigeBonus = (prestige) => 1 + PRESTIGE_XP * Math.min(Math.max(0, Number(prestige) || 0), PRESTIGE_MAX);
 
+  // Whether a výpověď is open and still adds XP: from level 40 until the bonus
+  // is maxed. It wipes level, credits and upgrades, so not with a loan open,
+  // whose debt the casino might keep.
+  const PRESTIGE_LEVEL = 40;
+  const prestigeReady = (player) => player?.level >= PRESTIGE_LEVEL && (Number(player.prestige) || 0) < PRESTIGE_MAX && !player.loan;
+
   // Level curve seen so far, shared by every account: { [level]: { xpNeed, reward } }
   // with the XP a level needs (player.xpNeed while at it) and the credits paid on
   // reaching it (levelUp.reward). Returns a new map when something new was
@@ -462,6 +468,7 @@
     recordLevel,
     xpForLevel,
     prestigeBonus,
+    prestigeReady,
     levelReward,
     xpAhead,
     dailyBonus,

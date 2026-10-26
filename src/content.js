@@ -49,6 +49,7 @@
     levelLoan: true,
     grindPays: true,
     grindEventHold: true,
+    autoPrestige: true,
     loanTrick: true,
     standup: true,
     achievementHunt: true,
@@ -1777,6 +1778,20 @@
   // unless finishing the current level first costs less than losing its XP. On
   // a sprint podium it waits for the sprint to end, so the prize is paid and
   // the bankruptcy lands on the new sprint's first points.
+  // Hands in a výpověď as soon as it opens (G.prestigeReady). Everything it
+  // wipes is worth less than the +10 % XP it adds for good.
+  async function prestigeStep() {
+    if (!settings.autoPrestige || !G.prestigeReady(player)) return false;
+    if (Date.now() - (claimTried.prestige ?? 0) < CLAIM_RETRY_MS) return false;
+    claimTried.prestige = Date.now();
+    const terms = { level: player.level, prestige: player.prestige ?? 0, credits: player.credits };
+    setStatus('statusPrestige', [String(terms.prestige + 1)]);
+    const res = await api('/api/profile/prestige', {});
+    if (!res.ok) log.warn('prestige_failed', { ...terms, status: res.status, error: res.data?.error });
+    else log.info('prestige', terms);
+    return true;
+  }
+
   async function bankruptStep() {
     if (!player.loan?.execution || !bankruptPlanned()) return false;
     if (Date.now() - (claimTried.bankrupt ?? 0) < CLAIM_RETRY_MS) return false;
@@ -2607,6 +2622,7 @@
 
   async function autoStep() {
     if (!player) return loadPlayer();
+    if (await prestigeStep()) return;
     if (await bankruptStep()) return;
     if (await claimFreebies()) return;
     if (settings.autoGames && (await hotfixFreeStep())) return;

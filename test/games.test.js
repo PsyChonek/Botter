@@ -53,6 +53,15 @@ test('prestigeBonus gives +10 % XP per výpověď, at most five', () => {
   assert.equal(G.prestigeBonus(7), 1.5);
 });
 
+test('prestigeReady from level 40 until five výpovědi, never with a loan', () => {
+  assert.equal(G.prestigeReady({ level: 39, prestige: 0 }), false);
+  assert.equal(G.prestigeReady({ level: 40, prestige: 0 }), true);
+  assert.equal(G.prestigeReady({ level: 40, prestige: 4 }), true);
+  assert.equal(G.prestigeReady({ level: 45, prestige: 5 }), false);
+  assert.equal(G.prestigeReady({ level: 40, prestige: 1, loan: { debt: 500 } }), false);
+  assert.equal(G.prestigeReady(null), false);
+});
+
 test('gameDelta books XP without the výpověď bonus', () => {
   const spin = G.gameDelta('/api/slot/spin', { bet: 40 }, { player: { credits: 1000, prestige: 3 }, xpGain: 13 }, 1000);
   assert.equal(spin.xp, 10);

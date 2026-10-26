@@ -458,6 +458,14 @@
       }
     }
   },
+  "statusPrestige": {
+    "message": "Podávám výpověď číslo $P1$...",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
   "statusBankrupt": {
     "message": "Vyhlašuji osobní bankrot, dluh $P1$ je levnější zahodit než splatit...",
     "placeholders": {
@@ -595,6 +603,9 @@
   },
   "optionsGrindEventHold": {
     "message": "Šetřit farmení XP v týdnu před XP víkendem (Hackathon, Halloween) a utratit kredity o víkendu. Vypněte, když jsou levely důležitější než kredity, třeba při honbě za výpovědí"
+  },
+  "optionsAutoPrestige": {
+    "message": "Dát výpověď na levelu 40 (přijdete o level, kredity a upgrady za trvalých +10 % XP, nejvýš pětkrát)"
   },
   "optionsLoanTrick": {
     "message": "Vzít jednorázový achievement +500 za čistou půjčku"

@@ -250,6 +250,12 @@ progress shows at `chrome://on-device-internals`.
   coffee that refills energy. It is spun 5 seconds after `player.wheelNextAt` has passed (a refused spin is retried after a minute), with the other free
   claims (also outside auto mode), and booked as free income. Account rotation visits
   another account whose wheel is ready, right after accounts not seen today.
+- **Výpověď** (prestige, `/api/profile/prestige`, `prestigeStep`, settings Auto tab
+  **Hand in a výpověď at level 40**, on by default): handed in as soon as the account
+  reaches level 40, before anything else in the auto step, while it has fewer than five
+  (the XP bonus stops at +50 %) and no loan open (`G.prestigeReady`). It wipes level,
+  credits and every upgrade for +10 % XP for good; the casino tops the credits up to
+  the start amount. A refused one is retried after 10 minutes.
 - **Personal bankruptcy** (Insolvence, `/api/loan/bankrupt`, settings Auto tab, on by
   default): offered only in execution. The debt is wiped and credits are set to 500,
   but the XP into the current level is lost, as are this week's sprint points, and
@@ -404,7 +410,7 @@ progress shows at `chrome://on-device-internals`.
   by 1.5, so levels never look cheaper than they are; XP is tracked without the
   výpověď bonus, +10 % per výpověď up to +50 % (`G.prestigeBonus`, `player.prestige`),
   and the account's current bonus is put back on every rate it plans or shows with,
-  so rates measured before a výpověď hold after it; the bot never hands one in itself), the volume is the XP to the next 10 levels instead,
+  so rates measured before a výpověď hold after it; the bot hands one in at level 40, see Výpověď), the volume is the XP to the next 10 levels instead,
   from the level curve (`G.xpForLevel`: round(280 × level^1.35), reward 1,000 × (level
   − 1), fitted exactly to recorded levels 14 to 18): an upgrade is bought when the
   credits wagered for that XP times its drop in edge beat its price. A goal is bought

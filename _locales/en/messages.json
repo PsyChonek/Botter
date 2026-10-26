@@ -458,6 +458,14 @@
       }
     }
   },
+  "statusPrestige": {
+    "message": "Handing in výpověď number $P1$...",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
   "statusBankrupt": {
     "message": "Declaring personal bankruptcy, $P1$ of debt is cheaper to drop than to pay...",
     "placeholders": {
@@ -595,6 +603,9 @@
   },
   "optionsGrindEventHold": {
     "message": "Hold XP grinding in the week before an XP weekend (Hackathon, Halloween) and spend the credits on it. Off when levels matter more than credits, such as racing to a výpověď"
+  },
+  "optionsAutoPrestige": {
+    "message": "Hand in a výpověď at level 40 (wipes level, credits and upgrades for +10 % XP for good, up to five times)"
   },
   "optionsLoanTrick": {
     "message": "Take the one-time +500 clean-loan achievement"
