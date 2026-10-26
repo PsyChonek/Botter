@@ -256,6 +256,15 @@ progress shows at `chrome://on-device-internals`.
   (the XP bonus stops at +50 %) and no loan open (`G.prestigeReady`). It wipes level,
   credits and every upgrade for +10 % XP for good; the casino tops the credits up to
   the start amount. A refused one is retried after 10 minutes.
+  - Once the credits cover the expected loss of grinding to level 40 at the grinder's
+    measured credits per XP, less the level rewards paid on the way (`G.prestigeNear`;
+    the level 40 reward is wiped with the rest), anything kept is wiped for nothing.
+    From there, like a planned bankruptcy, the grinder bets down to the last credit
+    (no reserve, daily budget or minimum balance), **Grind only while the level pays**
+    and the XP weekend hold are ignored, and no upgrade is bought or saved for and
+    no level or cycle loan taken, as a loan open at 40 would hold the výpověď back.
+    Saved accounts keep their prestige and XP in their snapshot, so rotation judges
+    them the same way, priced at the logged-in account's XP price.
 - **Personal bankruptcy** (Insolvence, `/api/loan/bankrupt`, settings Auto tab, on by
   default): offered only in execution. The debt is wiped and credits are set to 500,
   but the XP into the current level is lost, as are this week's sprint points, and

@@ -62,6 +62,21 @@ test('prestigeReady from level 40 until five výpovědi, never with a loan', () 
   assert.equal(G.prestigeReady(null), false);
 });
 
+test('prestigeNear once the credits fund the grind to level 40', () => {
+  // Level 39 with 10,000 XP left at 1.2 credits per XP: 12,000 to finish, no rewards on the way.
+  const p39 = { level: 39, xpNeed: 39_000, xpInto: 29_000, prestige: 1 };
+  assert.equal(G.prestigeNear({ ...p39, credits: 11_999 }, 1.2), false);
+  assert.equal(G.prestigeNear({ ...p39, credits: 12_000 }, 1.2), true);
+  // The reward for level 39 is paid on the way from 38.
+  const p38 = { level: 38, xpNeed: 30_000, xpInto: 0, prestige: 1 };
+  const cost = (30_000 + G.xpForLevel(39)) * 1.2 - G.levelReward(39);
+  assert.equal(G.prestigeNear({ ...p38, credits: cost - 1 }, 1.2), false);
+  assert.equal(G.prestigeNear({ ...p38, credits: cost }, 1.2), true);
+  assert.equal(G.prestigeNear({ ...p39, credits: 1e9 }, null), false);
+  assert.equal(G.prestigeNear({ ...p39, credits: 1e9, prestige: 5 }, 1.2), false);
+  assert.equal(G.prestigeNear({ level: 41, credits: 0, prestige: 2 }, null), true);
+});
+
 test('gameDelta books XP without the výpověď bonus', () => {
   const spin = G.gameDelta('/api/slot/spin', { bet: 40 }, { player: { credits: 1000, prestige: 3 }, xpGain: 13 }, 1000);
   assert.equal(spin.xp, 10);

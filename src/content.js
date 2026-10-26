@@ -1004,6 +1004,9 @@
       ...saved,
       login: player.login,
       level: player.level,
+      xpInto: player.xpInto,
+      xpNeed: player.xpNeed,
+      prestige: player.prestige,
       credits: player.credits,
       work: player.work,
       wheelNextAt: player.wheelNextAt,
@@ -1140,7 +1143,9 @@
 
   // Whether the grinder holds for a coming XP weekend (BotterAuto.grindHold),
   // unless that hold is switched off (grindEventHold).
-  const eventHold = (event, now) => settings.grindEventHold && A.grindHold(event, now);
+  // A near výpověď (prestigeNear) does not wait: XP is the only use left for
+  // the credits. who is a saved account's snapshot, else the logged-in player.
+  const eventHold = (event, now, who = player) => settings.grindEventHold && !prestigeNear(who) && A.grindHold(event, now);
 
   // Whether a saved account could still place the smallest XP grinding bet,
   // judged from its last snapshot and today's grind loss in its stats.
@@ -1149,9 +1154,10 @@
     if (!settings.autoMode || !(saved.level >= unlock)) return false;
     const now = Date.now();
     const event = A.weekendEvent(now);
-    if (eventHold(event, now)) return false;
-    // One whose grinder last found its level not paying (grindChoice) waits for a level-up.
-    if (settings.grindPays && saved.grindHeldLevel === saved.level) return false;
+    if (eventHold(event, now, saved)) return false;
+    // One whose grinder last found its level not paying (grindChoice) waits for
+    // a level-up, unless its výpověď is near and the level's pay no longer matters.
+    if (settings.grindPays && saved.grindHeldLevel === saved.level && !prestigeNear(saved)) return false;
     const { budget, lost } = A.grindBudget(statsCache[id]?.grind ?? EMPTY_STATS.grind, settings.xpBudget, event, now);
     return A.grindBets({ ...settings, xpBudget: budget }, saved.credits ?? 0, lost, [G.BET_LEVELS[0]]).length > 0;
   }
@@ -1755,10 +1761,19 @@
     return A.bankruptWorth(player, xpPrice());
   }
 
-  // Limits the grinder and the shop spend within. Past a planned bankruptcy a
+  // Whether the výpověď at level 40 is funded (G.prestigeNear): it wipes
+  // credits and upgrades, so from here they only buy the XP to get there. A
+  // saved account's snapshot is priced at the logged-in player's XP price.
+  const prestigeNear = (who = player) => !!player && settings.autoPrestige && G.prestigeNear(who, xpPrice());
+
+  // Whether credits are about to be reset, by a planned bankruptcy or a near
+  // výpověď, so nothing is kept back or bought for later.
+  const resetPlanned = () => bankruptPlanned() || prestigeNear();
+
+  // Limits the grinder and the shop spend within. Past a planned reset a
   // credit is worth nothing, so they may spend down to the last one.
   const limits = () =>
-    bankruptPlanned() ? { ...settings, reserve: 0, grindLimit: 'balance', grindMinBalance: 1 } : settings;
+    resetPlanned() ? { ...settings, reserve: 0, grindLimit: 'balance', grindMinBalance: 1 } : settings;
 
   // The account's sprint standing, fetched again once it is older than ten
   // minutes or its sprint has ended. Null while it cannot be read.
@@ -1884,7 +1899,8 @@
     }
     // A cycle loan's flag is cleared by loanCycleStep once its loan is gone;
     // until then a new loan would be taken for bankruptcy.
-    if (!settings.levelLoan || !settings.autoGames || player.loan || stats.flags.cycleLoan) return false;
+    // A loan still open at level 40 would hold the výpověď back (G.prestigeReady).
+    if (!settings.levelLoan || !settings.autoGames || player.loan || stats.flags.cycleLoan || prestigeNear()) return false;
     if (player.loanBlockedUntil > Date.now() || (settings.loanTrick && !stats.flags.cleanDone)) return false;
     if ((settings.autoWork && workAvailable()) || savingFor() || learningBlaze()) return false;
     if (Date.now() - (claimTried.levelLoanTake ?? 0) < CRASH_POLL_MS) return false;
@@ -1916,7 +1932,7 @@
       stats.flags.cycleLoan = false;
       saveStats();
     }
-    if (!settings.loanCycle || !settings.autoBankrupt || player.loan) return false;
+    if (!settings.loanCycle || !settings.autoBankrupt || player.loan || prestigeNear()) return false;
     if (player.loanBlockedUntil > Date.now() || (settings.loanTrick && !stats.flags.cleanDone)) return false;
     if (Date.now() - (claimTried.cycle ?? 0) < CLAIM_RETRY_MS) return false;
     claimTried.cycle = Date.now();
@@ -2033,7 +2049,7 @@
   // worth buying at this level. Changes are logged, not every review.
   function reviewShop() {
     if (!settings.buyUpgrades || !player) return (shopReview = null);
-    const key = JSON.stringify([accountId, player.level, player.upgrades, bankruptPlanned(), blazeRule().mode, blazeRule().decided, settings.learnBlaze, settings.firstGame, Number(planXpRate()?.toFixed(3))]);
+    const key = JSON.stringify([accountId, player.level, player.upgrades, resetPlanned(), blazeRule().mode, blazeRule().decided, settings.learnBlaze, settings.firstGame, Number(planXpRate()?.toFixed(3))]);
     if (shopReview?.key === key && Date.now() - shopReview.at < SHOP_REVIEW_MS) return shopReview;
     const queue = G.shopQueue(G.UPGRADE_PLAN, player, upgradeSkip);
     const goal = A.shopGoal(queue, shopPriority());
@@ -2065,7 +2081,7 @@
   // bought only from credits beyond what the goal needs (goalNeed), and not
   // past a planned bankruptcy.
   function spareOffer() {
-    if (!settings.spareUpgrades || bankruptPlanned()) return null;
+    if (!settings.spareUpgrades || resetPlanned()) return null;
     const review = reviewShop();
     return review ? A.spareUpgrade(review.queue, player.credits, goalNeed(review.goal), shopPriority()) : null;
   }
@@ -2160,7 +2176,7 @@
   // but the grinder does not wait for it. Nor while a level loan is open: the
   // shop sells nothing until it is repaid.
   function savingFor() {
-    if (!settings.saveForUpgrades || !settings.autoMode || bankruptPlanned() || levelLoanOpen()) return null;
+    if (!settings.saveForUpgrades || !settings.autoMode || resetPlanned() || levelLoanOpen()) return null;
     if (levelMargin() === null) return null;
     const goal = reviewShop()?.goal;
     return goal && !goal.reason ? goal : null;
@@ -2173,7 +2189,7 @@
   // lichváře obchod neprodává"), so nothing is tried until it is repaid.
   async function buyStep() {
     if (!settings.buyUpgrades || Date.now() - (claimTried.buy ?? 0) < CRASH_POLL_MS) return false;
-    if (player.loan?.debt > 0) return false;
+    if (player.loan?.debt > 0 || prestigeNear()) return false;
     const offer = shopOffer();
     if (!offer) return false;
     setStatus('statusBuying', [`${offer.game}:${offer.key}`, String(offer.next), credits(offer.price)]);
@@ -2511,7 +2527,7 @@
     const plan = auto
       ? A.autoGrindPlan(candidates, bet, player.level, GRIND_UNLOCKS, pickEdges, autoCaps(candidates, limit.reserve, extra), levels)
       : A.grindPlan(candidates, bet, player.level, GRIND_UNLOCKS, pickEdges);
-    const level = plan && settings.grindPays && !bankruptPlanned() ? levelValue(plan.game, pickEdges[plan.game], now) : null;
+    const level = plan && settings.grindPays && !resetPlanned() ? levelValue(plan.game, pickEdges[plan.game], now) : null;
     if (level && !level.pays) return { lost, levels, candidates, edges, plan: null, held: level };
     return { lost, levels, candidates, edges, plan };
   }
@@ -3043,7 +3059,7 @@
     const margin = levelMargin();
     const at = (offer, need) => ({ offer, need: margin === null ? null : need, floor: grindFloor(), margin });
     if (review.goal) return at(review.goal, goalNeed(review.goal));
-    if (!settings.spareUpgrades || bankruptPlanned()) return null;
+    if (!settings.spareUpgrades || resetPlanned()) return null;
     const spare = A.spareUpgrade(review.queue, Infinity, 0, shopPriority());
     return spare ? at(spare, goalNeed(null) + spare.price) : null;
   }

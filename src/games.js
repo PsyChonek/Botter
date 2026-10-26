@@ -304,6 +304,20 @@
     return xp;
   }
 
+  // Whether the next výpověď is close enough that credits beyond it are wiped
+  // for nothing: the credits cover the expected loss of grinding to level 40
+  // at price credits per XP, less the level rewards paid on the way (the one
+  // for level 40 is wiped with the rest). Also true once it is open. False
+  // with five výpovědi already or before an XP price is measured.
+  function prestigeNear(player, price) {
+    if (!(player?.level >= 1) || (Number(player.prestige) || 0) >= PRESTIGE_MAX) return false;
+    if (player.level >= PRESTIGE_LEVEL) return true;
+    if (!(price > 0)) return false;
+    let rewards = 0;
+    for (let level = player.level + 1; level < PRESTIGE_LEVEL; level++) rewards += levelReward(level);
+    return (player.credits ?? 0) >= xpAhead(player, PRESTIGE_LEVEL - player.level) * price - rewards;
+  }
+
   // Daily bonus on a streak day at a player level, the client's formula: the
   // base grows 250 a day up to day 7, and every level adds 10 % of it, 15 %
   // from level 5.
@@ -469,6 +483,7 @@
     xpForLevel,
     prestigeBonus,
     prestigeReady,
+    prestigeNear,
     levelReward,
     xpAhead,
     dailyBonus,
