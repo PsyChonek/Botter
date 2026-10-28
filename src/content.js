@@ -414,10 +414,12 @@
   // Learns from a game request sent waited ms after the response game. Only
   // the server's animation refusals count, and only within the longest hold,
   // so an unrelated refusal cannot stretch every later wait.
+  // Both the animation lock and the general "Zpomal trochu." limit count as
+  // refused; the latter raises the wait by the time left it reports.
   function learnSpeed(game, waited, res) {
-    const refused = res.status === 429 && /animac/i.test(String(res.data?.error ?? ''));
+    const refused = A.rateLimitWait(res) !== null;
     if (refused && waited > ANIM_LOCK_MAX_MS) return;
-    speed = A.speedLearn(speed, game.path, game.lock, waited, refused);
+    speed = A.speedLearn(speed, game.path, game.lock, waited, refused, A.speedHint(res));
     saveSpeed();
     if (refused) log.info('speed_learned', { path: game.path, waited, wait: speedHold(game) });
   }
@@ -511,7 +513,7 @@
       if (!res.status) noteResponse(path, 0, res.data);
       netDirty = true;
       let wait = A.rateLimitWait(res, attempt);
-      if (fast && wait !== null) wait = A.speedRetryWait(attempt);
+      if (fast && wait !== null) wait = A.speedHint(res) ?? A.speedRetryWait(attempt);
       // Only a first attempt says how long the wait after that response must be:
       // a retry's wait also holds the retry waits, which one long animation
       // would otherwise carry over to every later round.

@@ -1160,8 +1160,10 @@
 
   // The table after a game request sent waited ms after a response on path
   // (whose animation took lock ms) was refused or accepted.
-  function speedLearn(speed, path, lock, waited, refused) {
-    if (refused) return speedRefused(speed, path, waited - lock, waited - lock + SPEED_STEP_UP_MS);
+  // A refusal that says how much longer to wait (hint, see speedHint) raises
+  // the wait by that instead of the step up.
+  function speedLearn(speed, path, lock, waited, refused, hint = null) {
+    if (refused) return speedRefused(speed, path, waited - lock, waited - lock + (hint ?? SPEED_STEP_UP_MS));
     const row = speed?.[path] ?? { extra: 0, streak: 0 };
     const extra = Math.max(-lock, row.extra - SPEED_STEP_DOWN_MS);
     const crossing = row.floor !== undefined && extra <= row.floor;
@@ -1181,6 +1183,20 @@
   // Wait before retrying a refused game request at max speed: doubling from
   // the step up, instead of the server's own hint, which is always 30 s.
   const speedRetryWait = (attempt) => SPEED_STEP_UP_MS * 2 ** attempt;
+
+  // The casino's general limit ("Zpomal trochu.", a 429) puts the real time
+  // left in ms in its hint, unlike the animation lock, so at max speed a
+  // refused request waits that plus a margin. Null when the refusal says
+  // nothing useful: the animation lock, no hint, or not a refusal.
+  const SPEED_HINT_MARGIN_MS = 30;
+  function speedHint(res) {
+    if (rateLimitWait(res) === null || /animac/i.test(String(res.data?.error ?? ''))) return null;
+    const ms = res.data?.retryAfterMs != null
+      ? Number(res.data.retryAfterMs)
+      : hintMs(Number(res.retryAfter ?? res.data?.retryAfter ?? NaN));
+    if (!(ms >= 0)) return null;
+    return Math.min(RATE_LIMIT_MAX_MS, ms) + SPEED_HINT_MARGIN_MS;
+  }
 
   // Max speed for work tickets: the least time a ticket stays open before a
   // submit the server accepts, kept per ticket type in the same table as the
@@ -1339,6 +1355,7 @@
     speedWait,
     speedLearn,
     speedRetryWait,
+    speedHint,
     workSpeedLearn,
     WINS_BONUS,
     bonusEdges,

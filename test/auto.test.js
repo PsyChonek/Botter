@@ -1092,6 +1092,17 @@ test('speedLearn waits just past what the server refused and keeps probing short
   assert.deepEqual([0, 1, 2].map(A.speedRetryWait), [150, 300, 600]);
 });
 
+test('speedHint trusts the casino\'s ms hint on "Zpomal trochu." but not on the animation lock', () => {
+  assert.equal(A.speedHint({ ok: false, status: 429, data: { error: 'Zpomal trochu.', retryAfter: 262 } }), 292);
+  assert.equal(A.speedHint({ ok: false, status: 429, data: { error: 'Zpomal trochu.', retryAfterMs: 78 } }), 108);
+  assert.equal(A.speedHint({ ok: false, status: 429, data: { error: 'Moc rychle, počkej na animaci.', retryAfter: 30 } }), null);
+  assert.equal(A.speedHint({ ok: false, status: 429, data: { error: 'Zpomal trochu.' } }), null);
+  assert.equal(A.speedHint({ ok: true, status: 200, data: {} }), null);
+  // A refusal with a hint raises the wait past it, not by the fixed step.
+  const speed = A.speedLearn({}, '/api/mines/reveal', 0, 100, true, 292);
+  assert.equal(A.speedWait(speed, '/api/mines/reveal', 0, 32_000), 392);
+});
+
 test('speedLearn probes the refused wait again less and less often', () => {
   const path = '/api/roulette/spin';
   const accept = (speed, n) => {

@@ -105,7 +105,12 @@ progress shows at `chrome://on-device-internals`.
   ~30 rounds forever). Every trim at or below that wait keeps waiting for the probe, and
   the probe never resets: until 2026-10-25 the trim onto the refused wait dropped it, so
   each refusal started over at 20 and roulette hit the limit about every 2 minutes.
-  Work submit waits and the start gap use the same rule. A refused request is retried after 150 ms, 300 ms, 600 ms and so on (6
+  Work submit waits and the start gap use the same rule. The casino's general limit
+  ("Zpomal trochu.", a 429 whose hint is the real time left in ms) counts as a refusal
+  too, and raises the wait by that hint plus 30 ms (`speedHint`); until 2026-10-28 only
+  "počkej na animaci" counted, so mines kept trimming its wait and every start, reveal
+  and cashout was refused twice. A refused request is retried after its hint plus 30 ms
+  when it has one, else after 150 ms, 300 ms, 600 ms and so on (6
   times) instead of the 30 s the server asks for, and only first attempts teach the
   wait, so one long animation does not slow every later round. A step that played
   runs again at once instead of on the next tick. The learned waits sit in the page's
