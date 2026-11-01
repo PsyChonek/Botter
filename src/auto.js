@@ -1282,7 +1282,24 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
+  // Whether the game's paid daily quota is met. A výpověď resets the level but
+  // not the game's paid counter, so on its day the quota does not stop work:
+  // a fresh level 1 still needs the ticket XP.
+  function normDone(work, vypovedDay, today) {
+    if (!work || vypovedDay === today) return false;
+    return work.paidToday >= work.norm;
+  }
+
+  // The day of the account's last výpověď, seen as its prestige count going up
+  // between two snapshots, whether the bot or the user handed it in.
+  function prestigeDay(saved, prestige, today) {
+    if (saved?.prestige !== undefined && prestige > saved.prestige) return today;
+    return saved?.prestigeDay;
+  }
+
   const api = {
+    normDone,
+    prestigeDay,
     CRASH_PLANNED_MULT,
     crashMult,
     bestCrashTarget,

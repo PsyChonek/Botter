@@ -1235,3 +1235,20 @@ test('standupPlan plays a big win quest on Hledání bugů in its 10x shape', ()
   const blaze = A.standupPlan([{ key: 'spins_blaze', text: 'Zatoč 10× Blaze', progress: 0, target: 10, reward: 800 }], ctx);
   assert.equal(blaze.spot, null);
 });
+
+test('normDone stops at the paid quota, except on the day of a vypoved', () => {
+  const work = { paidToday: 30, norm: 30 };
+  assert.equal(A.normDone(work, null, '2026-11-01'), true);
+  assert.equal(A.normDone({ paidToday: 12, norm: 30 }, null, '2026-11-01'), false);
+  // A vypoved today resets the level but not the game's paid counter.
+  assert.equal(A.normDone(work, '2026-11-01', '2026-11-01'), false);
+  assert.equal(A.normDone(work, '2026-10-31', '2026-11-01'), true);
+  assert.equal(A.normDone(undefined, null, '2026-11-01'), false);
+});
+
+test('prestigeDay records the day the prestige count goes up', () => {
+  assert.equal(A.prestigeDay({ prestige: 2 }, 3, '2026-11-01'), '2026-11-01');
+  assert.equal(A.prestigeDay({ prestige: 3, prestigeDay: '2026-11-01' }, 3, '2026-11-02'), '2026-11-01');
+  assert.equal(A.prestigeDay({}, 3, '2026-11-01'), undefined);
+  assert.equal(A.prestigeDay(undefined, 0, '2026-11-01'), undefined);
+});

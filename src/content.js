@@ -1009,6 +1009,7 @@
       xpInto: player.xpInto,
       xpNeed: player.xpNeed,
       prestige: player.prestige,
+      prestigeDay: A.prestigeDay(saved, player.prestige, A.dayKey()),
       credits: player.credits,
       work: player.work,
       wheelNextAt: player.wheelNextAt,
@@ -1184,7 +1185,7 @@
         seenAt: saved.seenAt ?? 0,
         seenDay: saved.seenDay,
         energy: G.energyNow(saved.work, now),
-        normDone: settings.stopAtNorm && saved.seenDay === today && saved.work?.paidToday >= saved.work?.norm,
+        normDone: settings.stopAtNorm && saved.seenDay === today && A.normDone(saved.work, saved.prestigeDay, today),
         credits: saved.credits ?? 0,
         canGrind: canGrind(id, saved),
         wheel: settings.autoClaim && A.wheelReady(saved.wheelNextAt, now) && now - (saved.seenAt ?? 0) > CLAIM_RETRY_MS,
@@ -1391,7 +1392,7 @@
     submit.click();
   }
 
-  const normDone = () => settings.stopAtNorm && player && player.work.paidToday >= player.work.norm;
+  const normDone = () => settings.stopAtNorm && !!player && A.normDone(player.work, A.prestigeDay(accounts[accountId], player.prestige, A.dayKey()), A.dayKey());
 
   // Whether the work bot has something to do right now, so games can use the gaps.
   function workAvailable() {
