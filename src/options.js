@@ -674,6 +674,7 @@ function showAccountRows(accounts) {
       tr.append(
         cell(saved.session ? login : msg('optionsAccountNoLogin', [login])),
         cell(saved.level == null ? '-' : num.format(saved.level)),
+        cell(saved.prestige == null ? '-' : num.format(saved.prestige)),
         cell(saved.credits == null ? '-' : num.format(saved.credits)),
         cell(energy),
         cell(saved.seenAt ? when.format(saved.seenAt) : '-'),

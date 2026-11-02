@@ -1312,6 +1312,9 @@
   "colLevel": {
     "message": "Level"
   },
+  "colPrestige": {
+    "message": "Prestige"
+  },
   "colCredits": {
     "message": "Credits"
   },

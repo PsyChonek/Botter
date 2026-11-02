@@ -159,7 +159,7 @@ function renderAccounts(accounts) {
       row.append(name);
       // The saved snapshot of the account playing lags; its live figures are in the report.
       const live = account.current && report?.player ? report.player : account;
-      for (const value of [number(live.level), number(live.credits), live.energy ?? '-']) {
+      for (const value of [number(live.level), number(live.prestige), number(live.credits), live.energy ?? '-']) {
         const cell = document.createElement('td');
         cell.className = 'num';
         cell.textContent = value;

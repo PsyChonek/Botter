@@ -713,8 +713,8 @@ progress shows at `chrome://on-device-internals`.
     session, so a second tab can write its old session back. To run two accounts at
     once, open the second in an incognito window with Botter allowed in incognito;
     both share the bank and settings and keep separate stats.
-  - The Profit tab in the settings lists the saved accounts (Forget drops a saved
-    login, not its stats) and shows profit per account or summed over all of them.
+  - The Profit tab in the settings lists the saved accounts with level, výpovědi
+    (prestige), credits and energy (Forget drops a saved login, not its stats) and shows profit per account or summed over all of them.
 
 ## Install
 

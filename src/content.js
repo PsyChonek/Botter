@@ -3217,6 +3217,7 @@
       player: player && {
         login: player.login,
         level: player.level,
+        prestige: player.prestige ?? 0,
         credits: player.credits,
         energy: G.energyNow(player.work, Date.now()),
         maxEnergy: player.work?.maxEnergy ?? 20,
@@ -3225,6 +3226,7 @@
         id,
         login: saved.login ?? id,
         level: saved.level ?? null,
+        prestige: saved.prestige ?? null,
         credits: saved.credits ?? null,
         energy: saved.work ? G.energyNow(saved.work, Date.now()) : null,
         session: !!saved.session,

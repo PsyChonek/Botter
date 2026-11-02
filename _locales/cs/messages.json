@@ -1312,6 +1312,9 @@
   "colLevel": {
     "message": "Level"
   },
+  "colPrestige": {
+    "message": "Výpovědi"
+  },
   "colCredits": {
     "message": "Kredity"
   },
