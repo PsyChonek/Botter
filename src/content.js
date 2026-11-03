@@ -2498,7 +2498,11 @@
 
   // While saving for an upgrade (savingFor), its price is kept on top of the
   // reserve; saving = false judges the grinder without it.
+  // A level loan open grinds down to the last credit: the loan was taken to
+  // reach the level, so neither the reserve nor the daily budget stops it. If
+  // the credits run out the debt is left to execution and bankruptcy.
   function grindLimits(saving = true) {
+    if (levelLoanOpen()) return { ...settings, reserve: 0, grindLimit: 'balance', grindMinBalance: 1 };
     const limit = limits();
     const goal = saving ? savingFor() : null;
     return goal ? { ...limit, reserve: goalNeed(goal) } : limit;
@@ -2513,7 +2517,7 @@
   // extra is credits a level loan not taken yet would add (levelLoanStep).
   // The grinder holds (held, the level's cost and reward) while the XP left in
   // the level is expected to lose more than the level-up pays (levelValue),
-  // unless a planned bankruptcy wipes the credits anyway.
+  // unless a planned bankruptcy wipes the credits anyway or a level loan is open.
   function grindChoice(saving = true, extra = 0) {
     const now = Date.now();
     const event = A.weekendEvent(now);
@@ -2532,7 +2536,7 @@
     const plan = auto
       ? A.autoGrindPlan(candidates, bet, player.level, GRIND_UNLOCKS, pickEdges, autoCaps(candidates, limit.reserve, extra), levels)
       : A.grindPlan(candidates, bet, player.level, GRIND_UNLOCKS, pickEdges);
-    const level = plan && settings.grindPays && !resetPlanned() ? levelValue(plan.game, pickEdges[plan.game], now) : null;
+    const level = plan && settings.grindPays && !resetPlanned() && !levelLoanOpen() ? levelValue(plan.game, pickEdges[plan.game], now) : null;
     if (level && !level.pays) return { lost, levels, candidates, edges, plan: null, held: level };
     return { lost, levels, candidates, edges, plan };
   }
@@ -2589,7 +2593,7 @@
     }
     if (!plan) return false;
     const { game, bet } = plan;
-    const limit = limits();
+    const limit = grindLimits();
     if (limit.grindLimit !== 'daily') {
       const floor = limit.grindLimit === 'off' ? limit.reserve : limit.grindMinBalance;
       setStatus('statusGrindingFloor', [msg(`game_${game}`), credits(player.credits), credits(floor), credits(bet)]);

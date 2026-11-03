@@ -307,8 +307,11 @@ progress shows at `chrome://on-device-internals`.
     (never in part, which would only cut the bankroll; a refused repayment waits a
     minute), then taken again if it still pays, so each loan starts a new free hour.
     While it waits, `level_loan_wait` logs the debt, the credits and the minutes to
-    the next interest tick once a minute. A grind that falls behind keeps the loan
-    until a level-up or work pay covers it, and only then pays interest. Taken before the loan cycle, whose loan is never
+    the next interest tick once a minute. While the loan is open the grinder keeps
+    playing down to the last credit: the reserve, the daily budget and the
+    level-pays hold do not stop it. A grind that falls behind keeps the loan until a
+    level-up or work pay covers it, and only then pays interest. If the credits run
+    out, the debt grows to its cap, execution starts and bankruptcy wipes it. Taken before the loan cycle, whose loan is never
     repaid. The shop sells nothing while it is open, so no upgrade is saved for then.
   - **Sprint**: story points are the XP earned since Monday 9:00, and the top three
     are paid 5,000 / 3,500 / 2,000 when the sprint ends. Bankruptcy wipes the week's
