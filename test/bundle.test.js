@@ -65,3 +65,13 @@ test('a new game or shop game in the bundle is reported, a coming one is not', (
   assert.deepEqual(facts.soon, ['dice']);
   assert.deepEqual(problems, ['baccarat: new game from level 20', 'shop baccarat: new game in the shop']);
 });
+
+test('readChangelog reads the app changelog newest first, quotes and commas included', () => {
+  const text =
+    'x=[{date:`2026-10-29`,changes:[`Prace, ktera trva dele: 2x vyplata`,`Druhy \\`bod\\``]},{date:`2026-11-01`,changes:[`Loterie ukazuje vklad.`]}],y=1';
+  assert.deepEqual(B.readChangelog(text), [
+    { date: '2026-11-01', changes: ['Loterie ukazuje vklad.'] },
+    { date: '2026-10-29', changes: ['Prace, ktera trva dele: 2x vyplata', 'Druhy `bod`'] },
+  ]);
+  assert.deepEqual(B.readChangelog('nothing here'), []);
+});

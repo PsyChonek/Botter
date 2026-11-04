@@ -32,6 +32,7 @@ function selectTab(name, focus = false) {
   const key = tab.id.slice(4);
   watchHistory(key === 'progress');
   watchBoards(key === 'boards');
+  if (key === 'changes') loadChanges();
   if (location.hash.slice(1) !== key) history.replaceState(null, '', key === 'overview' ? location.pathname : `#${key}`);
 }
 
@@ -146,6 +147,137 @@ function renderReport() {
   $('auto').setAttribute('aria-pressed', String(auto));
   $('auto-state').textContent = t(auto ? 'on' : 'off');
   renderAccounts(report?.accounts ?? []);
+  renderShark();
+  renderUpdateWarn();
+}
+
+// ---------- loan shark ----------
+
+// The playing account's loan, worked out by the bot (BotterAuto.loanState) and
+// counted down here every second between reports.
+const clock = (ms) => {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const pad = (n) => String(n).padStart(2, '0');
+  const hours = Math.floor(total / 3600);
+  return hours ? `${hours}:${pad(Math.floor((total % 3600) / 60))}:${pad(total % 60)}` : `${Math.floor(total / 60)}:${pad(total % 60)}`;
+};
+const dateTime = (time) => new Date(time).toLocaleString(I18n.lang, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
+const KIND_KEYS = { level: 'kindLevel', cycle: 'kindCycle', clean: 'kindClean', other: 'kindOther' };
+
+function renderShark() {
+  const player = report?.player;
+  const loan = player?.loan;
+  $('shark-loan').hidden = !loan;
+  $('shark-none').hidden = !!loan;
+  if (!player) $('shark-none').textContent = t('sharkNoPlayer');
+  else if (!loan) {
+    $('shark-none').textContent = player.loanBlockedUntil
+      ? fill(t('sharkBlocked'), { when: dateTime(player.loanBlockedUntil) })
+      : fill(t('sharkNone'), { limit: number(player.loanLimit) });
+  } else {
+    $('shark-debt').textContent = number(loan.debt);
+    $('shark-debt-box').classList.toggle('execution', !!loan.execution);
+    $('shark-terms').textContent = fill(t('sharkTerms'), { principal: number(loan.principal), repaid: number(loan.repaid), hours: loan.hours });
+    renderSharkTick();
+    $('shark-exec').hidden = !loan.execution;
+    $('shark-exec').textContent = report.loanSettings?.autoBankrupt ? `${t('sharkExec')} ${fill(t('sharkExecBankrupt'), { xp: number(player.xpInto) })}` : t('sharkExec');
+    $('shark-kind').textContent = t(KIND_KEYS[loan.kind] ?? 'kindOther');
+  }
+  const set = report?.loanSettings;
+  $('shark-bot').hidden = !set;
+  if (set) {
+    const state = (on) => t(on ? 'on' : 'off');
+    $('shark-bot').textContent = fill(t('sharkBot'), {
+      level: state(set.levelLoan),
+      cycle: state(set.loanCycle),
+      bankrupt: state(set.autoBankrupt),
+      free: number(report.loanStats?.cycleFree ?? 0),
+    });
+  }
+}
+
+function renderSharkTick() {
+  const loan = report?.player?.loan;
+  if (!loan) return;
+  $('shark-tick').textContent =
+    loan.nextTickAt === null
+      ? fill(t('sharkCapped'), { cap: number(loan.cap) })
+      : fill(t(loan.hours === 0 ? 'sharkFree' : 'sharkTick'), { time: clock(loan.nextTickAt - Date.now()), debt: number(loan.nextDebt) });
+}
+setInterval(renderSharkTick, 1000);
+
+// ---------- casino changes ----------
+
+// A deploy that broke what the bot's models copy shows on every tab until a
+// Botter update matches it again.
+function renderUpdateWarn() {
+  const problems = report?.bundle?.problems ?? [];
+  $('update-warn').hidden = !problems.length;
+  $('changes-dot').hidden = !problems.length;
+  if (problems.length) $('update-text').textContent = fill(t('updateText'), { when: dateTime(report.bundle.at), n: problems.length });
+}
+
+let changes = null;
+
+function renderChanges() {
+  if (!changes || $('view-changes').hidden) return;
+  const problems = changes.bundle?.problems ?? [];
+  $('problems-card').hidden = !problems.length;
+  $('problems').replaceChildren(
+    ...problems.map((text) => {
+      const li = document.createElement('li');
+      li.textContent = text;
+      return li;
+    }),
+  );
+
+  // Entries newer than the changelog the previous deploy carried came with the latest one.
+  const entries = changes.bundle?.changes ?? [];
+  const before = changes.log[1]?.changelog ?? null;
+  $('changelog-empty').hidden = entries.length > 0;
+  $('changelog').replaceChildren(
+    ...entries.map((entry) => {
+      const block = document.createElement('article');
+      block.className = 'changelog-entry';
+      const head = document.createElement('h3');
+      head.textContent = new Date(`${entry.date}T12:00:00`).toLocaleDateString(I18n.lang, { day: 'numeric', month: 'long', year: 'numeric' });
+      if (before && entry.date > before) head.append(' ', badge(t('changelogNew'), true));
+      const list = document.createElement('ul');
+      list.append(
+        ...entry.changes.map((text) => {
+          const li = document.createElement('li');
+          li.textContent = text;
+          return li;
+        }),
+      );
+      block.append(head, list);
+      return block;
+    }),
+  );
+
+  $('deploys-empty').hidden = changes.log.length > 0;
+  $('deploys').hidden = !changes.log.length;
+  $('deploys').tBodies[0].replaceChildren(
+    ...changes.log.map((row) => {
+      const tr = document.createElement('tr');
+      const stale = row.problems?.length > 0;
+      const models = badge(stale ? fill(t('modelsStale'), { n: row.problems.length }) : t('modelsOk'), !stale);
+      if (stale) {
+        models.classList.add('bad');
+        models.title = row.problems.join('; ');
+      }
+      tr.append(cell(dateTime(row.at)), cell(row.name), cell(row.changelog ?? '-'), cell(models));
+      return tr;
+    }),
+  );
+}
+
+async function loadChanges() {
+  const res = await fetch('/api/changes').catch(() => null);
+  if (res?.status === 401) return location.assign('/login');
+  if (!res?.ok) return;
+  changes = await res.json();
+  renderChanges();
 }
 
 function renderAccounts(accounts) {
@@ -160,7 +292,8 @@ function renderAccounts(accounts) {
       row.append(name);
       // The saved snapshot of the account playing lags; its live figures are in the report.
       const live = account.current && report?.player ? report.player : account;
-      for (const value of [number(live.level), number(live.prestige), number(live.credits), live.energy ?? '-']) {
+      const debt = account.current && report?.player ? (report.player.loan?.debt ?? 0) : account.debt;
+      for (const value of [number(live.level), number(live.prestige), number(live.credits), live.energy ?? '-', debt ? number(debt) : debt === 0 ? '0' : '-']) {
         const cell = document.createElement('td');
         cell.className = 'num';
         cell.textContent = value;
@@ -747,6 +880,7 @@ function relabel() {
   renderActivity();
   renderProgress();
   renderBoards();
+  renderChanges();
 }
 
 // One language for everything: the server renders the panel in it too.

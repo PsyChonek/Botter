@@ -163,6 +163,11 @@ const API = {
   },
   'GET /api/history': () => history,
   'GET /api/leaderboards': () => leaderboards.get(),
+  // The casino deploys the bot has seen and the app's own changelog (trackBundle in content.js).
+  'GET /api/changes': () => {
+    const { bundle = null, bundleLog = [] } = store.get(['bundle', 'bundleLog']);
+    return { bundle, log: [...bundleLog].reverse() };
+  },
   'GET /api/storage': () => redactAll(store.get(null)),
   'POST /api/storage/set': ({ body }) => storageSet(body.items),
   'POST /api/storage/remove': ({ body }) => {

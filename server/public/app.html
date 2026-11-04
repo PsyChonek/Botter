@@ -44,10 +44,17 @@
     </button>
   </section>
 
+  <div id="update-warn" class="update-warn" role="alert" hidden>
+    <strong data-i18n="updateNeeded">Botter needs an update</strong>
+    <span id="update-text"></span>
+    <button type="button" class="link" data-goto="changes" data-i18n="updateShow">Show what changed</button>
+  </div>
+
   <nav class="tabs" role="tablist" data-i18n-label="sections">
     <button type="button" role="tab" id="tab-overview" aria-controls="view-overview" aria-selected="true" data-i18n="overview">Overview</button>
     <button type="button" role="tab" id="tab-progress" aria-controls="view-progress" aria-selected="false" tabindex="-1" data-i18n="progress">Progress</button>
     <button type="button" role="tab" id="tab-boards" aria-controls="view-boards" aria-selected="false" tabindex="-1" data-i18n="boards">Leaderboards</button>
+    <button type="button" role="tab" id="tab-changes" aria-controls="view-changes" aria-selected="false" tabindex="-1"><span data-i18n="changes">Changes</span><span id="changes-dot" class="tab-dot" hidden></span></button>
     <button type="button" role="tab" id="tab-settings" aria-controls="view-settings" aria-selected="false" tabindex="-1" data-i18n="settings">Settings</button>
     <button type="button" role="tab" id="tab-accounts" aria-controls="view-accounts" aria-selected="false" tabindex="-1" data-i18n="accounts">Accounts</button>
     <button type="button" role="tab" id="tab-activity" aria-controls="view-activity" aria-selected="false" tabindex="-1" data-i18n="activity">Activity</button>
@@ -60,6 +67,22 @@
         <p id="panel-empty" class="muted" data-i18n="panelNone"></p>
         <div id="panel"></div>
       </section>
+      <div class="stack">
+      <section class="card shark" id="shark" aria-labelledby="shark-heading">
+        <h2 id="shark-heading" data-i18n="shark">Loan shark</h2>
+        <p id="shark-none" class="muted"></p>
+        <div id="shark-loan" hidden>
+          <div id="shark-debt-box" class="debt">
+            <div class="muted small" data-i18n="sharkOwe">You owe</div>
+            <div id="shark-debt" class="debt-value"></div>
+            <div id="shark-terms" class="muted small"></div>
+          </div>
+          <p id="shark-tick" class="shark-line"></p>
+          <p id="shark-exec" class="shark-line neg" hidden></p>
+          <p id="shark-kind" class="shark-line"></p>
+        </div>
+        <p id="shark-bot" class="muted small"></p>
+      </section>
       <section class="card" aria-labelledby="recent-heading">
         <div class="card-head">
           <h2 id="recent-heading" data-i18n="recent">Recent activity</h2>
@@ -68,6 +91,7 @@
         <p class="muted empty-activity" data-i18n="activityEmpty"></p>
         <ol id="recent" class="log"></ol>
       </section>
+      </div>
     </div>
 
     <div role="tabpanel" id="view-progress" aria-labelledby="tab-progress" class="view progress" hidden>
@@ -133,6 +157,37 @@
       </section>
     </div>
 
+    <div role="tabpanel" id="view-changes" aria-labelledby="tab-changes" class="view changes" hidden>
+      <section class="card warn-card" id="problems-card" aria-labelledby="problems-heading" hidden>
+        <h2 id="problems-heading" data-i18n="problemsHeading">What the bot has to catch up on</h2>
+        <p class="muted small" data-i18n="problemsNote"></p>
+        <ul id="problems" class="problems"></ul>
+      </section>
+      <section class="card" aria-labelledby="changelog-heading">
+        <h2 id="changelog-heading" data-i18n="changelogHeading">What's new in the casino</h2>
+        <p id="changelog-empty" class="muted" data-i18n="changelogEmpty"></p>
+        <div id="changelog"></div>
+      </section>
+      <section class="card" aria-labelledby="deploys-heading">
+        <h2 id="deploys-heading" data-i18n="deploysHeading">Casino deploys</h2>
+        <p class="muted small" data-i18n="deploysNote"></p>
+        <p id="deploys-empty" class="muted" data-i18n="deploysEmpty"></p>
+        <div class="table-wrap">
+          <table id="deploys" hidden>
+            <thead>
+              <tr>
+                <th scope="col" data-i18n="seen">Seen</th>
+                <th scope="col" data-i18n="bundleName">Bundle</th>
+                <th scope="col" data-i18n="changelogDate">Changelog</th>
+                <th scope="col" data-i18n="models">Bot models</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
     <div role="tabpanel" id="view-settings" aria-labelledby="tab-settings" class="view" hidden>
       <iframe id="settings" class="settings" data-i18n-title="settings" title="Settings"></iframe>
     </div>
@@ -150,6 +205,7 @@
                 <th scope="col" class="num" data-i18n="prestige">Prestige</th>
                 <th scope="col" class="num" data-i18n="credits">Credits</th>
                 <th scope="col" class="num" data-i18n="energy">Energy</th>
+                <th scope="col" class="num" data-i18n="debt">Debt</th>
                 <th scope="col"><span class="visually-hidden" data-i18n="actions">Actions</span></th>
               </tr>
             </thead>

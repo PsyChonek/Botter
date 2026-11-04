@@ -310,6 +310,35 @@ td.action { text-align: right; white-space: nowrap; }
 .sprint-end { margin: 0 0 8px; font-weight: 600; }
 #board-hint { margin: -4px 0 8px; }
 
+/* ---------- loan shark ---------- */
+
+.stack { display: grid; gap: 20px; align-content: start; min-width: 0; }
+.debt { padding: 12px 14px; border-radius: 10px; background: var(--raised); border: 1px solid var(--border); margin-bottom: 10px; }
+.debt-value { font-size: 1.8rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.debt.execution { border-color: var(--neg); }
+.debt.execution .debt-value { color: var(--neg); }
+.shark-line { margin: 0 0 8px; }
+.shark-line.neg { color: var(--neg); font-weight: 600; }
+#shark-tick { font-variant-numeric: tabular-nums; }
+
+/* ---------- casino changes ---------- */
+
+.update-warn {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px;
+  max-width: 1232px; margin: 16px auto 0; padding: 12px 16px; border-radius: var(--radius);
+  border: 1px solid var(--neg); border-left-width: 6px; background: var(--card); color: var(--fg);
+}
+.update-warn strong { color: var(--neg); }
+.tab-dot { display: inline-block; width: 8px; height: 8px; margin-left: 6px; border-radius: 50%; background: var(--neg); vertical-align: middle; }
+.warn-card { border-color: var(--neg); }
+.problems { margin: 0; padding-left: 20px; }
+.problems li { margin: 4px 0; font-family: ui-monospace, monospace; font-size: 0.85rem; }
+.changelog-entry + .changelog-entry { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; }
+.changelog-entry h3 { margin: 0 0 6px; font-size: 1rem; }
+.changelog-entry ul { margin: 0; padding-left: 20px; }
+.changelog-entry li { margin: 4px 0; }
+.badge.bad { background: var(--neg); color: #fff; }
+
 /* ---------- activity ---------- */
 
 .check { display: inline-flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--muted); }
@@ -349,7 +378,7 @@ td.action { text-align: right; white-space: nowrap; }
 
 @media (max-width: 1280px) {
   .hero { margin: 20px 24px 0; }
-  .tabs { margin: 16px 24px 0; }
+  .tabs, .update-warn { margin: 16px 24px 0; }
 }
 
 @media (max-width: 980px) {
@@ -363,7 +392,7 @@ td.action { text-align: right; white-space: nowrap; }
   .hero { grid-template-columns: minmax(0, 1fr); margin: 16px 16px 0; padding: 16px; }
   .stats { grid-row: auto; flex-wrap: wrap; gap: 16px 24px; }
   .auto { width: 100%; grid-auto-flow: column; justify-content: center; gap: 10px; }
-  .tabs { margin: 12px 16px 0; }
+  .tabs, .update-warn { margin: 12px 16px 0; }
   main { padding: 16px 16px 32px; }
   .card { padding: 16px; }
   .conn #conn-text { display: none; }

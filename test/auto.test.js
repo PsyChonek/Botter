@@ -1252,3 +1252,20 @@ test('prestigeDay records the day the prestige count goes up', () => {
   assert.equal(A.prestigeDay({}, 3, '2026-11-01'), undefined);
   assert.equal(A.prestigeDay(undefined, 0, '2026-11-01'), undefined);
 });
+
+test('loanState works the debt out like the casino loan screen', () => {
+  const H = A.LOAN_HOUR_MS;
+  const loan = { principal: 10_000, repaid: 1_000, rate: 0.08, takenAt: 1_000_000 };
+  const fresh = A.loanState(loan, loan.takenAt + 30 * 60_000);
+  assert.deepEqual(fresh, { hours: 0, debt: 9_000, cap: 25_000, capped: false, execution: false, nextTickAt: loan.takenAt + H, nextDebt: 9_800 });
+  const later = A.loanState(loan, loan.takenAt + 2 * H + 5);
+  assert.equal(later.hours, 2);
+  assert.equal(later.debt, Math.round(10_000 * 1.08 ** 2) - 1_000);
+  const capped = A.loanState(loan, loan.takenAt + 13 * H);
+  assert.equal(capped.debt, 24_000);
+  assert.equal(capped.execution, true);
+  assert.equal(capped.nextTickAt, null);
+  assert.equal(capped.nextDebt, null);
+  assert.equal(A.loanState(null), null);
+  assert.equal(A.loanState({ principal: 500, repaid: 0 }), null);
+});

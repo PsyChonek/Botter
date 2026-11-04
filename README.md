@@ -108,15 +108,19 @@ straight to `/api/work/start` and `/api/work/submit`, games always go through th
 and the Supabase session is refreshed by the server.
 
 The dashboard on port 8080 has an account strip (account, status, level, credits,
-energy, Auto) and six tabs. **Overview** holds the panel `content.js` builds (Work and
+energy, Auto) and seven tabs. **Overview** holds the panel `content.js` builds (Work and
 Games, auto switches, Profit, XP per game, upgrade queue, More), rendered on the server in
-a small DOM and mirrored live with every click sent back, next to the latest activity.
+a small DOM and mirrored live with every click sent back, next to the loan shark card (debt,
+principal, repaid, a countdown to the next interest tick and the debt after it, execution,
+and why the bot took the loan) and the latest activity.
 **Progress** charts the level and credits of every account over time. **Leaderboards**
 shows the casino's six boards (sprint with its countdown and last podium, level, net
 worth, biggest win, losers, debtors), fetched with the bot's session and cached for a
-minute, with every saved account highlighted.
+minute, with every saved account highlighted. **Changes** lists the casino's own changelog,
+every casino deploy the bot has seen and whether its models still match it; a deploy that
+breaks a model puts a "Botter needs an update" banner over every tab.
 **Settings** is the extension's own settings page with every tab, on the same storage.
-**Accounts** lists the saved logins with a switch, a GitHub sign-in and an e-mail sign-in, and **Activity**
+**Accounts** lists the saved logins with their debt, a switch, a GitHub sign-in and an e-mail sign-in, and **Activity**
 is the full log. One language switch covers all of it, the panel included.
 
 ```sh

@@ -145,6 +145,25 @@
     };
   }
 
+  // The app's own changelog ("Co je nového"): [{ date, changes: [text] }],
+  // newest first, at most `limit` entries. Read from the raw bundle, so the
+  // texts keep their own numbers.
+  function readChangelog(text, limit = 12) {
+    const out = [];
+    for (const m of text.matchAll(/\{date:`(\d{4}-\d{2}-\d{2})`,changes:\[/g)) {
+      const changes = [];
+      const item = /`((?:[^`\\]|\\.)*)`(,?)/y;
+      item.lastIndex = m.index + m[0].length;
+      let hit;
+      while ((hit = item.exec(text))) {
+        changes.push(hit[1].replace(/\\(.)/g, '$1'));
+        if (!hit[2]) break;
+      }
+      if (changes.length) out.push({ date: m[1], changes });
+    }
+    return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)).slice(0, limit);
+  }
+
   const OUTSIDE_GAMES = ['crash', 'lottery'];
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -197,7 +216,7 @@
   // script tag or the URL itself.
   const bundleName = (src) => /\/assets\/(index-[\w-]+\.js)/.exec(src ?? '')?.[1] ?? null;
 
-  const api = { NEEDLES, canon, readFacts, check, bundleName };
+  const api = { NEEDLES, canon, readFacts, readChangelog, check, bundleName };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BotterBundle = api;
 })(globalThis);

@@ -243,6 +243,7 @@
   let unsavedHotfix = 0;
   let capture = []; // raw responses of rarely seen endpoints, for debugging
   let bundle = null; // the casino app bundle last checked (trackBundle)
+  let bundleLog = []; // every casino deploy seen, oldest first (trackBundle)
   let unsavedSpins = 0;
   let grindPausedUntil = 0;
   let grindError = null; // why the last grinding round failed, shown while paused
@@ -298,6 +299,7 @@
     hotfixRounds = stored.hotfixRounds ?? [];
     capture = stored.capture ?? [];
     bundle = stored.bundle ?? null;
+    bundleLog = stored.bundleLog ?? [];
     settings = { ...DEFAULT_SETTINGS, ...stored.settings };
     bank = stored.bank ?? {};
     statsCache = byPrefix(stored, STATS_PREFIX);
@@ -330,6 +332,7 @@
     if (changes.hotfixRounds) hotfixRounds = changes.hotfixRounds.newValue ?? [];
     if (changes.capture) capture = changes.capture.newValue ?? [];
     if (changes.bundle) bundle = changes.bundle.newValue ?? null;
+    if (changes.bundleLog) bundleLog = changes.bundleLog.newValue ?? [];
     if (changes.rounds) rounds = changes.rounds.newValue ?? {};
     if (changes.netReset) {
       net = emptyNet();
@@ -1012,6 +1015,8 @@
       prestigeDay: A.prestigeDay(saved, player.prestige, A.dayKey()),
       credits: player.credits,
       work: player.work,
+      loan: player.loan ?? null,
+      loanBlockedUntil: player.loanBlockedUntil ?? null,
       wheelNextAt: player.wheelNextAt,
       upgrades: player.upgrades,
       grindHeldLevel: grindHeldLevel === player.level ? grindHeldLevel : null,
@@ -3212,8 +3217,19 @@
 
   // What the Docker runner's dashboard shows: the status line, the current
   // account and every saved one, and the counters the panel shows.
+  // Why the open loan was taken: by the level loan, the bankruptcy cycle or
+  // the clean-loan trick, or 'other' for one the bot did not take.
+  function loanKind() {
+    if (!player?.loan) return null;
+    if (stats.flags.levelLoan) return 'level';
+    if (stats.flags.cycleLoan) return 'cycle';
+    if (stats.flags.cleanTaken && !stats.flags.cleanDone) return 'clean';
+    return 'other';
+  }
+
   function report() {
     const sum = (s) => ({ correct: s.correct, total: s.correct + s.wrong });
+    const now = Date.now();
     return {
       status: msg(status.key, status.subs),
       settings: { autoMode: settings.autoMode, enabled: settings.enabled, gamesEnabled: settings.gamesEnabled, aiSolver: settings.aiSolver },
@@ -3225,7 +3241,13 @@
         credits: player.credits,
         energy: G.energyNow(player.work, Date.now()),
         maxEnergy: player.work?.maxEnergy ?? 20,
+        loan: player.loan ? { principal: player.loan.principal, repaid: player.loan.repaid ?? 0, takenAt: player.loan.takenAt, ...A.loanState(player.loan, now), kind: loanKind() } : null,
+        loanLimit: player.loanLimit ?? null,
+        loanBlockedUntil: player.loanBlockedUntil > now ? player.loanBlockedUntil : null,
+        xpInto: player.xpInto ?? 0,
       },
+      loanSettings: { levelLoan: settings.levelLoan, loanCycle: settings.loanCycle, autoBankrupt: settings.autoBankrupt, loanTrick: settings.loanTrick },
+      loanStats: { cycleFree: stats.free.loan ?? 0, cleanDone: !!stats.flags.cleanDone },
       accounts: Object.entries(accounts).map(([id, saved]) => ({
         id,
         login: saved.login ?? id,
@@ -3233,6 +3255,9 @@
         prestige: saved.prestige ?? null,
         credits: saved.credits ?? null,
         energy: saved.work ? G.energyNow(saved.work, Date.now()) : null,
+        debt: saved.loan ? (A.loanState(saved.loan, now)?.debt ?? saved.loan.debt ?? null) : saved.loan === null ? 0 : null,
+        execution: !!saved.loan && !!A.loanState(saved.loan, now)?.execution,
+        loanBlockedUntil: saved.loanBlockedUntil > now ? saved.loanBlockedUntil : null,
         session: !!saved.session,
         brokenUntil: saved.brokenUntil ?? null,
         current: id === accountId,
@@ -3241,7 +3266,7 @@
       answers: { bank: sum(stats.bank), ai: sum(stats[settings.aiSolver] ?? stats.local), guess: sum(stats.guess) },
       work: stats.work,
       gamesNet: G.totalNet(stats.games),
-      bundle: bundle && { name: bundle.name, problems: bundle.problems ?? [] },
+      bundle: bundle && { name: bundle.name, at: bundle.at, from: bundle.from, changelog: bundle.changelog, problems: bundle.problems ?? [] },
     };
   }
 
@@ -3255,23 +3280,30 @@
   // account: { name, at, from, changelog, problems }, from being the name it
   // replaced.
   const BUNDLE_NEWS_MS = 24 * 3600_000;
+  const BUNDLE_LOG_MAX = 50;
   async function trackBundle() {
     const src = document.querySelector('script[src*="/assets/index-"]')?.src;
     const name = B.bundleName(src);
     const recheck = name === bundle?.name;
-    if (!name || (recheck && !bundle.problems?.length)) return;
+    if (!name || (recheck && !bundle.problems?.length && bundle.changes)) return;
     let result;
+    let changes;
     try {
       const res = await fetch(src);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      result = B.check(await res.text(), G, O);
+      const text = await res.text();
+      result = B.check(text, G, O);
+      changes = B.readChangelog(text);
     } catch (err) {
       log.warn('bundle_check_failed', { name, error: String(err) });
       return;
     }
     const from = recheck ? bundle.from : bundle?.name ?? null;
-    bundle = { name, at: recheck ? bundle.at : Date.now(), from, changelog: result.facts.changelog, problems: result.problems };
-    chrome.storage.local.set({ bundle });
+    bundle = { name, at: recheck ? bundle.at : Date.now(), from, changelog: result.facts.changelog, problems: result.problems, changes };
+    // The log has one row per deploy; a recheck updates its row once the models catch up.
+    const row = { name, at: bundle.at, from, changelog: bundle.changelog, problems: result.problems, checkedAt: Date.now() };
+    bundleLog = [...bundleLog.filter((entry) => entry.name !== name), row].slice(-BUNDLE_LOG_MAX);
+    chrome.storage.local.set({ bundle, bundleLog });
     const fields = { name, from, changelog: bundle.changelog, problems: result.problems };
     if (result.problems.length) log.warn('bundle_models_stale', fields);
     else log.info(from ? 'bundle_changed' : 'bundle_seen', fields);

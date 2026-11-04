@@ -164,6 +164,33 @@
   // partial repayment does not lower it, only a full one closes the loan.
   const LOAN_RATE = 0.08;
   const LOAN_HOUR_MS = 60 * 60 * 1000;
+  // The debt stops growing at this multiple of the principal (about 12 hours
+  // in), and execution starts.
+  const LOAN_CAP = 2.5;
+
+  // The loan as the casino's loan screen works it out: full hours since it was
+  // taken, the debt (compounded, capped, less what was repaid), whether it is
+  // capped, and when the next interest tick lands and what the debt is then
+  // (null once capped).
+  function loanState(loan, now = Date.now()) {
+    if (!loan || !(loan.principal > 0) || !(loan.takenAt > 0)) return null;
+    const rate = loan.rate ?? LOAN_RATE;
+    const repaid = loan.repaid ?? 0;
+    const cap = Math.floor(loan.principal * LOAN_CAP);
+    const gross = (hours) => Math.min(Math.round(loan.principal * (1 + rate) ** hours), cap);
+    const hours = Math.max(0, Math.floor((now - loan.takenAt) / LOAN_HOUR_MS));
+    const capped = gross(hours) >= cap;
+    return {
+      hours,
+      debt: Math.max(0, gross(hours) - repaid),
+      cap,
+      capped,
+      execution: capped || loan.execution === true,
+      nextTickAt: capped ? null : loan.takenAt + (hours + 1) * LOAN_HOUR_MS,
+      nextDebt: capped ? null : Math.max(0, gross(hours + 1) - repaid),
+    };
+  }
+
   // A level loan is repaid in full once it is this old and the credits cover
   // it, then taken again if it still pays, so each loan starts a new free hour
   // and none reaches its first interest tick while the grind keeps up.
@@ -1313,6 +1340,8 @@
     loanAmount,
     loanCycle,
     LOAN_HOUR_MS,
+    LOAN_CAP,
+    loanState,
     LOAN_RENEW_MS,
     loanRenewDue,
     levelLoanRepay,
