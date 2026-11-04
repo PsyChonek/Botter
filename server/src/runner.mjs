@@ -366,6 +366,22 @@ export class Runner extends EventEmitter {
     return null;
   }
 
+  // A GET on the casino API as whoever the page is logged in as. Null when
+  // no one is or the call fails.
+  async casinoGet(path) {
+    let token;
+    try {
+      token = JSON.parse(this.readSession()?.raw ?? 'null')?.access_token;
+    } catch {}
+    if (!token) return null;
+    const res = await fetch(new URL(path, this.casinoUrl), { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) {
+      log.warn('casino_get_failed', { path, status: res.status });
+      return null;
+    }
+    return res.json();
+  }
+
   storageKey() {
     return `sb-${new URL(this.supabaseUrl).hostname.split('.')[0]}-auth-token`;
   }

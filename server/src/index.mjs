@@ -6,6 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createAuth, readCookie, COOKIE_NAME } from './auth.mjs';
 import { History, SAMPLE_EVERY_MS } from './history.mjs';
+import { Leaderboards } from './leaderboards.mjs';
 import { log } from './log.mjs';
 import { Runner } from './runner.mjs';
 import { Store } from './store.mjs';
@@ -30,6 +31,10 @@ const runner = new Runner({
   supabaseKey: env.SUPABASE_KEY || 'sb_publishable_582CKqAOfQSOLdNhjZ-cOg_4-Rbq4tr',
   locale: store.get('serverLocale').serverLocale || env.BOT_LOCALE || 'cs',
 });
+const leaderboards = new Leaderboards({
+  fetchBoard: (by) => runner.casinoGet(`/api/leaderboard?by=${by}`),
+  ownIds: () => new Set(runner.accounts().map(([id]) => id)),
+});
 const LOCALES = ['cs', 'en'];
 
 const PUBLIC = {
@@ -52,7 +57,7 @@ const SESSION_MARK = '[kept on the server]';
 
 const HEADERS = {
   'Content-Security-Policy':
-    "default-src 'self'; img-src 'self' data:; connect-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+    "default-src 'self'; img-src 'self' data: https://avatars.githubusercontent.com; connect-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
   'Cache-Control': 'no-store',
@@ -157,6 +162,7 @@ const API = {
     return runner.switchTo(body.id) ? { ok: true } : [409, { error: 'no_session' }];
   },
   'GET /api/history': () => history,
+  'GET /api/leaderboards': () => leaderboards.get(),
   'GET /api/storage': () => redactAll(store.get(null)),
   'POST /api/storage/set': ({ body }) => storageSet(body.items),
   'POST /api/storage/remove': ({ body }) => {

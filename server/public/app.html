@@ -47,6 +47,7 @@
   <nav class="tabs" role="tablist" data-i18n-label="sections">
     <button type="button" role="tab" id="tab-overview" aria-controls="view-overview" aria-selected="true" data-i18n="overview">Overview</button>
     <button type="button" role="tab" id="tab-progress" aria-controls="view-progress" aria-selected="false" tabindex="-1" data-i18n="progress">Progress</button>
+    <button type="button" role="tab" id="tab-boards" aria-controls="view-boards" aria-selected="false" tabindex="-1" data-i18n="boards">Leaderboards</button>
     <button type="button" role="tab" id="tab-settings" aria-controls="view-settings" aria-selected="false" tabindex="-1" data-i18n="settings">Settings</button>
     <button type="button" role="tab" id="tab-accounts" aria-controls="view-accounts" aria-selected="false" tabindex="-1" data-i18n="accounts">Accounts</button>
     <button type="button" role="tab" id="tab-activity" aria-controls="view-activity" aria-selected="false" tabindex="-1" data-i18n="activity">Activity</button>
@@ -86,6 +87,49 @@
         <h2 id="level-heading" data-i18n="levelChart">Level</h2>
         <div id="chart-level" class="chart" tabindex="0" role="img" data-i18n-label="levelChart"></div>
         <div class="table-wrap"><table id="table-level" class="chart-table"></table></div>
+      </section>
+    </div>
+
+    <div role="tabpanel" id="view-boards" aria-labelledby="tab-boards" class="view boards" hidden>
+      <div class="range" role="group" id="board-pick" data-i18n-label="boards"></div>
+      <p id="boards-empty" class="muted" data-i18n="boardsEmpty"></p>
+      <section class="card" id="board-card" aria-labelledby="board-heading" hidden>
+        <div class="card-head">
+          <h2 id="board-heading"></h2>
+          <span id="board-updated" class="muted small"></span>
+        </div>
+        <p id="board-hint" class="muted small"></p>
+        <p id="board-sprint" class="sprint-end" hidden></p>
+        <p id="board-none" class="muted" data-i18n="boardNone" hidden></p>
+        <div class="table-wrap">
+          <table id="board" class="board">
+            <thead>
+              <tr>
+                <th scope="col" class="num" data-i18n="rank">#</th>
+                <th scope="col" data-i18n="player">Player</th>
+                <th scope="col" class="num" data-i18n="level">Level</th>
+                <th scope="col" class="num" id="board-value"></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="card" id="last-sprint" aria-labelledby="last-sprint-heading" hidden>
+        <h2 id="last-sprint-heading"></h2>
+        <div class="table-wrap">
+          <table class="board">
+            <thead>
+              <tr>
+                <th scope="col" class="num" data-i18n="rank">#</th>
+                <th scope="col" data-i18n="player">Player</th>
+                <th scope="col" class="num" data-i18n="boardValueSprint">Story points</th>
+                <th scope="col" class="num" data-i18n="reward">Reward</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </section>
     </div>
 

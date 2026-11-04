@@ -31,6 +31,7 @@ function selectTab(name, focus = false) {
   if (focus) tab.focus();
   const key = tab.id.slice(4);
   watchHistory(key === 'progress');
+  watchBoards(key === 'boards');
   if (location.hash.slice(1) !== key) history.replaceState(null, '', key === 'overview' ? location.pathname : `#${key}`);
 }
 
@@ -453,6 +454,152 @@ new ResizeObserver(([entry]) => {
   renderProgress();
 }).observe($('view-progress'));
 
+// ---------- leaderboards ----------
+
+// The casino's six boards from /api/leaderboards, one shown at a time. Rows of
+// the saved accounts are highlighted, the one logged in most.
+const BOARDS_EVERY_MS = 60_000;
+const BOARD_KEYS = { sprint: 'Sprint', level: 'Level', credits: 'Credits', biggest: 'Biggest', losers: 'Losers', debtors: 'Debtors' };
+let boards = null;
+let boardShown = 'sprint';
+let boardsTimer = null;
+
+const fill = (text, values) => text.replace(/\{(\w+)\}/g, (match, key) => values[key] ?? match);
+
+function duration(ms) {
+  const minutes = Math.max(0, Math.floor(ms / 60_000));
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (days) return `${days} ${t('days')} ${hours % 24} ${t('hours')}`;
+  if (hours) return `${hours} ${t('hours')} ${minutes % 60} ${t('minutes')}`;
+  return `${minutes} ${t('minutes')}`;
+}
+
+function cell(content, cls = '') {
+  const td = document.createElement('td');
+  if (cls) td.className = cls;
+  td.append(content);
+  return td;
+}
+
+function playerCell(entry) {
+  const box = document.createElement('div');
+  box.className = 'player';
+  if (entry.avatar) {
+    const img = document.createElement('img');
+    img.src = entry.avatar;
+    img.alt = '';
+    img.width = 28;
+    img.height = 28;
+    img.loading = 'lazy';
+    img.referrerPolicy = 'no-referrer';
+    box.append(img);
+  } else {
+    const blank = document.createElement('span');
+    blank.className = 'avatar';
+    blank.setAttribute('aria-hidden', 'true');
+    blank.textContent = entry.login.slice(0, 1).toUpperCase();
+    box.append(blank);
+  }
+  const text = document.createElement('div');
+  const name = document.createElement('strong');
+  name.textContent = entry.login;
+  text.append(name);
+  if (entry.me) text.append(' ', badge(t('you'), true));
+  else if (entry.own) text.append(' ', badge(t('ours')));
+  if (entry.insolvent) text.append(' ', badge(t('insolvent')));
+  else if (entry.debtor) text.append(' ', badge(t('debtor')));
+  if (entry.title) {
+    const title = document.createElement('div');
+    title.className = 'muted small';
+    title.textContent = entry.prestige ? `${entry.title}, ${t('prestige').toLowerCase()} ${entry.prestige}` : entry.title;
+    text.append(title);
+  }
+  box.append(text);
+  return box;
+}
+
+function renderBoards() {
+  if (!boards || $('view-boards').hidden) return;
+  const list = boards.boards;
+  $('boards-empty').hidden = list.length > 0;
+  $('board-card').hidden = !list.length;
+  if (!list.length) {
+    $('last-sprint').hidden = true;
+    $('board-pick').replaceChildren();
+    return;
+  }
+  if (!list.some((board) => board.by === boardShown)) boardShown = list[0].by;
+  $('board-pick').replaceChildren(
+    ...list.map((board) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = t(`board${BOARD_KEYS[board.by]}`);
+      button.setAttribute('aria-pressed', String(board.by === boardShown));
+      button.addEventListener('click', () => {
+        boardShown = board.by;
+        renderBoards();
+      });
+      return button;
+    }),
+  );
+
+  const board = list.find((item) => item.by === boardShown);
+  const key = BOARD_KEYS[board.by];
+  $('board-heading').textContent = t(`board${key}`);
+  $('board-hint').textContent = t(`hint${key}`);
+  $('board-value').textContent = t(`boardValue${key}`);
+  $('board-updated').textContent = boards.at ? `${t('updated')} ${new Date(boards.at).toLocaleTimeString(I18n.lang, { hour: '2-digit', minute: '2-digit' })}` : '';
+  $('board-none').hidden = board.entries.length > 0;
+  $('board').hidden = !board.entries.length;
+  const negative = board.by === 'losers' || board.by === 'debtors';
+  $('board').tBodies[0].replaceChildren(
+    ...board.entries.map((entry) => {
+      const row = document.createElement('tr');
+      if (entry.own) row.className = entry.me ? 'own me' : 'own';
+      const value = entry.value === null ? '-' : negative && entry.value ? `-${number(entry.value)}` : number(entry.value);
+      row.append(cell(String(entry.rank ?? '-'), entry.rank && entry.rank <= 3 ? `num podium p${entry.rank}` : 'num'), cell(playerCell(entry)), cell(number(entry.level), 'num'), cell(value, 'num'));
+      return row;
+    }),
+  );
+
+  const sprint = board.by === 'sprint' ? board.sprint : null;
+  $('board-sprint').hidden = !sprint?.endAt;
+  if (sprint?.endAt) {
+    const left = sprint.endAt - Date.now();
+    $('board-sprint').textContent = fill(t(left > 0 ? 'sprintEnds' : 'sprintEnded'), { n: sprint.number ?? '', time: duration(left) });
+  }
+  const last = sprint?.last;
+  $('last-sprint').hidden = !last?.results.length;
+  if (last?.results.length) {
+    $('last-sprint-heading').textContent = fill(t('lastSprint'), { n: last.number ?? '' });
+    $('last-sprint').querySelector('tbody').replaceChildren(
+      ...last.results.map((result) => {
+        const row = document.createElement('tr');
+        row.append(cell(String(result.place ?? '-'), `num podium p${result.place}`), cell(result.login), cell(number(result.score), 'num'), cell(number(result.reward), 'num pos'));
+        return row;
+      }),
+    );
+  }
+}
+
+async function loadBoards() {
+  const res = await fetch('/api/leaderboards').catch(() => null);
+  if (res?.status === 401) return location.assign('/login');
+  if (!res?.ok) return;
+  boards = await res.json();
+  renderBoards();
+}
+
+// Fetched while the tab is open; the server caches the boards for a minute.
+function watchBoards(open) {
+  clearInterval(boardsTimer);
+  boardsTimer = null;
+  if (!open) return;
+  loadBoards();
+  boardsTimer = setInterval(loadBoards, BOARDS_EVERY_MS);
+}
+
 // ---------- activity ----------
 
 function logItem(item) {
@@ -599,6 +746,7 @@ function relabel() {
   renderReport();
   renderActivity();
   renderProgress();
+  renderBoards();
 }
 
 // One language for everything: the server renders the panel in it too.

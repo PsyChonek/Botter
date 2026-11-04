@@ -291,6 +291,25 @@ td.action { text-align: right; white-space: nowrap; }
 .chart-table .pos { color: var(--pos); }
 .chart-table .neg { color: var(--neg); }
 
+/* ---------- leaderboards ---------- */
+
+.boards .range, .boards > p { margin: 0; }
+.board td { vertical-align: middle; }
+.board td.num:first-child, .board th.num:first-child { width: 2.5em; padding-right: 16px; }
+.board .podium { font-weight: 700; }
+.board .podium.p1 { color: var(--warn); }
+.board .podium.p2 { color: var(--muted); }
+.board .podium.p3 { color: var(--fg); }
+.board tr.own td { background: var(--raised); }
+.board tr.me td { font-weight: 600; }
+.board tr.own td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.board .pos { color: var(--pos); }
+.player { display: flex; align-items: center; gap: 10px; }
+.player img, .player .avatar { flex: none; width: 28px; height: 28px; border-radius: 50%; }
+.player .avatar { display: grid; place-items: center; background: var(--track); color: var(--fg); font-size: 0.8rem; font-weight: 700; }
+.sprint-end { margin: 0 0 8px; font-weight: 600; }
+#board-hint { margin: -4px 0 8px; }
+
 /* ---------- activity ---------- */
 
 .check { display: inline-flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--muted); }
