@@ -568,15 +568,13 @@ td.action { text-align: right; white-space: nowrap; }
 
 :root { --ease-out: cubic-bezier(0.22, 1, 0.36, 1); --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); }
 
-button, select, input, .card, .acct, .play-col, [role='tab'] {
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.25s ease, transform 0.2s var(--ease-out), opacity 0.2s ease;
+button, select, input, .acct, [role='tab'] {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.25s ease, transform 0.2s var(--ease-out);
 }
 button:active:not(:disabled) { transform: scale(0.97); }
 .acct:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); }
 .acct[aria-pressed='true'] { box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent); }
 .bar > span, .meter span { transition: width 0.8s var(--ease-out); }
-.auto[aria-pressed='true'] { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); animation: auto-glow 2.4s ease-in-out infinite; }
-@keyframes auto-glow { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 0%, transparent); } }
 
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pos); position: relative; display: inline-block; }
 .live-dot::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--pos); animation: ping 1.8s var(--ease-out) infinite; }
@@ -611,8 +609,6 @@ button:active:not(:disabled) { transform: scale(0.97); }
 .play-money .net { display: inline-block; }
 .strip i.pop { animation: pop 0.5s var(--ease-spring); }
 @keyframes pop { from { transform: scale(0); } to { transform: none; } }
-.acct .v.bump { animation: bump 0.5s var(--ease-out); }
-@keyframes bump { 40% { color: var(--accent); } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

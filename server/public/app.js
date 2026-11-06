@@ -100,8 +100,36 @@ function showPanel(html) {
   if (html === panelHtml) return;
   panelHtml = html;
   $('panel-empty').hidden = !!html;
-  panelRoot.innerHTML = `${html}<style>${PANEL_OVERRIDES}</style>`;
+  const next = document.createElement('div');
+  next.innerHTML = `${html}<style>${PANEL_OVERRIDES}</style>`;
+  morph(panelRoot, next);
   $('auto').disabled = !panelRoot.querySelector('.auto-toggle');
+}
+
+// Brings target's children in line with source's, touching only what
+// differs, so a panel update changes a few text nodes instead of rebuilding
+// every element (and restyling the page) several times a second.
+function morph(target, source) {
+  const before = [...target.childNodes];
+  const after = [...source.childNodes];
+  after.forEach((to, i) => {
+    const from = before[i];
+    if (!from) target.append(to);
+    else if (from.nodeType !== to.nodeType || from.nodeName !== to.nodeName) from.replaceWith(to);
+    else if (from.nodeType !== Node.ELEMENT_NODE) {
+      if (from.nodeValue !== to.nodeValue) from.nodeValue = to.nodeValue;
+    } else {
+      for (const { name } of [...from.attributes]) if (!to.hasAttribute(name)) from.removeAttribute(name);
+      for (const { name, value } of [...to.attributes]) if (from.getAttribute(name) !== value) from.setAttribute(name, value);
+      morph(from, to);
+      // A select shows the option the server marked, unless it is being used.
+      if (from.nodeName === 'SELECT' && from !== document.activeElement) {
+        const picked = [...to.options].findIndex((option) => option.hasAttribute('selected'));
+        if (picked >= 0 && from.selectedIndex !== picked) from.selectedIndex = picked;
+      }
+    }
+  });
+  for (const extra of before.slice(after.length)) extra.remove();
 }
 
 function pathOf(element) {
@@ -807,9 +835,7 @@ function tween(node, value, format = number) {
     node.textContent = format(value);
     return;
   }
-  node.classList.remove('bump');
-  void node.offsetWidth;
-  node.classList.add('bump');
+  node.animate([{ color: 'var(--accent)' }, {}], { duration: 600, easing: 'ease-out' });
   const start = performance.now();
   const step = (now) => {
     if (node.dataset.value !== String(value)) return;
@@ -878,8 +904,10 @@ function updateCard(card, tab) {
   card.badge.hidden = !player?.prestige;
   card.badge.textContent = t('prestigeCount', [String(player?.prestige ?? 0)]);
   card.shown.hidden = !tab.focused;
-  card.status.textContent = tab.status ?? '-';
-  card.status.title = tab.status ?? '';
+  if (card.status.title !== (tab.status ?? '')) {
+    card.status.textContent = tab.status ?? '-';
+    card.status.title = tab.status ?? '';
+  }
   card.stats.hidden = card.goal.hidden = !player;
   if (!player) return;
   tween(card.level.value, player.level);
@@ -905,12 +933,13 @@ function renderTabs(list) {
     card.li.remove();
     cards.delete(id);
   }
-  for (const tab of list) {
+  list.forEach((tab, i) => {
     let card = cards.get(tab.id);
     if (!card) cards.set(tab.id, (card = buildCard(tab)));
     updateCard(card, tab);
-    $('hero-accounts').append(card.li);
-  }
+    // Moving a node restarts its entrance animation: only when out of place.
+    if ($('hero-accounts').children[i] !== card.li) $('hero-accounts').insertBefore(card.li, $('hero-accounts').children[i] ?? null);
+  });
 }
 
 // ---------- live play ----------
