@@ -1299,3 +1299,15 @@ test('loanState works the debt out like the casino loan screen', () => {
   assert.equal(A.loanState(null), null);
   assert.equal(A.loanState({ principal: 500, repaid: 0 }), null);
 });
+
+test('bumpLevel makes the auto bet size riskier by whole levels, within the limits', () => {
+  const levels = [20, 40, 100, 200, 400, 1000];
+  // Live 2026-11-06: 139,221 credits / 185 swings caps roulette at 752, so 400; one level up is 1,000.
+  assert.equal(A.bumpLevel(levels, 752, 0), 400);
+  assert.equal(A.bumpLevel(levels, 752, 1), 1000);
+  assert.equal(A.bumpLevel(levels, 752, 3), 1000, 'never past the biggest level allowed');
+  assert.equal(A.bumpLevel(levels, 5, 1), 40, 'from the smallest level when none fits');
+  const plan = A.autoGrindPlan(['roulette'], 400, 20, { roulette: 1 }, { roulette: 0.027 }, { roulette: 752 }, levels, 1);
+  assert.deepEqual(plan, { game: 'roulette', bet: 400 }, 'the limits (bet 400) still cap the bump');
+  assert.deepEqual(A.autoGrindPlan(['roulette'], 1000, 20, { roulette: 1 }, { roulette: 0.027 }, { roulette: 752 }, levels, 1), { game: 'roulette', bet: 1000 });
+});

@@ -350,13 +350,22 @@
 
   // grindPlan for the auto bet size: only games whose cap fits the smallest
   // level, played at the biggest level under both the cap and the bet the
-  // limits allow. A game that swings too hard for the credits gives way to the
-  // next cheapest one.
-  function autoGrindPlan(games, bet, level, unlocks, edges, caps, levels) {
+  // limits allow, then bump levels higher (the riskier setting autoBetBump),
+  // never past what the limits allow. A game that swings too hard for the
+  // credits gives way to the next cheapest one.
+  function autoGrindPlan(games, bet, level, unlocks, edges, caps, levels, bump = 0) {
     const fits = games.filter((game) => caps[game] >= levels[0]);
     const plan = grindPlan(fits, bet, level, unlocks, edges);
     if (!plan) return null;
-    return { game: plan.game, bet: levels.filter((step) => step <= Math.min(bet, caps[plan.game])).at(-1) };
+    return { game: plan.game, bet: bumpLevel(levels.filter((step) => step <= bet), caps[plan.game], bump) };
+  }
+
+  // The biggest of levels (ascending) at most cap, moved bump levels up within
+  // them: the auto bet size made that much riskier. The smallest level when
+  // none fits the cap.
+  function bumpLevel(levels, cap, bump = 0) {
+    const fit = levels.filter((step) => step <= cap).length - 1;
+    return levels[Math.min(levels.length - 1, Math.max(0, fit) + Math.max(0, Math.trunc(bump) || 0))];
   }
 
   // What the XP grinder knows per game, for the panel: the simulated edge, XP
@@ -1430,6 +1439,7 @@
     speedHint,
     workSpeedLearn,
     speedClean,
+    bumpLevel,
     SPEED_EXTRA_MAX_MS,
     WINS_BONUS,
     bonusEdges,

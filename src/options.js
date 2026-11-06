@@ -32,7 +32,7 @@ const CHECKBOXES = [
 ];
 const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet', 'grindLimit', 'grindGame', 'firstGame', 'lotteryPick'];
 const BET_SELECTS = ['gameBet', 'crashBet', 'grindBet', 'lotteryPrice'];
-const INT_SELECTS = [...BET_SELECTS, 'huntRoundsGoal'];
+const INT_SELECTS = [...BET_SELECTS, 'huntRoundsGoal', 'autoBetBump'];
 const TEXTS = ['openrouterModel', 'lotteryLines'];
 const NUMBERS = [
   'minDelayMs',
@@ -78,6 +78,7 @@ const DEFAULTS = {
   grindMinBalance: 0,
   grindGame: 'auto',
   grindBet: 0,
+  autoBetBump: 1,
   buyUpgrades: false,
   saveForUpgrades: true,
   spareUpgrades: true,
@@ -134,6 +135,7 @@ field('grindBet').add(new Option(msg('grindBet_auto'), '0'));
 for (const name of BET_SELECTS) {
   for (const bet of G.BET_LEVELS) field(name).add(new Option(num.format(bet), String(bet)));
 }
+for (const bump of [0, 1, 2, 3]) field('autoBetBump').add(new Option(msg(`autoBetBump_${bump}`), String(bump)));
 for (const rounds of globalThis.BotterAuto.HUNT_ROUNDS_TIERS) field('huntRoundsGoal').add(new Option(num.format(rounds), String(rounds)));
 for (const mode of globalThis.BotterAuto.LOTTERY_PICK_MODES) field('lotteryPick').add(new Option(msg(`lotteryPick_${mode}`), mode));
 for (const key of G.ROULETTE_BETS) field('rouletteBet').add(new Option(msg(`roulette_${key}`), key));

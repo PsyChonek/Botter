@@ -796,6 +796,21 @@
   "optionsGrindGame": {
     "message": "Hra pro farmění XP"
   },
+  "optionsAutoBetBump": {
+    "message": "Riziko automatické sázky"
+  },
+  "autoBetBump_0": {
+    "message": "Bezpečně (podle výkyvů)"
+  },
+  "autoBetBump_1": {
+    "message": "O úroveň výš"
+  },
+  "autoBetBump_2": {
+    "message": "O dvě úrovně výš"
+  },
+  "autoBetBump_3": {
+    "message": "O tři úrovně výš"
+  },
   "optionsGrindBet": {
     "message": "Sázka při farmění XP"
   },

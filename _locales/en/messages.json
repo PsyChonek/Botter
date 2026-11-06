@@ -796,6 +796,21 @@
   "optionsGrindGame": {
     "message": "XP grinding game"
   },
+  "optionsAutoBetBump": {
+    "message": "Auto bet size risk"
+  },
+  "autoBetBump_0": {
+    "message": "Safe (fits the swing)"
+  },
+  "autoBetBump_1": {
+    "message": "One level higher"
+  },
+  "autoBetBump_2": {
+    "message": "Two levels higher"
+  },
+  "autoBetBump_3": {
+    "message": "Three levels higher"
+  },
   "optionsGrindBet": {
     "message": "XP grinding bet"
   },

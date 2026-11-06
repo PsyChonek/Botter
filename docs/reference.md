@@ -194,7 +194,10 @@ progress shows at `chrome://on-device-internals`.
   `grindBet` 0): each game may bet at most the credits above the reserve, less what a
   loan still owes, over 185 standard deviations of one round (`A.autoBetCap`), so
   Forbes z Chánova (sd about 6.5 bets) keeps about 1,200 bets behind it and roulette
-  185. A game that swings too hard for the credits
+  185. **Auto bet size risk** (`autoBetBump`, Auto tab, since 2026-11-06 default one
+  level higher): the auto size is moved that many bet levels up (`A.bumpLevel`), never
+  past what the limits allow, so roulette on 139,000 credits bets 1,000 instead of 400.
+  A game that swings too hard for the credits
   gives way to the next cheapest (`A.autoGrindPlan`), and with nothing that fits the
   grinder waits. The panel shows each game's XP per credit and loss per XP
   measured from its tracked rounds, for information only. Near a limit the grinder
