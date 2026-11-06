@@ -166,12 +166,9 @@ test('runs every saved account at once in its own tab and feeds their plays', as
     assert.ok(submitters().has(`Bearer ${token(0)}`));
     assert.ok(submitters().has(`Bearer ${JSON.parse(other).access_token}`));
     await until(() => runner.plays.filter((item) => item.kind === 'work').length >= 2);
-    // Each tab keeps its own login and switching only changes what the dashboard shows.
+    // Each tab keeps its own login, and the report carries every tab.
     assert.notEqual(runner.readSession(runner.tabs.get(UID)).raw, runner.readSession(runner.tabs.get('user-2')).raw);
-    assert.equal(runner.switchTo('user-2'), true);
-    assert.equal(runner.focusTab().id, 'user-2');
     assert.equal(runner.report().tabs.length, 2);
-    assert.equal(runner.switchTo('nobody'), false);
   } finally {
     cleanup();
     casino.server.close();

@@ -4,7 +4,7 @@
 // each pinned to its account (no rotation). The service worker's solvers run in
 // another context. chrome.storage is the shared Store, each tab has its own
 // localStorage (session, pacing, learned speeds), and API calls go straight to
-// the casino with that tab's session. The dashboard shows one focused tab.
+// the casino with that tab's session. The dashboard mirrors the home tab's panel.
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
@@ -101,7 +101,6 @@ export class Runner extends EventEmitter {
     this.plays = [];
     // id -> { id, localStorage, sessionStorage, page }
     this.tabs = new Map();
-    this.focusId = null;
     this.solve = null;
     this.refreshTimer = null;
     this.bundleSrc = null;
@@ -194,10 +193,11 @@ export class Runner extends EventEmitter {
     this.tabs.delete(id);
   }
 
-  // The tab the dashboard shows: the one picked there, else home, else any.
+  // The tab whose panel the dashboard mirrors: home, else any. Every tab
+  // runs either way; the panel's controls are shared settings.
   focusTab() {
     const { settings = {} } = this.store.get('settings');
-    return this.tabs.get(this.focusId) ?? this.tabs.get(settings.homeAccount) ?? this.tabs.values().next().value ?? null;
+    return this.tabs.get(settings.homeAccount) ?? this.tabs.values().next().value ?? null;
   }
 
   get page() {
@@ -328,7 +328,7 @@ export class Runner extends EventEmitter {
     const window = {
       ...WEB_GLOBALS,
       ...timers.globals,
-      BotterHeadless: { pinned: true, focus: (id) => this.switchTo(id), play: (item) => alive && this.addPlay(tab, item) },
+      BotterHeadless: { pinned: true, play: (item) => alive && this.addPlay(tab, item) },
       console: this.console('page', tab),
       navigator: { language: this.locale, languages: [this.locale] },
       location: {
@@ -394,7 +394,7 @@ export class Runner extends EventEmitter {
     await this.bootPage(tab);
   }
 
-  // The focused tab's panel, as HTML for the dashboard to mirror.
+  // The home tab's panel, as HTML for the dashboard to mirror.
   panelHtml() {
     return this.page?.document.getElementById('botter-panel')?.shadowRoot?.innerHTML ?? '';
   }
@@ -417,20 +417,13 @@ export class Runner extends EventEmitter {
     return true;
   }
 
-  // Shows another account's tab on the dashboard. Every tab keeps running.
-  switchTo(id) {
-    if (!this.tabs.get(id)?.page) return false;
-    this.focusId = id;
-    return true;
-  }
-
   async setLocale(locale) {
     this.locale = locale;
     this.i18n = i18n(this.extensionDir, locale);
     for (const tab of [...this.tabs.values()]) await this.reload(tab);
   }
 
-  // The focused tab's report, with every tab's status line.
+  // The home tab's report, with every tab's status and player.
   report() {
     const report = this.page?.window.BotterHeadless.report?.() ?? null;
     if (!report) return null;
@@ -439,7 +432,7 @@ export class Runner extends EventEmitter {
       .filter((tab) => tab.id)
       .map((tab) => {
         const own = tab === focus ? report : tab.page?.window.BotterHeadless.report?.();
-        return { id: tab.id, login: own?.player?.login ?? this.loginOf(tab.id), status: own?.status ?? null, player: own?.player ?? null, focused: tab === focus };
+        return { id: tab.id, login: own?.player?.login ?? this.loginOf(tab.id), status: own?.status ?? null, player: own?.player ?? null };
       });
     return report;
   }
@@ -466,7 +459,7 @@ export class Runner extends EventEmitter {
     return null;
   }
 
-  // A GET on the casino API as the focused tab's account. Null when it has
+  // A GET on the casino API as the home tab's account. Null when it has
   // no login or the call fails.
   async casinoGet(path) {
     let token;
@@ -607,6 +600,5 @@ export class Runner extends EventEmitter {
       await this.openTab(id, raw);
     }
     this.closeTab(LOGIN_TAB);
-    this.focusId = id;
   }
 }

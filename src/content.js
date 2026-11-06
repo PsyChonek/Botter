@@ -2986,6 +2986,8 @@
       switchAccount(ui.account.value);
     });
     ui.addAccount.addEventListener('click', addAccount);
+    // Pinned to one account among several running at once: nothing to pick.
+    if (PINNED) ui.account.closest('.row').hidden = true;
     ui.show.addEventListener('click', () => setPanelHidden(false));
     ui.workToggle.addEventListener('click', () => (settings.enabled ? stopWork() : startWork()));
     ui.gamesToggle.addEventListener('click', () => (settings.gamesEnabled ? stopGames() : startGames()));

@@ -176,7 +176,6 @@ function renderReport() {
   $('auto-state').textContent = t(auto ? 'on' : 'off');
   renderAccounts(report?.accounts ?? []);
   renderTabs(report?.tabs ?? []);
-  renderPlayAccounts();
   renderShark();
   renderUpdateWarn();
 }
@@ -320,9 +319,10 @@ function renderAccounts(accounts) {
       const name = document.createElement('td');
       name.textContent = account.login;
       row.append(name);
-      // The saved snapshot of the account playing lags; its live figures are in the report.
-      const live = account.current && report?.player ? report.player : account;
-      const debt = account.current && report?.player ? (report.player.loan?.debt ?? 0) : account.debt;
+      // Saved snapshots lag; every running account's live figures are in the report.
+      const running = report?.tabs?.find((tab) => tab.id === account.id)?.player;
+      const live = running ?? account;
+      const debt = running ? (running.loan?.debt ?? 0) : account.debt;
       for (const value of [number(live.level), number(live.prestige), number(live.credits), live.energy ?? '-', debt ? number(debt) : debt === 0 ? '0' : '-']) {
         const cell = document.createElement('td');
         cell.className = 'num';
@@ -331,23 +331,9 @@ function renderAccounts(accounts) {
       }
       const action = document.createElement('td');
       action.className = 'action';
-      if (account.current) {
-        action.append(badge(t('current'), true));
-      } else if (account.brokenUntil > now) {
-        action.append(badge(t('setAside')));
-      } else if (!account.session) {
-        action.append(badge(t('noSession')));
-      } else {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.textContent = t('use');
-        button.setAttribute('aria-label', `${t('use')}: ${account.login}`);
-        button.addEventListener('click', async () => {
-          button.disabled = true;
-          await post('/api/account/switch', { id: account.id });
-        });
-        action.append(button);
-      }
+      if (account.brokenUntil > now) action.append(badge(t('setAside')));
+      else if (!account.session) action.append(badge(t('noSession')));
+      else action.append(badge(t('running'), true));
       row.append(action);
       return row;
     }),
@@ -859,15 +845,14 @@ function statBox(label) {
 const cards = new Map();
 
 function buildCard(tab) {
-  const button = el('button', 'acct');
-  button.type = 'button';
+  const button = el('article', 'acct');
   button.dataset.id = tab.id;
+  button.setAttribute('aria-label', tab.login ?? tab.id);
   const head = el('span', 'acct-head');
   const dot = el('span', 'dot');
   const name = el('span', 'acct-name');
   const badge = el('span', 'acct-badge');
-  const shown = el('span', 'acct-shown', t('shownBelow'));
-  head.append(dot, name, badge, shown);
+  head.append(dot, name, badge);
   const status = el('span', 'acct-status');
   const stats = el('span', 'acct-stats');
   const level = statBox(t('level'));
@@ -888,22 +873,17 @@ function buildCard(tab) {
   const toBar = bar('goal');
   goal.append(xpRow, xpBar, toRow, toBar);
   button.append(head, status, stats, goal);
-  button.addEventListener('click', async () => {
-    if (button.getAttribute('aria-pressed') !== 'true') await post('/api/account/switch', { id: tab.id });
-  });
   const li = el('li');
   li.append(button);
-  return { li, button, dot, name, badge, shown, status, stats, level, credits, energy, energyBar, goal, xpRow, xpLabel, xpText, xpBar, toText, toBar };
+  return { li, button, dot, name, badge, status, stats, level, credits, energy, energyBar, goal, xpRow, xpLabel, xpText, xpBar, toText, toBar };
 }
 
 function updateCard(card, tab) {
   const player = tab.player;
-  card.button.setAttribute('aria-pressed', String(tab.focused));
   card.dot.style.background = accountColor(tab.login);
   card.name.textContent = tab.login ?? tab.id;
   card.badge.hidden = !player?.prestige;
   card.badge.textContent = t('prestigeCount', [String(player?.prestige ?? 0)]);
-  card.shown.hidden = !tab.focused;
   if (card.status.title !== (tab.status ?? '')) {
     card.status.textContent = tab.status ?? '-';
     card.status.title = tab.status ?? '';
@@ -1142,20 +1122,9 @@ function buildColumn(login) {
   return column;
 }
 
-function renderPlayAccounts() {
-  const select = $('play-account');
-  const logins = (report?.accounts ?? []).map((account) => account.login).filter(Boolean).sort();
-  const have = [...select.options].slice(1).map((option) => option.value);
-  if (have.join() === logins.join()) return;
-  const value = select.value;
-  select.replaceChildren(select.options[0], ...logins.map((login) => new Option(login, login)));
-  select.value = logins.includes(value) ? value : '';
-}
-
 const playFilter = () => {
-  const account = $('play-account').value;
   const actions = $('play-actions').checked;
-  return (item) => (!account || item.account === account) && (actions || item.kind !== 'action');
+  return (item) => actions || item.kind !== 'action';
 };
 
 function renderPlays() {
@@ -1219,7 +1188,6 @@ function addActions(items) {
   if (actions.length) addPlays(actions);
 }
 
-$('play-account').addEventListener('change', renderPlays);
 $('play-actions').addEventListener('change', renderPlays);
 $('play-pause').addEventListener('click', () => {
   playsPaused = !playsPaused;

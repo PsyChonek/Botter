@@ -109,10 +109,11 @@ and the Supabase session is refreshed by the server.
 
 **Every saved account runs at once** (since 2026-11-06), each in its own page context
 with its own localStorage (session, pacing, learned speeds), pinned to its account: no
-rotation, every account works, grinds and claims on its own. The account strip shows
-the focused one, with a chip per running account (its status) to focus another; the
-panel's account dropdown does the same. Before, one page rotated between the accounts,
-so only one played at a time.
+rotation, every account works, grinds and claims on its own. The account strip shows a
+card per account (status, level, credits, energy, XP to the next level and to 40). There
+is nothing to pick: the panel below mirrors the home account's page, and its controls are
+settings every account shares. Before, one page rotated between the accounts, so only one
+played at a time.
 
 The dashboard on port 8080 has an account strip (account, status, level, credits,
 energy, Auto) and seven tabs. **Overview** holds the panel `content.js` builds (Work and
@@ -123,8 +124,8 @@ and why the bot took the loan) and the latest activity. Above them, **Live play*
 every round, ticket, wheel spin, level-up, reward and other action of every account as it
 happens: the roulette pocket, dice, baccarat and blackjack cards, slot reels, the mines
 board, the case item, with the bet, net and XP (`GameData.playOutcome`, sent through
-`BotterHeadless.play`), filtered by account, plus each account's rounds a minute, net and
-XP over the last 5 minutes.
+`BotterHeadless.play`), plus each account's rounds a minute, net and
+XP over the last 5 minutes, in one column per account.
 **Progress** charts the level and credits of every account over time. **Leaderboards**
 shows the casino's six boards (sprint with its countdown and last podium, level, net
 worth, biggest win, losers, debtors), fetched with the bot's session and cached for a
@@ -132,7 +133,7 @@ minute, with every saved account highlighted. **Changes** lists the casino's own
 every casino deploy the bot has seen and whether its models still match it; a deploy that
 breaks a model puts a "Botter needs an update" banner over every tab.
 **Settings** is the extension's own settings page with every tab, on the same storage.
-**Accounts** lists the saved logins with their debt, a switch, a GitHub sign-in and an e-mail sign-in, and **Activity**
+**Accounts** lists the saved logins with their live level, credits, energy, debt and state (running, set aside, no login), a GitHub sign-in and an e-mail sign-in, and **Activity**
 is the full log. One language switch covers all of it, the panel included.
 
 ```sh

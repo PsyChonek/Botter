@@ -157,10 +157,7 @@ const API = {
     }
     return { ok: true };
   },
-  'POST /api/account/switch': ({ body }) => {
-    if (typeof body.id !== 'string' || body.id.length > 100) return [400, { error: 'bad_request' }];
-    return runner.switchTo(body.id) ? { ok: true } : [409, { error: 'no_session' }];
-  },
+
   'GET /api/history': () => history,
   'GET /api/leaderboards': () => leaderboards.get(),
   // The casino deploys the bot has seen and the app's own changelog (trackBundle in content.js).
