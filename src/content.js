@@ -20,6 +20,10 @@
   // with no casino page: work tickets go through the API instead of the app's
   // buttons and games never use the game screen.
   const HEADLESS = !!globalThis.BotterHeadless;
+  // The runner can also run one page per saved account at once, each pinned
+  // to its account: it never rotates or switches, and picking another account
+  // in the panel only asks the runner to show that page (BotterHeadless.focus).
+  const PINNED = HEADLESS && !!globalThis.BotterHeadless.pinned;
 
   const DEFAULT_SETTINGS = {
     enabled: false,
@@ -73,6 +77,7 @@
     grindMinBalance: 0,
     grindGame: 'auto',
     grindBet: 0, // 0: auto size (autoCaps), else a bet level
+    autoBetBump: 1, // levels above the auto size (BotterAuto.bumpLevel)
     buyUpgrades: false,
     saveForUpgrades: true,
     spareUpgrades: true,
@@ -605,6 +610,13 @@
     }
   });
 
+  // One played round, ticket, spin or reward for the Docker dashboard's play
+  // feed (BotterHeadless.play). The extension has no feed, so it sends nothing.
+  function play(item) {
+    if (!HEADLESS) return;
+    globalThis.BotterHeadless.play?.({ at: Date.now(), account: player?.login ?? accounts[accountId]?.login ?? null, ...item });
+  }
+
   // Every /api/ response the page sees, from the app or from the bot.
   function onResponse({ path, ok, status, request, data, uid }) {
     if (uid) useAccount(uid);
@@ -653,6 +665,7 @@
       submitTries = 0;
       log.debug('task_started', { id: task.id, type: task.type });
     } else if (path === '/api/work/submit' && data.result) {
+      play({ kind: 'work', type: task?.type ?? null, correct: !!data.result.correct, credits: data.result.earned ?? 0, xp: data.result.xpGain ?? 0 });
       onResult(request?.id, data, before);
     } else if (FREE_PATHS[path] && typeof before === 'number' && data.player) {
       const kind = FREE_PATHS[path];
@@ -660,6 +673,7 @@
       const gain = data.player.credits - before + (data.result?.garnished ?? 0) - G.rewardTotal(data);
       stats.free[kind] = (stats.free[kind] ?? 0) + gain;
       saveStats();
+      play({ kind: 'free', what: kind, credits: gain, segment: data.result?.segment ?? null });
       if (kind === 'wheel') log.info('wheel_spin', { segment: data.result?.segment, credits: data.result?.credits, energy: data.result?.energy });
     } else {
       const delta = G.gameDelta(path, request, data, before, bjStake);
@@ -689,6 +703,7 @@
         checkWinsLimit(delta, data);
         saveStats();
         log.debug('game_round', delta);
+        play({ kind: 'game', game: delta.game, step: path.split('/').pop(), bet: delta.wagered, net: delta.net, xp: delta.xp * xpBonus(), ...G.playOutcome(path, request, data) });
       }
     }
     render();
@@ -701,7 +716,10 @@
   let levelWrites = Promise.resolve();
   function trackLevel(data) {
     if (!data?.player && !data?.levelUp) return;
-    if (data.levelUp) log.info('level_up', { to: data.levelUp.to, reward: data.levelUp.reward, xpNeed: data.player?.xpNeed });
+    if (data.levelUp) {
+      log.info('level_up', { to: data.levelUp.to, reward: data.levelUp.reward, xpNeed: data.player?.xpNeed });
+      play({ kind: 'level', to: data.levelUp.to, credits: data.levelUp.reward ?? 0 });
+    }
     levelWrites = levelWrites
       .then(async () => {
         const { levels = {} } = await chrome.storage.local.get('levels');
@@ -752,6 +770,7 @@
     if (event) stats.free.event = (stats.free.event ?? 0) + event;
     bookGrind(levelUp + standup + achievement + fund + event);
     saveStats();
+    if (standup || achievement || fund || event) play({ kind: 'reward', standup, achievement, payroll: fund, event });
     if (!standup && !achievement && !fund) return;
     log.info('rewards', {
       standup,
@@ -1073,6 +1092,7 @@
   // after any refresh in flight has landed, or the saved copy would hold a
   // refresh token the server has just revoked.
   async function switchAccount(id) {
+    if (PINNED) return globalThis.BotterHeadless.focus?.(id);
     const target = accounts[id];
     if (switching || id === accountId || !target?.session) return;
     switching = true;
@@ -1087,7 +1107,7 @@
   // Detaches the current session and reloads to the login screen. The app's own
   // log out would revoke the session on the server, and with it the saved copy.
   async function addAccount() {
-    if (switching) return;
+    if (switching || PINNED) return;
     switching = true;
     await hookIdle();
     await saveAccount(true);
@@ -1121,7 +1141,7 @@
     await chrome.storage.local.set({ [ACCOUNT_PREFIX + marker.to]: kept });
     log.warn('session_expired', { login: expired.login });
     setStatus('statusSessionExpired', [expired.login ?? marker.to]);
-    if (accounts[marker.from]?.session) await switchAccount(marker.from);
+    if (!PINNED && accounts[marker.from]?.session) await switchAccount(marker.from);
   }
 
   // A saved account to go to instead of one that cannot load: the one the
@@ -1143,7 +1163,7 @@
     if (loadFails < LOAD_FAIL_LIMIT || !saved) return sleep(LOGGED_OUT_WAIT_MS);
     accounts[id] = { ...saved, brokenUntil: Date.now() + BROKEN_ACCOUNT_MS };
     await chrome.storage.local.set({ [ACCOUNT_PREFIX + id]: accounts[id] });
-    const fallback = fallbackAccount(id, readSwitch()?.from);
+    const fallback = PINNED ? null : fallbackAccount(id, readSwitch()?.from);
     log.warn('account_set_aside', { login: saved.login, minutes: BROKEN_ACCOUNT_MS / 60_000, to: fallback && accounts[fallback].login });
     setStatus('statusAccountBroken', [saved.login ?? id, String(BROKEN_ACCOUNT_MS / 60_000)]);
     if (!fallback) return sleep(LOGGED_OUT_WAIT_MS);
@@ -1179,7 +1199,7 @@
   // An account left within CLAIM_RETRY_MS already tried its wheel, so a refused
   // spin there does not pull the bot back and forth.
   async function rotateStep(urgent = false) {
-    if (!settings.rotateAccounts || !player || Date.now() - accountSince < ROTATE_DWELL_MS) return false;
+    if (PINNED || !settings.rotateAccounts || !player || Date.now() - accountSince < ROTATE_DWELL_MS) return false;
     if (urgent && taskOpen()) return false;
     const now = Date.now();
     const here = dueRounds({ ...accounts[accountId], level: player.level, credits: player.credits }, now);
@@ -2176,8 +2196,8 @@
   // smallest.
   function wantedGrindBet(game) {
     if (!autoBetSize()) return Number(settings.grindBet);
-    const cap = Math.min(autoCaps([game], limits().reserve)[game], player.maxBet);
-    return G.BET_LEVELS.filter((bet) => bet <= cap).at(-1) ?? G.BET_LEVELS[0];
+    const cap = autoCaps([game], limits().reserve)[game];
+    return A.bumpLevel(G.BET_LEVELS.filter((bet) => bet <= player.maxBet), cap, settings.autoBetBump);
   }
 
   // The goal upgrade the grinder leaves credits for, or null. Its verdict says
@@ -2541,7 +2561,7 @@
     const bonus = winsBonusOn(now) ? A.WINS_BONUS : 0;
     const pickEdges = A.bonusEdges(edges, O.gains(candidates, player.upgrades, blazeMode()), bonus);
     const plan = auto
-      ? A.autoGrindPlan(candidates, bet, player.level, GRIND_UNLOCKS, pickEdges, autoCaps(candidates, limit.reserve, extra), levels)
+      ? A.autoGrindPlan(candidates, bet, player.level, GRIND_UNLOCKS, pickEdges, autoCaps(candidates, limit.reserve, extra), levels, settings.autoBetBump)
       : A.grindPlan(candidates, bet, player.level, GRIND_UNLOCKS, pickEdges);
     const level = plan && settings.grindPays && !resetPlanned() && !levelLoanOpen() ? levelValue(plan.game, pickEdges[plan.game], now) : null;
     if (level && !level.pays) return { lost, levels, candidates, edges, plan: null, held: level };

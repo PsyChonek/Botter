@@ -107,12 +107,24 @@ The container runs Botter with no browser: the extension's own scripts (`page-ho
 straight to `/api/work/start` and `/api/work/submit`, games always go through the API,
 and the Supabase session is refreshed by the server.
 
+**Every saved account runs at once** (since 2026-11-06), each in its own page context
+with its own localStorage (session, pacing, learned speeds), pinned to its account: no
+rotation, every account works, grinds and claims on its own. The account strip shows
+the focused one, with a chip per running account (its status) to focus another; the
+panel's account dropdown does the same. Before, one page rotated between the accounts,
+so only one played at a time.
+
 The dashboard on port 8080 has an account strip (account, status, level, credits,
 energy, Auto) and seven tabs. **Overview** holds the panel `content.js` builds (Work and
 Games, auto switches, Profit, XP per game, upgrade queue, More), rendered on the server in
 a small DOM and mirrored live with every click sent back, next to the loan shark card (debt,
 principal, repaid, a countdown to the next interest tick and the debt after it, execution,
-and why the bot took the loan) and the latest activity.
+and why the bot took the loan) and the latest activity. Above them, **Live play** shows
+every round, ticket, wheel spin, level-up, reward and other action of every account as it
+happens: the roulette pocket, dice, baccarat and blackjack cards, slot reels, the mines
+board, the case item, with the bet, net and XP (`GameData.playOutcome`, sent through
+`BotterHeadless.play`), filtered by account, plus each account's rounds a minute, net and
+XP over the last 5 minutes.
 **Progress** charts the level and credits of every account over time. **Leaderboards**
 shows the casino's six boards (sprint with its countdown and last podium, level, net
 worth, biggest win, losers, debtors), fetched with the bot's session and cached for a
@@ -149,7 +161,7 @@ Open `http://<host>:8080`, sign in, then:
 | `UPDATE_BRANCH`, `UPDATE_INTERVAL` | `master`, `300` | Branch the updater follows and how often it checks, in seconds. |
 
 - Storage lives in `/data/storage.json` (the `botter-data` volume): settings, bank,
-  stats, accounts and the page's localStorage survive restarts and upgrades.
+  stats, accounts and each account's page localStorage survive restarts and upgrades.
 - **Signing in an account** (new, or one whose session ran out): on the Accounts tab
   press **Open GitHub sign-in**. GitHub sends you back to the casino with `?code=` in
   the address bar; paste that whole address into the dashboard. The casino only lets the

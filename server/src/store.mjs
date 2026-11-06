@@ -10,12 +10,14 @@ export class Store {
     this.file = file;
     this.local = {};
     this.page = {};
+    this.pages = {};
     this.listeners = new Set();
     this.timer = null;
     if (existsSync(file)) {
       const data = JSON.parse(readFileSync(file, 'utf8'));
       this.local = data.local ?? {};
       this.page = data.page ?? {};
+      this.pages = data.pages ?? {};
     }
   }
 
@@ -67,9 +69,10 @@ export class Store {
     return () => this.listeners.delete(listener);
   }
 
-  // The page's localStorage, persisted with the rest.
-  localStorage() {
-    const page = this.page;
+  // A page's localStorage, persisted with the rest: one per account the runner
+  // runs a page for (pages[id]), or with no id the single page of before.
+  localStorage(id = null) {
+    const page = id === null ? this.page : (this.pages[id] ??= {});
     const save = () => this.scheduleSave();
     return {
       get length() {
@@ -101,7 +104,7 @@ export class Store {
     this.timer = null;
     mkdirSync(dirname(this.file), { recursive: true });
     const tmp = `${this.file}.tmp`;
-    writeFileSync(tmp, JSON.stringify({ local: this.local, page: this.page }));
+    writeFileSync(tmp, JSON.stringify({ local: this.local, page: this.page, pages: this.pages }));
     renameSync(tmp, this.file);
   }
 }

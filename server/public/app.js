@@ -147,6 +147,8 @@ function renderReport() {
   $('auto').setAttribute('aria-pressed', String(auto));
   $('auto-state').textContent = t(auto ? 'on' : 'off');
   renderAccounts(report?.accounts ?? []);
+  renderTabs(report?.tabs ?? []);
+  renderPlayAccounts();
   renderShark();
   renderUpdateWarn();
 }
@@ -775,6 +777,261 @@ function renderActivity() {
 
 $('only-problems').addEventListener('change', renderActivity);
 
+// ---------- running accounts ----------
+
+// Every account runs in its own tab on the server; picking one shows it here.
+function renderTabs(list) {
+  $('hero-tabs-wrap').hidden = list.length < 2;
+  if (list.length < 2) return;
+  $('hero-tabs').replaceChildren(
+    ...list.map((tab) => {
+      const li = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.setAttribute('aria-pressed', String(tab.focused));
+      const login = document.createElement('span');
+      login.className = 'tab-login';
+      const dot = document.createElement('span');
+      dot.className = 'dot';
+      dot.style.background = accountColor(tab.login);
+      login.append(dot, tab.login ?? tab.id);
+      const status = document.createElement('span');
+      status.className = 'tab-status';
+      status.textContent = tab.status ?? '-';
+      status.title = tab.status ?? '';
+      button.append(login, status);
+      button.addEventListener('click', async () => {
+        if (tab.focused) return;
+        await post('/api/account/switch', { id: tab.id });
+      });
+      li.append(button);
+      return li;
+    }),
+  );
+}
+
+// ---------- live play ----------
+
+const PLAYS_KEPT = 400;
+const PLAYS_SHOWN = 80;
+const PACE_WINDOW_MS = 5 * 60_000;
+// Activity lines that say nothing about play, kept out of the feed.
+const QUIET_ACTIONS = new Set(['rate_limit_retry', 'account', 'page_booted', 'standup_skipped', 'upgrades_skipped', 'wheel_spin', 'level_up', 'rewards']);
+const RED_POCKETS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
+const SUITS = { h: '♥', d: '♦', c: '♣', s: '♠' };
+const plays = [];
+let playsPaused = false;
+let freshUntil = 0;
+
+function accountColor(login) {
+  const logins = (report?.accounts ?? []).map((account) => account.login).sort();
+  const slot = logins.indexOf(login);
+  return slot < 0 ? 'var(--track)' : `var(--series-${(slot % 8) + 1})`;
+}
+
+const el = (tag, className, text) => {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+};
+
+function pocketChip(pocket) {
+  const n = Number(pocket);
+  const color = !/^\d+$/.test(String(pocket)) || n === 0 ? 'green' : RED_POCKETS.has(n) ? 'red' : 'black';
+  const chip = el('span', `pocket ${color}`, String(pocket));
+  chip.setAttribute('aria-label', t('pocketLabel', [String(pocket), t(`pocket_${color}`)]));
+  return chip;
+}
+
+function cardChip(card) {
+  const text = String(card);
+  const suit = text.slice(-1);
+  const mark = SUITS[suit];
+  const chip = el('span', `playing-card${suit === 'h' || suit === 'd' ? ' red' : ''}`, mark ? text.slice(0, -1) + mark : text);
+  return chip;
+}
+
+function hand(label, cards) {
+  const wrap = el('span', 'hand');
+  wrap.append(el('span', 'hand-label', label), ...(cards ?? []).map(cardChip));
+  return wrap;
+}
+
+function symbolHue(symbol) {
+  let h = 0;
+  for (const ch of String(symbol)) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  return h;
+}
+
+function reels(grid) {
+  const box = el('span', 'reels');
+  box.style.gridTemplateColumns = `repeat(${grid[0]?.length ?? 1}, auto)`;
+  box.setAttribute('role', 'img');
+  box.setAttribute('aria-label', grid.map((row) => row.join(' ')).join(', '));
+  for (const row of grid) {
+    for (const symbol of row) {
+      const cell = el('span', '', String(symbol).slice(0, 4));
+      cell.style.setProperty('--h', symbolHue(symbol));
+      cell.setAttribute('aria-hidden', 'true');
+      box.append(cell);
+    }
+  }
+  return box;
+}
+
+const betText = (bets) => Object.entries(bets ?? {}).map(([spot, amount]) => `${spot} ${number(amount)}`).join(', ');
+
+// The picture of one play: the outcome the casino showed, as far as the
+// response carried it (GameData.playOutcome on the bot's side).
+function playVisual(item) {
+  const box = el('div', 'play-visual');
+  if (item.kind === 'game') {
+    if (item.pocket !== undefined) box.append(pocketChip(item.pocket));
+    if (item.dice) box.append(...item.dice.map((d) => el('span', 'die', String(d))));
+    if (item.banker || (item.player && item.game === 'baccarat')) {
+      box.append(hand(t('handPlayer'), item.player), hand(t('handBanker'), item.banker));
+      if (item.winner) box.append(el('span', 'badge', t(`winner_${item.winner}`) || item.winner));
+    }
+    if (item.dealer) {
+      box.append(hand(t('handYou'), item.player), hand(t('handDealer'), item.dealer));
+      if (item.action) box.append(el('span', 'bet-tag', item.action));
+    }
+    if (item.grid) box.append(reels(item.grid));
+    if (item.game === 'mines') {
+      const bar = el('span', 'mines-bar');
+      bar.setAttribute('aria-label', t('minesRevealed', [String(item.revealed ?? 0)]));
+      for (let i = 0; i < Math.min(12, Math.max(item.revealed ?? 0, 1)); i++) bar.append(Object.assign(el('i', i < (item.revealed ?? 0) ? 'on' : ''), { ariaHidden: 'true' }));
+      box.append(bar, el('span', 'bet-tag', item.step));
+    }
+    if (item.item) box.append(el('span', 'badge', `${item.item}${item.rarity ? ` (${item.rarity})` : ''}`));
+    if (item.numbers) box.append(el('span', 'bet-tag', item.numbers.join(' ')));
+    if (item.bets && !item.banker) box.append(el('span', 'bet-tag', betText(item.bets)));
+  } else if (item.kind === 'work') {
+    box.append(el('span', `badge ${item.correct ? 'good' : 'bad'}`, t(item.correct ? 'workRight' : 'workWrong')));
+    if (item.type) box.append(el('span', 'bet-tag', item.type));
+  } else if (item.kind === 'free') {
+    const segment = item.segment;
+    box.append(el('span', 'badge', segment?.label ?? (segment?.x ? `${segment.x}x` : (segment?.kind ?? item.what))));
+  } else if (item.kind === 'level') {
+    box.append(el('span', 'badge good', t('levelUpTo', [String(item.to)])));
+  } else if (item.kind === 'reward') {
+    const parts = ['standup', 'achievement', 'payroll', 'event'].filter((key) => item[key]).map((key) => `${t(`reward_${key}`)} ${number(item[key])}`);
+    box.append(el('span', 'badge good', parts.join(', ')));
+  } else if (item.kind === 'action') {
+    const text = Object.entries(item.fields ?? {})
+      .map(([key, value]) => `${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`)
+      .join('  ');
+    const fields = el('span', 'action-fields', text);
+    fields.title = text;
+    box.append(fields);
+  }
+  return box;
+}
+
+function playTitle(item) {
+  if (item.kind === 'game') return t(`game_${item.game}`) || item.game;
+  if (item.kind === 'free') return t(`free_${item.what}`) || item.what;
+  if (item.kind === 'action') return item.msg;
+  return t(`play_${item.kind}`);
+}
+
+function playMoney(item) {
+  const box = el('div', 'play-money');
+  const value = item.kind === 'game' ? item.net : item.kind === 'reward' ? ['standup', 'achievement', 'payroll', 'event'].reduce((sum, key) => sum + (item[key] ?? 0), 0) : item.credits;
+  if (typeof value === 'number') box.append(el('span', `net ${value > 0 ? 'pos' : value < 0 ? 'neg' : ''}`, signed(value)));
+  const sub = [];
+  if (item.kind === 'game' && item.bet) sub.push(t('betOf', [number(item.bet)]));
+  if (item.xp) sub.push(`${number(item.xp)} XP`);
+  if (sub.length) box.append(el('span', 'sub', sub.join(' / ')));
+  return box;
+}
+
+function playRow(item) {
+  const li = el('li', item.received > freshUntil - 1000 ? 'fresh' : '');
+  const time = el('time', '', new Date(item.at).toLocaleTimeString(I18n.lang));
+  time.dateTime = new Date(item.at).toISOString();
+  const who = el('div', 'play-who');
+  const line = el('span', 'who');
+  const dot = el('span', 'dot');
+  dot.style.background = accountColor(item.account);
+  line.append(dot, item.account ?? '-');
+  who.append(line, el('span', 'what', playTitle(item)));
+  li.append(time, who, playVisual(item), playMoney(item));
+  return li;
+}
+
+function renderPlayAccounts() {
+  const select = $('play-account');
+  const logins = (report?.accounts ?? []).map((account) => account.login).filter(Boolean).sort();
+  const have = [...select.options].slice(1).map((option) => option.value);
+  if (have.join() === logins.join()) return;
+  const value = select.value;
+  select.replaceChildren(select.options[0], ...logins.map((login) => new Option(login, login)));
+  select.value = logins.includes(value) ? value : '';
+}
+
+// Rounds a minute, net and XP per account over the last few minutes.
+function renderPace() {
+  const from = Date.now() - PACE_WINDOW_MS;
+  const per = new Map();
+  for (const item of plays) {
+    if (item.kind !== 'game' || item.at < from) continue;
+    const row = per.get(item.account) ?? { rounds: 0, net: 0, xp: 0 };
+    row.rounds += 1;
+    row.net += item.net ?? 0;
+    row.xp += item.xp ?? 0;
+    per.set(item.account, row);
+  }
+  const minutes = PACE_WINDOW_MS / 60_000;
+  $('play-pace').replaceChildren(
+    ...[...per.entries()].sort().map(([login, row]) => {
+      const chip = el('span', 'pace');
+      const dot = el('span', 'dot');
+      dot.style.background = accountColor(login);
+      chip.append(dot, t('paceLine', [login ?? '-', (row.rounds / minutes).toFixed(1), signed(row.net), number(row.xp)]));
+      return chip;
+    }),
+  );
+}
+
+function renderPlays() {
+  renderPace();
+  if (playsPaused) return;
+  const account = $('play-account').value;
+  const actions = $('play-actions').checked;
+  const shown = plays.filter((item) => (!account || item.account === account) && (actions || item.kind !== 'action')).slice(0, PLAYS_SHOWN);
+  $('play-empty').hidden = shown.length > 0;
+  $('plays').replaceChildren(...shown.map(playRow));
+}
+
+function addPlays(items) {
+  const now = Date.now();
+  for (const item of items) plays.unshift({ ...item, received: now });
+  plays.sort((a, b) => b.at - a.at);
+  plays.length = Math.min(plays.length, PLAYS_KEPT);
+  freshUntil = now;
+  renderPlays();
+}
+
+// Info lines of the activity log (a výpověď, a loan, a purchase) join the feed as actions.
+function addActions(items) {
+  const actions = items
+    .filter((item) => item.level !== 'debug' && !QUIET_ACTIONS.has(item.msg))
+    .map((item) => ({ kind: 'action', at: Date.parse(item.time), account: item.account ?? null, msg: item.msg, fields: item.fields }));
+  if (actions.length) addPlays(actions);
+}
+
+$('play-account').addEventListener('change', renderPlays);
+$('play-actions').addEventListener('change', renderPlays);
+$('play-pause').addEventListener('click', () => {
+  playsPaused = !playsPaused;
+  $('play-pause').setAttribute('aria-pressed', String(playsPaused));
+  $('play-pause').textContent = t(playsPaused ? 'resume' : 'pause');
+  renderPlays();
+});
+setInterval(renderPace, 5000);
+
 // ---------- live updates ----------
 
 function connect() {
@@ -785,7 +1042,9 @@ function connect() {
     report = JSON.parse(event.data);
     renderReport();
   });
+  source.addEventListener('plays', (event) => addPlays(JSON.parse(event.data)));
   source.addEventListener('activity', (event) => {
+    addActions(JSON.parse(event.data));
     activity.unshift(...JSON.parse(event.data).reverse());
     activity.length = Math.min(activity.length, ACTIVITY_KEPT);
     renderActivity();

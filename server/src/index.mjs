@@ -208,6 +208,7 @@ function events(req, res, url) {
   const storage = url.searchParams.get('storage') === '1';
   if (!storage) {
     res.write(`event: activity\ndata: ${JSON.stringify(runner.activity.slice(-200))}\n\n`);
+    res.write(`event: plays\ndata: ${JSON.stringify(runner.plays.slice(-120))}\n\n`);
     res.write(`event: report\ndata: ${JSON.stringify(runner.report())}\n\n`);
     res.write(`event: panel\ndata: ${JSON.stringify(runner.panelHtml())}\n\n`);
   }
@@ -231,6 +232,14 @@ function broadcast(event, data) {
 }
 
 runner.on('activity', (item) => broadcast('activity', [item]));
+// Plays come several a second per account, so they go out in batches.
+let playBatch = [];
+runner.on('play', (item) => playBatch.push(item));
+setInterval(() => {
+  if (!playBatch.length) return;
+  if (streams.size) broadcast('plays', playBatch);
+  playBatch = [];
+}, 500);
 setInterval(() => streams.size && broadcast('report', runner.report()), 2000);
 store.onChanged((changes) => broadcast('storage', redactChanges(changes)));
 

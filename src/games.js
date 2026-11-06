@@ -376,6 +376,66 @@
   // payroll fund's 0.5 %). greens counts zero pockets, mismatches payouts that
   // differ from the rules; expected and variance are the payout's mean and
   // variance by the rules, summed over the checked spins.
+  // A small picture of one game response for the dashboard's play feed:
+  // the pocket, dice, cards, case item, mines board or reels it showed, each
+  // read only where the response has it. Grids are cut to PLAY_GRID_MAX and
+  // symbols to short text, so a feed item stays a few hundred bytes.
+  const PLAY_GRID_MAX = 6;
+  const SUIT_MARK = { hearts: 'h', diamonds: 'd', clubs: 'c', spades: 's', h: 'h', d: 'd', c: 'c', s: 's' };
+  const playCard = (card) => {
+    if (!card || typeof card !== 'object') return String(card ?? '?');
+    const suit = SUIT_MARK[String(card.suit ?? '').toLowerCase()] ?? '';
+    return card.hidden ? '?' : `${card.rank ?? '?'}${suit}`;
+  };
+  const playCards = (list) => (Array.isArray(list) ? list.map(playCard) : undefined);
+  const playSymbol = (cell) => {
+    if (cell && typeof cell === 'object') cell = cell.symbol ?? cell.key ?? cell.id ?? cell.name ?? '?';
+    return String(cell).slice(0, 8);
+  };
+  function playGrid(value) {
+    if (!Array.isArray(value) || !value.length || !value.every(Array.isArray)) return undefined;
+    return value.slice(0, PLAY_GRID_MAX).map((row) => row.slice(0, PLAY_GRID_MAX).map(playSymbol));
+  }
+  function findGrid(...sources) {
+    for (const source of sources) {
+      if (!source || typeof source !== 'object') continue;
+      for (const key of ['finalGrid', 'grid', 'reels', 'board', 'symbols']) {
+        const grid = playGrid(source[key]);
+        if (grid) return grid;
+      }
+    }
+    return undefined;
+  }
+
+  function playOutcome(path, request, data) {
+    const game = PATH_GAME[path];
+    if (!game || !data) return {};
+    switch (game) {
+      case 'roulette':
+        return { pocket: String(data.pocket ?? '?'), bets: request?.bets };
+      case 'dice':
+        return { dice: Array.isArray(data.dice) ? data.dice : undefined, bets: request?.bets };
+      case 'baccarat':
+        return { player: playCards(data.hand?.player), banker: playCards(data.hand?.banker), winner: data.hand?.winner, bets: request?.bets };
+      case 'blackjack':
+        return { player: playCards(data.hand?.player), dealer: playCards(data.hand?.dealer), done: !!data.hand?.done, action: request?.action };
+      case 'cases':
+        return { item: data.item?.name ?? data.item?.key, rarity: data.item?.rarity };
+      case 'mines': {
+        const board = data.game ?? {};
+        return { revealed: board.revealed?.length ?? 0, bugs: board.mines ?? request?.mines, done: !!board.done, step: path.split('/').pop() };
+      }
+      case 'lottery':
+        return { numbers: request?.numbers };
+      case 'hotfix': {
+        const round = data.outcome?.round ?? data.free?.rounds?.at(-1);
+        return { grid: playGrid(round?.steps?.at(-1)?.reels), free: path.endsWith('/free') };
+      }
+      default:
+        return { grid: findGrid(data.result, data.outcome, data) };
+    }
+  }
+
   function addRouletteSpin(check, zeros, request, data, net) {
     // The key comes from the server's upgrade level: only 0 to 2 are kept apart.
     zeros = Math.max(0, Math.min(ROULETTE_EXTRA.length, Math.trunc(Number(zeros)) || 0));
@@ -486,6 +546,7 @@
     rewardsPaid,
     rewardTotal,
     gameDelta,
+    playOutcome,
     recordLevel,
     xpForLevel,
     PAYROLL_RETURN,

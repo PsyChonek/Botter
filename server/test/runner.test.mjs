@@ -152,3 +152,28 @@ test('signs in with GitHub through PKCE from the pasted casino address', async (
     casino.server.close();
   }
 });
+
+test('runs every saved account at once in its own tab and feeds their plays', async () => {
+  const casino = await fakeCasino();
+  const { runner, store, cleanup } = setup(casino, session(3600));
+  const other = JSON.stringify({ access_token: `${b64({ alg: 'none' })}.${b64({ sub: 'user-2', n: 0 })}.sig`, refresh_token: 'refresh-b', expires_at: Math.round(Date.now() / 1000) + 3600 });
+  store.set({ 'account:user-2': { login: 'second', session: other, storageKey: 'sb-fake-auth-token' } });
+  try {
+    await runner.start();
+    assert.deepEqual([...runner.tabs.keys()].sort(), [UID, 'user-2']);
+    const submitters = () => new Set(casino.calls.filter((call) => call.path === '/api/work/submit').map((call) => call.auth));
+    await until(() => submitters().size === 2);
+    assert.ok(submitters().has(`Bearer ${token(0)}`));
+    assert.ok(submitters().has(`Bearer ${JSON.parse(other).access_token}`));
+    await until(() => runner.plays.filter((item) => item.kind === 'work').length >= 2);
+    // Each tab keeps its own login and switching only changes what the dashboard shows.
+    assert.notEqual(runner.readSession(runner.tabs.get(UID)).raw, runner.readSession(runner.tabs.get('user-2')).raw);
+    assert.equal(runner.switchTo('user-2'), true);
+    assert.equal(runner.focusTab().id, 'user-2');
+    assert.equal(runner.report().tabs.length, 2);
+    assert.equal(runner.switchTo('nobody'), false);
+  } finally {
+    cleanup();
+    casino.server.close();
+  }
+});

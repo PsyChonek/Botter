@@ -1,8 +1,10 @@
-// Runs the extension's own scripts with no browser. page-hook.js and the
-// content scripts run in one vm context that stands in for the casino tab, the
-// service worker's solvers in another. chrome.storage and localStorage come
-// from the Store, API calls go straight to the casino with the saved session,
-// and the reload the bot does to switch accounts boots a fresh page context.
+// Runs the extension's own scripts with no browser. Every saved account gets a
+// tab of its own: page-hook.js and the content scripts run in one vm context
+// per account that stands in for a casino tab logged in as it, all at once and
+// each pinned to its account (no rotation). The service worker's solvers run in
+// another context. chrome.storage is the shared Store, each tab has its own
+// localStorage (session, pacing, learned speeds), and API calls go straight to
+// the casino with that tab's session. The dashboard shows one focused tab.
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
@@ -16,6 +18,9 @@ import { log } from './log.mjs';
 const require = createRequire(import.meta.url);
 
 const ACTIVITY_LIMIT = 500;
+const PLAY_LIMIT = 300;
+// The tab that runs while no account is saved, showing the logged-out panel.
+const LOGIN_TAB = '';
 const REFRESH_EVERY_MS = 30_000;
 // A session is refreshed this long before its access token runs out.
 const REFRESH_AHEAD_MS = 5 * 60_000;
@@ -92,37 +97,123 @@ export class Runner extends EventEmitter {
     this.i18n = i18n(extensionDir, locale);
     this.core = require(join(extensionDir, 'src', 'core.js'));
     this.manifest = JSON.parse(readFileSync(join(extensionDir, 'manifest.json'), 'utf8'));
-    this.sessionStorage = memoryStorage();
-    this.localStorage = store.localStorage();
     this.activity = [];
-    this.page = null;
+    this.plays = [];
+    // id -> { id, localStorage, sessionStorage, page }
+    this.tabs = new Map();
+    this.focusId = null;
     this.solve = null;
     this.refreshTimer = null;
     this.bundleSrc = null;
     this.reloadTimer = null;
     this.githubFlows = new Map();
-    // A login that arrives while no one is logged in (a backup imported in
-    // the settings) is used at once instead of on the next restart.
+    // A login that arrives for an account with no tab yet (a backup imported
+    // in the settings) gets its tab at once instead of on the next check.
     store.onChanged((changes) => {
-      if (this.readSession() || this.reloadTimer) return;
-      if (!Object.entries(changes).some(([key, change]) => key.startsWith(ACCOUNT_PREFIX) && change.newValue?.session)) return;
+      if (this.reloadTimer || !this.started) return;
+      const fresh = Object.entries(changes).some(([key, change]) => key.startsWith(ACCOUNT_PREFIX) && change.newValue?.session && !this.tabs.has(key.slice(ACCOUNT_PREFIX.length)));
+      if (!fresh) return;
       this.reloadTimer = setTimeout(() => {
         this.reloadTimer = null;
-        if (!this.readSession()) this.reload();
+        this.syncTabs().catch((error) => log.warn('tabs_sync_error', { error: error.message }));
       }, 1000);
     });
   }
 
   async start() {
+    this.started = true;
     this.bootBackground();
-    await this.bootPage();
-    this.refreshTimer = setInterval(() => this.refreshSession().catch((error) => log.warn('session_refresh_error', { error: error.message })), REFRESH_EVERY_MS);
+    this.adoptLegacyPage();
+    await this.syncTabs();
+    this.refreshTimer = setInterval(() => this.tick().catch((error) => log.warn('session_refresh_error', { error: error.message })), REFRESH_EVERY_MS);
+  }
+
+  async tick() {
+    await this.syncTabs();
+    for (const tab of this.tabs.values()) await this.refreshSession(tab);
   }
 
   stop() {
+    this.started = false;
     clearInterval(this.refreshTimer);
-    this.disposePage();
+    clearTimeout(this.reloadTimer);
+    for (const tab of this.tabs.values()) this.disposePage(tab);
     this.store.flush();
+  }
+
+  // The single page of before kept its localStorage unnamed; it moves to the
+  // account its session belongs to, so that tab keeps its learned speeds.
+  adoptLegacyPage() {
+    const legacy = this.store.localStorage();
+    if (!legacy.length) return;
+    const items = {};
+    for (let i = 0; i < legacy.length; i++) items[legacy.key(i)] = legacy.getItem(legacy.key(i));
+    const session = Object.entries(items).find(([key]) => SESSION_KEY.test(key));
+    let id = null;
+    try {
+      id = session && this.core.tokenSubject(JSON.parse(session[1])?.access_token);
+    } catch {}
+    if (!id) return;
+    const target = this.store.localStorage(id);
+    if (!target.length) for (const [key, value] of Object.entries(items)) target.setItem(key, value);
+    legacy.clear();
+    log.info('page_storage_moved', { id });
+  }
+
+  // Opens a tab for every saved account with a login, and the login tab
+  // while there is none.
+  async syncTabs() {
+    const ids = this.accounts()
+      .filter(([, saved]) => saved.session)
+      .map(([id]) => id);
+    for (const id of ids) if (!this.tabs.has(id)) await this.openTab(id);
+    if (ids.length && this.tabs.has(LOGIN_TAB)) this.closeTab(LOGIN_TAB);
+    if (!this.tabs.size) await this.openTab(LOGIN_TAB);
+  }
+
+  // A tab logged in as id: its own localStorage, given the account's saved
+  // login unless it holds a newer one (raw, a session just issued, wins).
+  async openTab(id, raw = null) {
+    const tab = { id, localStorage: this.store.localStorage(id), sessionStorage: memoryStorage(), page: null };
+    this.tabs.set(id, tab);
+    const saved = id ? this.store.get(ACCOUNT_PREFIX + id)[ACCOUNT_PREFIX + id] : null;
+    const session = raw ?? saved?.session;
+    const current = this.readSession(tab);
+    if (session && (!current || this.core.isNewerSession(session, current.raw))) {
+      if (current) tab.localStorage.removeItem(current.key);
+      tab.localStorage.setItem(current?.key ?? saved?.storageKey ?? this.storageKey(), session);
+    }
+    await this.bootPage(tab);
+    return tab;
+  }
+
+  closeTab(id) {
+    const tab = this.tabs.get(id);
+    if (!tab) return;
+    this.disposePage(tab);
+    this.tabs.delete(id);
+  }
+
+  // The tab the dashboard shows: the one picked there, else home, else any.
+  focusTab() {
+    const { settings = {} } = this.store.get('settings');
+    return this.tabs.get(this.focusId) ?? this.tabs.get(settings.homeAccount) ?? this.tabs.values().next().value ?? null;
+  }
+
+  get page() {
+    return this.focusTab()?.page ?? null;
+  }
+
+  loginOf(id) {
+    return id ? (this.store.get(ACCOUNT_PREFIX + id)[ACCOUNT_PREFIX + id]?.login ?? null) : null;
+  }
+
+  // A played round, ticket, spin or reward from a tab, for the play feed.
+  addPlay(tab, item) {
+    const play = { ...item, account: item.account ?? this.loginOf(tab.id) };
+    this.plays.push(play);
+    if (this.plays.length > PLAY_LIMIT) this.plays.shift();
+    this.emit('play', play);
   }
 
   script(name) {
@@ -160,7 +251,7 @@ export class Runner extends EventEmitter {
     };
   }
 
-  console(origin) {
+  console(origin, tab = null) {
     const write = (level) => (...args) => {
       const text = args.map((arg) => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' ');
       let entry = null;
@@ -170,7 +261,7 @@ export class Runner extends EventEmitter {
       if (entry?.app !== 'botter') return log[level === 'log' ? 'debug' : level]?.('script', { origin, text });
       process.stdout.write(text + '\n');
       const { app, level: lvl = 'info', msg = '', ...fields } = entry;
-      const item = { time: new Date().toISOString(), level: lvl, msg, fields };
+      const item = { time: new Date().toISOString(), level: lvl, msg, fields, ...(tab?.id ? { account: this.loginOf(tab.id) } : {}) };
       this.activity.push(item);
       if (this.activity.length > ACTIVITY_LIMIT) this.activity.shift();
       this.emit('activity', item);
@@ -220,9 +311,8 @@ export class Runner extends EventEmitter {
       });
   }
 
-  async bootPage() {
-    this.ensureSession();
-    await this.refreshSession().catch((error) => log.warn('session_refresh_error', { error: error.message }));
+  async bootPage(tab) {
+    await this.refreshSession(tab).catch((error) => log.warn('session_refresh_error', { error: error.message }));
     this.bundleSrc = await this.findBundle();
 
     let alive = true;
@@ -238,8 +328,8 @@ export class Runner extends EventEmitter {
     const window = {
       ...WEB_GLOBALS,
       ...timers.globals,
-      BotterHeadless: {},
-      console: this.console('page'),
+      BotterHeadless: { pinned: true, focus: (id) => this.switchTo(id), play: (item) => alive && this.addPlay(tab, item) },
+      console: this.console('page', tab),
       navigator: { language: this.locale, languages: [this.locale] },
       location: {
         origin: casino.origin,
@@ -248,10 +338,10 @@ export class Runner extends EventEmitter {
         hostname: casino.hostname,
         protocol: casino.protocol,
         pathname: casino.pathname,
-        reload: () => setImmediate(() => this.reload()),
+        reload: () => setImmediate(() => this.reload(tab)),
       },
-      localStorage: this.localStorage,
-      sessionStorage: this.sessionStorage,
+      localStorage: tab.localStorage,
+      sessionStorage: tab.sessionStorage,
       fetch: (input, init) => fetch(new URL(typeof input === 'string' ? input : input.url, casino), init),
       addEventListener: (type, fn) => listeners[type]?.add(fn),
       removeEventListener: (type, fn) => listeners[type]?.delete(fn),
@@ -281,7 +371,7 @@ export class Runner extends EventEmitter {
     const scripts = this.manifest.content_scripts.flatMap((entry) => entry.js);
     for (const name of scripts) vm.runInContext(this.script(name), context, { filename: name });
 
-    this.page = {
+    tab.page = {
       window,
       document: dom.document,
       dispose: () => {
@@ -290,20 +380,21 @@ export class Runner extends EventEmitter {
         for (const off of unsubscribers) off();
       },
     };
-    log.info('page_booted', { session: !!this.readSession() });
+    log.info('page_booted', { session: !!this.readSession(tab), account: this.loginOf(tab.id) });
   }
 
-  disposePage() {
-    this.page?.dispose();
-    this.page = null;
+  disposePage(tab) {
+    tab.page?.dispose();
+    tab.page = null;
   }
 
-  async reload() {
-    this.disposePage();
-    await this.bootPage();
+  async reload(tab) {
+    if (this.tabs.get(tab.id) !== tab) return;
+    this.disposePage(tab);
+    await this.bootPage(tab);
   }
 
-  // The panel content.js built, as HTML for the dashboard to mirror.
+  // The focused tab's panel, as HTML for the dashboard to mirror.
   panelHtml() {
     return this.page?.document.getElementById('botter-panel')?.shadowRoot?.innerHTML ?? '';
   }
@@ -326,24 +417,31 @@ export class Runner extends EventEmitter {
     return true;
   }
 
-  // Logs the page in as a saved account the way the panel's dropdown does,
-  // so the current login is saved first.
+  // Shows another account's tab on the dashboard. Every tab keeps running.
   switchTo(id) {
-    const select = this.page?.document.getElementById('botter-panel')?.shadowRoot?.querySelector('#account');
-    if (!select || !select.options.some((option) => option.value === id && !option.disabled)) return false;
-    select.value = id;
-    select.dispatchEvent(new this.page.window.Event('change'));
+    if (!this.tabs.get(id)?.page) return false;
+    this.focusId = id;
     return true;
   }
 
   async setLocale(locale) {
     this.locale = locale;
     this.i18n = i18n(this.extensionDir, locale);
-    await this.reload();
+    for (const tab of [...this.tabs.values()]) await this.reload(tab);
   }
 
+  // The focused tab's report, with every tab's status line.
   report() {
-    return this.page?.window.BotterHeadless.report?.() ?? null;
+    const report = this.page?.window.BotterHeadless.report?.() ?? null;
+    if (!report) return null;
+    const focus = this.focusTab();
+    report.tabs = [...this.tabs.values()]
+      .filter((tab) => tab.id)
+      .map((tab) => {
+        const own = tab === focus ? report : tab.page?.window.BotterHeadless.report?.();
+        return { id: tab.id, login: own?.player?.login ?? this.loginOf(tab.id), status: own?.status ?? null, focused: tab === focus };
+      });
+    return report;
   }
 
   // The casino's current bundle name, for the bot's model check.
@@ -358,16 +456,18 @@ export class Runner extends EventEmitter {
     }
   }
 
-  readSession() {
-    for (let i = 0; i < this.localStorage.length; i++) {
-      const key = this.localStorage.key(i);
-      if (SESSION_KEY.test(key)) return { key, raw: this.localStorage.getItem(key) };
+  readSession(tab = this.focusTab()) {
+    const storage = tab?.localStorage;
+    if (!storage) return null;
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (SESSION_KEY.test(key)) return { key, raw: storage.getItem(key) };
     }
     return null;
   }
 
-  // A GET on the casino API as whoever the page is logged in as. Null when
-  // no one is or the call fails.
+  // A GET on the casino API as the focused tab's account. Null when it has
+  // no login or the call fails.
   async casinoGet(path) {
     let token;
     try {
@@ -392,24 +492,11 @@ export class Runner extends EventEmitter {
       .map(([key, value]) => [key.slice(ACCOUNT_PREFIX.length), value]);
   }
 
-  // With no one logged in, the page logs in as a saved account: home first,
-  // then any other that has a session and is not set aside.
-  ensureSession() {
-    if (this.readSession()) return;
-    const { settings = {} } = this.store.get('settings');
-    const now = Date.now();
-    const usable = this.accounts().filter(([, saved]) => saved.session && !(saved.brokenUntil > now));
-    const [id, saved] = usable.find(([id]) => id === settings.homeAccount) ?? usable[0] ?? [];
-    if (!saved) return;
-    this.localStorage.setItem(saved.storageKey ?? this.storageKey(), saved.session);
-    log.info('session_restored', { login: saved.login ?? id });
-  }
-
   // supabase-js refreshes the session in the browser; here the runner does,
   // and files the new one under its account straight away, since the server
   // has revoked the refresh token it replaced.
-  async refreshSession() {
-    const current = this.readSession();
+  async refreshSession(tab) {
+    const current = this.readSession(tab);
     if (!current) return;
     let session;
     try {
@@ -429,18 +516,22 @@ export class Runner extends EventEmitter {
       log.warn('session_refresh_failed', { status: res.status, error: data.error_description ?? data.msg ?? data.error });
       return;
     }
-    this.saveSession(data, current);
+    this.saveSession(data, current, tab);
   }
 
-  // Stores a session the auth server issued: in localStorage when it still
-  // belongs to whoever is logged in there, and on the saved account always.
-  saveSession(data, replacing = null) {
+  // Stores a session the auth server issued: in the account's tab when it
+  // still holds the one replaced, and on the saved account always.
+  saveSession(data, replacing = null, tab = null) {
     const raw = this.core.sessionFromToken(data);
     const id = this.core.tokenSubject(data.access_token);
     if (!raw || !id) return null;
-    const now = this.readSession();
+    tab ??= this.tabs.get(id) ?? null;
+    const now = tab ? this.readSession(tab) : null;
     const key = replacing?.key ?? now?.key ?? this.storageKey();
-    if (!replacing || now?.raw === replacing.raw) this.localStorage.setItem(key, raw);
+    if (tab && (!replacing || now?.raw === replacing.raw)) {
+      if (now && now.key !== key) tab.localStorage.removeItem(now.key);
+      tab.localStorage.setItem(key, raw);
+    }
     const saved = this.store.get(ACCOUNT_PREFIX + id)[ACCOUNT_PREFIX + id];
     if (saved && this.core.isNewerSession(raw, saved.session)) this.store.set({ [ACCOUNT_PREFIX + id]: { ...saved, session: raw, storageKey: key } });
     return id;
@@ -501,11 +592,21 @@ export class Runner extends EventEmitter {
     return { ok: true };
   }
 
-  // Logs the page in with a fresh session in place of whoever was logged in.
+  // Runs a fresh session in its account's tab, opening one for a new account,
+  // and shows it on the dashboard.
   async adopt(data) {
-    const current = this.readSession();
-    if (current) this.localStorage.removeItem(current.key);
-    this.saveSession(data);
-    await this.reload();
+    const id = this.core.tokenSubject(data.access_token);
+    const raw = this.core.sessionFromToken(data);
+    if (!id || !raw) return;
+    const tab = this.tabs.get(id);
+    if (tab) {
+      this.saveSession(data, null, tab);
+      await this.reload(tab);
+    } else {
+      this.saveSession(data);
+      await this.openTab(id, raw);
+    }
+    this.closeTab(LOGIN_TAB);
+    this.focusId = id;
   }
 }
