@@ -1173,12 +1173,20 @@
   // instead, which doubles with each refusal up to SPEED_PROBE_MAX: once the
   // fastest wait is found it is tested again only now and then. The floor and
   // probe are kept for good, since an accept at the floor can be timing jitter.
+  // No refusal teaches more than SPEED_EXTRA_MAX_MS of extra, and a hint adds at
+  // most SPEED_HINT_LEARN_MAX_MS: a refusal far past any real animation (a stale
+  // gap, or the general limiter's 30 s backoff) is not this path's limit, and
+  // since trimming below the floor waits for up to 640 accepted per 50 ms, one
+  // such refusal used to stick for good (roulette sat at 25 s a spin from
+  // 2026-11-03).
   // speed: { [path]: { extra, streak, floor?, probe? } }.
   const SPEED_STEP_UP_MS = 150;
   const SPEED_STEP_DOWN_MS = 50;
   const SPEED_PROBE = 10;
   const SPEED_PROBE_MAX = 640;
   const SPEED_RETRIES = 6;
+  const SPEED_EXTRA_MAX_MS = 5000;
+  const SPEED_HINT_LEARN_MAX_MS = 1000;
 
   // Milliseconds to wait after a response on path whose animation takes lock ms.
   function speedWait(speed, path, lock, max) {
@@ -1190,7 +1198,12 @@
   // A refusal that says how much longer to wait (hint, see speedHint) raises
   // the wait by that instead of the step up.
   function speedLearn(speed, path, lock, waited, refused, hint = null) {
-    if (refused) return speedRefused(speed, path, waited - lock, waited - lock + (hint ?? SPEED_STEP_UP_MS));
+    if (refused) {
+      const extra = waited - lock;
+      if (extra > SPEED_EXTRA_MAX_MS) return speed;
+      const up = Math.min(SPEED_EXTRA_MAX_MS, extra + Math.min(hint ?? SPEED_STEP_UP_MS, SPEED_HINT_LEARN_MAX_MS));
+      return speedRefused(speed, path, extra, up);
+    }
     const row = speed?.[path] ?? { extra: 0, streak: 0 };
     const extra = Math.max(-lock, row.extra - SPEED_STEP_DOWN_MS);
     const crossing = row.floor !== undefined && extra <= row.floor;
@@ -1231,9 +1244,22 @@
   // past that by a step that doubles with each refusal of the same ticket
   // (tries before it), so a retry never lands just short again; accepted ones
   // trim it like a game wait.
-  function workSpeedLearn(speed, key, openMs, refused, tries = 0) {
+  // A max (the start gap) ignores refusals past it and never learns more.
+  function workSpeedLearn(speed, key, openMs, refused, tries = 0, max = Infinity) {
     if (!refused) return speedLearn(speed, key, 0, openMs, false);
-    return speedRefused(speed, key, openMs, openMs + speedRetryWait(tries));
+    if (openMs > max) return speed;
+    return speedRefused(speed, key, openMs, Math.min(max, openMs + speedRetryWait(tries)));
+  }
+
+  // The table without rows (picked by keep) that learned more than
+  // SPEED_EXTRA_MAX_MS, which only a bogus refusal could teach: they start over.
+  function speedClean(speed, keep = () => true) {
+    const out = {};
+    for (const [key, row] of Object.entries(speed ?? {})) {
+      const bad = keep(key) && (row.extra > SPEED_EXTRA_MAX_MS || row.floor > SPEED_EXTRA_MAX_MS);
+      if (!bad) out[key] = row;
+    }
+    return out;
   }
 
   // This week's event: { key, startAt, endAt, active }. A week runs from
@@ -1403,6 +1429,8 @@
     speedRetryWait,
     speedHint,
     workSpeedLearn,
+    speedClean,
+    SPEED_EXTRA_MAX_MS,
     WINS_BONUS,
     bonusEdges,
     edgePlan,

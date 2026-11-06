@@ -398,7 +398,9 @@
   const SPEED_KEY = 'botter:speed';
   let speed = {};
   try {
-    speed = JSON.parse(localStorage.getItem(SPEED_KEY)) ?? {};
+    // Game waits and the work start gap that a bogus refusal pushed past
+    // any real limit start over (BotterAuto.speedClean); submit waits keep theirs.
+    speed = A.speedClean(JSON.parse(localStorage.getItem(SPEED_KEY)) ?? {}, (key) => !key.startsWith('work:') || key === 'work:start');
   } catch {
     // Nothing learned yet, or storage blocked.
   }
@@ -457,7 +459,7 @@
   const startWait = () => A.speedWait(speed, START_KEY, 0, MAX_WORK_DWELL_MS);
   function learnStart(refused) {
     if (startGap === null) return;
-    speed = A.workSpeedLearn(speed, START_KEY, startGap, refused, startTries);
+    speed = A.workSpeedLearn(speed, START_KEY, startGap, refused, startTries, A.SPEED_EXTRA_MAX_MS);
     saveSpeed();
     if (refused) log.info('work_start_learned', { gap: startGap, wait: startWait(), tries: startTries + 1 });
   }

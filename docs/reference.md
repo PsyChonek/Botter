@@ -109,7 +109,12 @@ progress shows at `chrome://on-device-internals`.
   ("Zpomal trochu.", a 429 whose hint is the real time left in ms) counts as a refusal
   too, and raises the wait by that hint plus 30 ms (`speedHint`); until 2026-10-28 only
   "počkej na animaci" counted, so mines kept trimming its wait and every start, reveal
-  and cashout was refused twice. A refused request is retried after its hint plus 30 ms
+  and cashout was refused twice. No refusal teaches more than 5 s of extra, nor more
+  than 1 s from its hint, and rows past 5 s (the start gap too) are dropped when the
+  page loads (`speedClean`, since 2026-11-06): a refusal 30 s after a roulette spin had
+  taught a 25.8 s floor, and since trimming below a floor waits for up to 640 accepted
+  per 50 ms, roulette ran at 29.5 s a spin and levelling all but stopped from 2026-11-03.
+  A refused request is retried after its hint plus 30 ms
   when it has one, else after 150 ms, 300 ms, 600 ms and so on (6
   times) instead of the 30 s the server asks for, and only first attempts teach the
   wait, so one long animation does not slow every later round. A step that played

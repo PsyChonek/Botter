@@ -1088,8 +1088,38 @@ test('speedLearn waits just past what the server refused and keeps probing short
   let other = {};
   for (let i = 0; i < 30; i++) other = A.speedLearn(other, '/api/cases/open', 0, 0, false);
   assert.equal(A.speedWait(other, '/api/cases/open', 0, 32_000), 0);
-  assert.equal(A.speedWait(A.speedLearn({}, '/api/hotfix/free', 0, 40_000, true), '/api/hotfix/free', 0, 32_000), 32_000);
+  assert.equal(A.speedWait({ '/api/hotfix/free': { extra: 40_000, streak: 0 } }, '/api/hotfix/free', 0, 32_000), 32_000);
   assert.deepEqual([0, 1, 2].map(A.speedRetryWait), [150, 300, 600]);
+});
+
+test('speedLearn ignores refusals far past any real limit, which used to stick for good', () => {
+  const path = '/api/roulette/spin';
+  // Live on 2026-11-03: a refusal 30 s after a spin taught a 25.8 s floor, and
+  // trimming below it waited 640 spins per 50 ms, so roulette ran at 29.5 s a spin.
+  assert.deepEqual(A.speedLearn({}, path, 4200, 30_063, true), {});
+  // The general limiter's 30 s backoff hint teaches at most 1 s.
+  const hinted = A.speedLearn({}, '/api/mines/cashout', 0, 0, true, 30_030);
+  assert.equal(A.speedWait(hinted, '/api/mines/cashout', 0, 32_000), 1000);
+  // Nothing learns more than the cap, the start gap included.
+  const stepped = A.speedLearn({ [path]: { extra: 4900, streak: 0 } }, path, 4200, 9100, true, 800);
+  assert.equal(A.speedWait(stepped, path, 4200, 32_000), 4200 + A.SPEED_EXTRA_MAX_MS);
+  let start = A.workSpeedLearn({}, 'work:start', 57_000, true, 3, A.SPEED_EXTRA_MAX_MS);
+  assert.deepEqual(start, {});
+  start = A.workSpeedLearn({}, 'work:start', 4900, true, 3, A.SPEED_EXTRA_MAX_MS);
+  assert.equal(A.speedWait(start, 'work:start', 0, 60_000), A.SPEED_EXTRA_MAX_MS);
+});
+
+test('speedClean drops rows a bogus refusal poisoned and keeps the rest', () => {
+  const live = {
+    '/api/roulette/spin': { extra: 25_152, streak: 396, floor: 25_863, probe: 640 },
+    '/api/mines/cashout': { extra: 21_987, streak: 2, floor: -137, probe: 80 },
+    '/api/blackjack/action': { extra: 2338, streak: 230, floor: 2758, probe: 640 },
+    'work:start': { extra: 57_584, streak: 7 },
+    'work:typing': { extra: 9000, streak: 3 },
+  };
+  const keep = (key) => !key.startsWith('work:') || key === 'work:start';
+  assert.deepEqual(Object.keys(A.speedClean(live, keep)), ['/api/blackjack/action', 'work:typing']);
+  assert.deepEqual(A.speedClean(null), {});
 });
 
 test('speedHint trusts the casino\'s ms hint on "Zpomal trochu." but not on the animation lock', () => {
