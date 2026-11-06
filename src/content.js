@@ -3267,6 +3267,7 @@
         loanLimit: player.loanLimit ?? null,
         loanBlockedUntil: player.loanBlockedUntil > now ? player.loanBlockedUntil : null,
         xpInto: player.xpInto ?? 0,
+        xpNeed: player.xpNeed ?? null,
       },
       loanSettings: { levelLoan: settings.levelLoan, loanCycle: settings.loanCycle, autoBankrupt: settings.autoBankrupt, loanTrick: settings.loanTrick },
       loanStats: { cycleFree: stats.free.loan ?? 0, cleanDone: !!stats.flags.cleanDone },

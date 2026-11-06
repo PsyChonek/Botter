@@ -439,7 +439,7 @@ export class Runner extends EventEmitter {
       .filter((tab) => tab.id)
       .map((tab) => {
         const own = tab === focus ? report : tab.page?.window.BotterHeadless.report?.();
-        return { id: tab.id, login: own?.player?.login ?? this.loginOf(tab.id), status: own?.status ?? null, focused: tab === focus };
+        return { id: tab.id, login: own?.player?.login ?? this.loginOf(tab.id), status: own?.status ?? null, player: own?.player ?? null, focused: tab === focus };
       });
     return report;
   }

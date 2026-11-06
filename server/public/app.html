@@ -23,7 +23,7 @@
     <button type="button" id="logout" class="ghost" data-i18n="logout">Sign out</button>
   </header>
 
-  <section class="hero" aria-labelledby="hero-account">
+  <section class="hero" id="hero" aria-labelledby="hero-account">
     <div class="hero-main">
       <p class="eyebrow" data-i18n="account">Account</p>
       <h2 id="hero-account" class="hero-account">-</h2>
@@ -42,10 +42,7 @@
       <span class="auto-label" data-i18n="auto">Auto</span>
       <span id="auto-state" class="auto-state"></span>
     </button>
-    <div id="hero-tabs-wrap" class="hero-tabs" hidden>
-      <p class="eyebrow" id="hero-tabs-label" data-i18n="runningAccounts">Running now</p>
-      <ul id="hero-tabs" aria-labelledby="hero-tabs-label"></ul>
-    </div>
+    <ul id="hero-accounts" class="hero-accounts" data-i18n-label="runningAccounts" hidden></ul>
   </section>
 
   <div id="update-warn" class="update-warn" role="alert" hidden>
@@ -77,9 +74,8 @@
             <button type="button" id="play-pause" class="ghost" aria-pressed="false" data-i18n="pause">Pause</button>
           </div>
         </div>
-        <div id="play-pace" class="play-pace"></div>
         <p id="play-empty" class="muted" data-i18n="playEmpty">Nothing played yet.</p>
-        <ol id="plays" class="plays" aria-live="off"></ol>
+        <div id="play-cols" class="play-cols"></div>
       </section>
       <section class="card" aria-labelledby="panel-heading">
         <h2 id="panel-heading" data-i18n="panel">Bot</h2>

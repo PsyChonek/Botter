@@ -779,46 +779,99 @@ $('only-problems').addEventListener('change', renderActivity);
 
 // ---------- running accounts ----------
 
-// Every account runs in its own tab on the server; picking one shows it here.
+const PRESTIGE_LEVEL = 40;
+const pct = (part, whole) => `${Math.max(0, Math.min(100, (100 * part) / whole)).toFixed(1)}%`;
+
+const el = (tag, className, text) => {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+};
+
+function bar(fraction, className = '') {
+  const outer = el('span', `bar ${className}`);
+  outer.setAttribute('aria-hidden', 'true');
+  const inner = el('span');
+  inner.style.width = fraction;
+  outer.append(inner);
+  return outer;
+}
+
+function accountStat(label, value, extra) {
+  const box = el('span', 'acct-stat');
+  box.append(el('span', 'k', label), el('span', 'v', value));
+  if (extra) box.append(extra);
+  return box;
+}
+
+// Every account runs in its own tab on the server: one card each, the
+// focused one (shown in the panel below) marked. Picking a card focuses it.
+function accountCard(tab) {
+  const player = tab.player;
+  const button = el('button', 'acct');
+  button.type = 'button';
+  button.dataset.id = tab.id;
+  button.setAttribute('aria-pressed', String(tab.focused));
+  const head = el('span', 'acct-head');
+  const dot = el('span', 'dot');
+  dot.style.background = accountColor(tab.login);
+  head.append(dot, el('span', 'acct-name', tab.login ?? tab.id));
+  if (player?.prestige) head.append(el('span', 'acct-badge', t('prestigeCount', [String(player.prestige)])));
+  if (tab.focused) head.append(el('span', 'acct-shown', t('shownBelow')));
+  const status = el('span', 'acct-status', tab.status ?? '-');
+  status.title = tab.status ?? '';
+  button.append(head, status);
+  if (player) {
+    const stats = el('span', 'acct-stats');
+    const energy = `${player.energy} / ${player.maxEnergy}`;
+    stats.append(
+      accountStat(t('level'), number(player.level)),
+      accountStat(t('credits'), number(player.credits)),
+      accountStat(t('energy'), energy, bar(pct(player.energy, player.maxEnergy))),
+    );
+    button.append(stats);
+    const goal = el('span', 'acct-goal');
+    if (player.xpNeed) {
+      const row = el('span', 'row');
+      row.append(el('span', '', t('xpToNext', [String(player.level + 1)])), el('span', '', `${number(player.xpInto)} / ${number(player.xpNeed)}`));
+      goal.append(row, bar(pct(player.xpInto, player.xpNeed)));
+    }
+    const toGo = el('span', 'row');
+    toGo.append(el('span', '', t('toPrestige')), el('span', '', `${player.level} / ${PRESTIGE_LEVEL}`));
+    goal.append(toGo, bar(pct(player.level - 1 + (player.xpNeed ? player.xpInto / player.xpNeed : 0), PRESTIGE_LEVEL - 1), 'goal'));
+    button.append(goal);
+  }
+  button.addEventListener('click', async () => {
+    if (!tab.focused) await post('/api/account/switch', { id: tab.id });
+  });
+  const li = el('li');
+  li.append(button);
+  return li;
+}
+
 function renderTabs(list) {
-  $('hero-tabs-wrap').hidden = list.length < 2;
-  if (list.length < 2) return;
-  $('hero-tabs').replaceChildren(
-    ...list.map((tab) => {
-      const li = document.createElement('li');
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.setAttribute('aria-pressed', String(tab.focused));
-      const login = document.createElement('span');
-      login.className = 'tab-login';
-      const dot = document.createElement('span');
-      dot.className = 'dot';
-      dot.style.background = accountColor(tab.login);
-      login.append(dot, tab.login ?? tab.id);
-      const status = document.createElement('span');
-      status.className = 'tab-status';
-      status.textContent = tab.status ?? '-';
-      status.title = tab.status ?? '';
-      button.append(login, status);
-      button.addEventListener('click', async () => {
-        if (tab.focused) return;
-        await post('/api/account/switch', { id: tab.id });
-      });
-      li.append(button);
-      return li;
-    }),
-  );
+  const multi = list.length > 1;
+  $('hero').classList.toggle('multi', multi);
+  $('hero-accounts').hidden = !multi;
+  if (!multi) return;
+  // Re-rendered every report: keep keyboard focus on the same card.
+  const focused = document.activeElement?.closest?.('.acct')?.dataset.id;
+  $('hero-accounts').replaceChildren(...list.map(accountCard));
+  if (focused) $('hero-accounts').querySelector(`.acct[data-id="${CSS.escape(focused)}"]`)?.focus();
 }
 
 // ---------- live play ----------
 
-const PLAYS_KEPT = 400;
-const PLAYS_SHOWN = 80;
+const PLAYS_KEPT = 600;
+const PLAYS_SHOWN = 60;
+const STRIP_SHOWN = 40;
 const PACE_WINDOW_MS = 5 * 60_000;
 // Activity lines that say nothing about play, kept out of the feed.
-const QUIET_ACTIONS = new Set(['rate_limit_retry', 'account', 'page_booted', 'standup_skipped', 'upgrades_skipped', 'wheel_spin', 'level_up', 'rewards']);
+const QUIET_ACTIONS = new Set(['rate_limit_retry', 'account', 'page_booted', 'standup_skipped', 'upgrades_skipped', 'wheel_spin', 'level_up', 'rewards', 'speed_learned']);
 const RED_POCKETS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
 const SUITS = { h: '♥', d: '♦', c: '♣', s: '♠' };
+const clockTime = (at) => new Date(at).toLocaleTimeString(I18n.lang, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 const plays = [];
 let playsPaused = false;
 let freshUntil = 0;
@@ -829,16 +882,13 @@ function accountColor(login) {
   return slot < 0 ? 'var(--track)' : `var(--series-${(slot % 8) + 1})`;
 }
 
-const el = (tag, className, text) => {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
+const pocketColor = (pocket) => {
+  const n = Number(pocket);
+  return !/^\d+$/.test(String(pocket)) || n === 0 ? 'green' : RED_POCKETS.has(n) ? 'red' : 'black';
 };
 
 function pocketChip(pocket) {
-  const n = Number(pocket);
-  const color = !/^\d+$/.test(String(pocket)) || n === 0 ? 'green' : RED_POCKETS.has(n) ? 'red' : 'black';
+  const color = pocketColor(pocket);
   const chip = el('span', `pocket ${color}`, String(pocket));
   chip.setAttribute('aria-label', t('pocketLabel', [String(pocket), t(`pocket_${color}`)]));
   return chip;
@@ -848,8 +898,7 @@ function cardChip(card) {
   const text = String(card);
   const suit = text.slice(-1);
   const mark = SUITS[suit];
-  const chip = el('span', `playing-card${suit === 'h' || suit === 'd' ? ' red' : ''}`, mark ? text.slice(0, -1) + mark : text);
-  return chip;
+  return el('span', `playing-card${suit === 'h' || suit === 'd' ? ' red' : ''}`, mark ? text.slice(0, -1) + mark : text);
 }
 
 function hand(label, cards) {
@@ -881,6 +930,7 @@ function reels(grid) {
 }
 
 const betText = (bets) => Object.entries(bets ?? {}).map(([spot, amount]) => `${spot} ${number(amount)}`).join(', ');
+const rewardSum = (item) => ['standup', 'achievement', 'payroll', 'event'].reduce((sum, key) => sum + (item[key] ?? 0), 0);
 
 // The picture of one play: the outcome the casino showed, as far as the
 // response carried it (GameData.playOutcome on the bot's side).
@@ -889,9 +939,9 @@ function playVisual(item) {
   if (item.kind === 'game') {
     if (item.pocket !== undefined) box.append(pocketChip(item.pocket));
     if (item.dice) box.append(...item.dice.map((d) => el('span', 'die', String(d))));
-    if (item.banker || (item.player && item.game === 'baccarat')) {
+    if (item.game === 'baccarat') {
       box.append(hand(t('handPlayer'), item.player), hand(t('handBanker'), item.banker));
-      if (item.winner) box.append(el('span', 'badge', t(`winner_${item.winner}`) || item.winner));
+      if (item.winner) box.append(el('span', 'badge', t(`winner_${item.winner}`)));
     }
     if (item.dealer) {
       box.append(hand(t('handYou'), item.player), hand(t('handDealer'), item.dealer));
@@ -900,13 +950,15 @@ function playVisual(item) {
     if (item.grid) box.append(reels(item.grid));
     if (item.game === 'mines') {
       const bar = el('span', 'mines-bar');
+      bar.setAttribute('role', 'img');
       bar.setAttribute('aria-label', t('minesRevealed', [String(item.revealed ?? 0)]));
-      for (let i = 0; i < Math.min(12, Math.max(item.revealed ?? 0, 1)); i++) bar.append(Object.assign(el('i', i < (item.revealed ?? 0) ? 'on' : ''), { ariaHidden: 'true' }));
+      for (let i = 0; i < Math.min(12, Math.max(item.revealed ?? 0, 1)); i++) bar.append(el('i', i < (item.revealed ?? 0) ? 'on' : ''));
       box.append(bar, el('span', 'bet-tag', item.step));
     }
     if (item.item) box.append(el('span', 'badge', `${item.item}${item.rarity ? ` (${item.rarity})` : ''}`));
     if (item.numbers) box.append(el('span', 'bet-tag', item.numbers.join(' ')));
-    if (item.bets && !item.banker) box.append(el('span', 'bet-tag', betText(item.bets)));
+    if (item.bets && item.game !== 'baccarat') box.append(el('span', 'bet-tag', betText(item.bets)));
+    else if (item.bet && !item.bets) box.append(el('span', 'bet-tag', t('betOf', [number(item.bet)])));
   } else if (item.kind === 'work') {
     box.append(el('span', `badge ${item.correct ? 'good' : 'bad'}`, t(item.correct ? 'workRight' : 'workWrong')));
     if (item.type) box.append(el('span', 'bet-tag', item.type));
@@ -930,35 +982,73 @@ function playVisual(item) {
 }
 
 function playTitle(item) {
-  if (item.kind === 'game') return t(`game_${item.game}`) || item.game;
-  if (item.kind === 'free') return t(`free_${item.what}`) || item.what;
+  if (item.kind === 'game') return t(`game_${item.game}`);
+  if (item.kind === 'free') return t(`free_${item.what}`);
   if (item.kind === 'action') return item.msg;
   return t(`play_${item.kind}`);
 }
 
 function playMoney(item) {
   const box = el('div', 'play-money');
-  const value = item.kind === 'game' ? item.net : item.kind === 'reward' ? ['standup', 'achievement', 'payroll', 'event'].reduce((sum, key) => sum + (item[key] ?? 0), 0) : item.credits;
+  const value = item.kind === 'game' ? item.net : item.kind === 'reward' ? rewardSum(item) : item.credits;
   if (typeof value === 'number') box.append(el('span', `net ${value > 0 ? 'pos' : value < 0 ? 'neg' : ''}`, signed(value)));
-  const sub = [];
-  if (item.kind === 'game' && item.bet) sub.push(t('betOf', [number(item.bet)]));
-  if (item.xp) sub.push(`${number(item.xp)} XP`);
-  if (sub.length) box.append(el('span', 'sub', sub.join(' / ')));
+  if (item.xp) box.append(el('span', 'sub', `${number(item.xp)} XP`));
   return box;
 }
 
 function playRow(item) {
-  const li = el('li', item.received > freshUntil - 1000 ? 'fresh' : '');
-  const time = el('time', '', new Date(item.at).toLocaleTimeString(I18n.lang));
+  const li = el('li', item.received >= freshUntil ? 'fresh' : '');
+  const time = el('time', '', clockTime(item.at));
   time.dateTime = new Date(item.at).toISOString();
-  const who = el('div', 'play-who');
-  const line = el('span', 'who');
-  const dot = el('span', 'dot');
-  dot.style.background = accountColor(item.account);
-  line.append(dot, item.account ?? '-');
-  who.append(line, el('span', 'what', playTitle(item)));
-  li.append(time, who, playVisual(item), playMoney(item));
+  const what = el('span', 'play-what', playTitle(item));
+  what.title = what.textContent;
+  li.append(time, what, playVisual(item), playMoney(item));
   return li;
+}
+
+// The last results of one account as a strip: roulette pockets in their
+// color, any other game as a win or a loss.
+function strip(items) {
+  const box = el('div', 'strip');
+  box.setAttribute('aria-hidden', 'true');
+  for (const item of items.filter((x) => x.kind === 'game' && x.step !== 'start').slice(0, STRIP_SHOWN).reverse()) {
+    if (item.pocket !== undefined) box.append(el('i', pocketColor(item.pocket), String(item.pocket)));
+    else box.append(el('i', item.net >= 0 ? 'win' : 'loss'));
+  }
+  return box;
+}
+
+function pace(items) {
+  const from = Date.now() - PACE_WINDOW_MS;
+  const games = items.filter((item) => item.kind === 'game' && item.at >= from);
+  const net = games.reduce((sum, item) => sum + (item.net ?? 0), 0);
+  const xp = games.reduce((sum, item) => sum + (item.xp ?? 0), 0);
+  const box = el('span', 'pace');
+  box.title = t('paceHint');
+  const stat = (value, label, className = '') => {
+    const span = el('span');
+    span.append(el('b', className, value), ` ${label}`);
+    return span;
+  };
+  box.append(
+    stat((games.length / (PACE_WINDOW_MS / 60_000)).toFixed(1), t('perMinute')),
+    stat(signed(net), t('netShort'), net > 0 ? 'pos' : net < 0 ? 'neg' : ''),
+    stat(number(xp), 'XP'),
+  );
+  return box;
+}
+
+function playColumn(login, items) {
+  const col = el('section', 'play-col');
+  const head = el('div', 'play-col-head');
+  const dot = el('span', 'dot');
+  dot.style.background = accountColor(login);
+  head.append(dot, el('span', 'name', login ?? '-'), pace(items));
+  col.setAttribute('aria-label', login ?? '-');
+  const list = el('ol', 'plays');
+  list.append(...items.slice(0, PLAYS_SHOWN).map(playRow));
+  col.append(head, strip(items), list);
+  return col;
 }
 
 function renderPlayAccounts() {
@@ -971,38 +1061,15 @@ function renderPlayAccounts() {
   select.value = logins.includes(value) ? value : '';
 }
 
-// Rounds a minute, net and XP per account over the last few minutes.
-function renderPace() {
-  const from = Date.now() - PACE_WINDOW_MS;
-  const per = new Map();
-  for (const item of plays) {
-    if (item.kind !== 'game' || item.at < from) continue;
-    const row = per.get(item.account) ?? { rounds: 0, net: 0, xp: 0 };
-    row.rounds += 1;
-    row.net += item.net ?? 0;
-    row.xp += item.xp ?? 0;
-    per.set(item.account, row);
-  }
-  const minutes = PACE_WINDOW_MS / 60_000;
-  $('play-pace').replaceChildren(
-    ...[...per.entries()].sort().map(([login, row]) => {
-      const chip = el('span', 'pace');
-      const dot = el('span', 'dot');
-      dot.style.background = accountColor(login);
-      chip.append(dot, t('paceLine', [login ?? '-', (row.rounds / minutes).toFixed(1), signed(row.net), number(row.xp)]));
-      return chip;
-    }),
-  );
-}
-
+// One column per account, side by side, newest first.
 function renderPlays() {
-  renderPace();
   if (playsPaused) return;
   const account = $('play-account').value;
   const actions = $('play-actions').checked;
-  const shown = plays.filter((item) => (!account || item.account === account) && (actions || item.kind !== 'action')).slice(0, PLAYS_SHOWN);
+  const shown = plays.filter((item) => (!account || item.account === account) && (actions || item.kind !== 'action'));
+  const logins = [...new Set(shown.map((item) => item.account))].sort();
   $('play-empty').hidden = shown.length > 0;
-  $('plays').replaceChildren(...shown.map(playRow));
+  $('play-cols').replaceChildren(...logins.map((login) => playColumn(login, shown.filter((item) => item.account === login))));
 }
 
 function addPlays(items) {
@@ -1030,7 +1097,6 @@ $('play-pause').addEventListener('click', () => {
   $('play-pause').textContent = t(playsPaused ? 'resume' : 'pause');
   renderPlays();
 });
-setInterval(renderPace, 5000);
 
 // ---------- live updates ----------
 
