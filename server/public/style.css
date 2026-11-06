@@ -404,16 +404,25 @@ td.action { text-align: right; white-space: nowrap; }
 
 /* ---------- running accounts ---------- */
 
-/* With several accounts running, the strip is one card per account next to Auto. */
-.hero.multi { grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; }
+/* With several accounts running: a header row (label, Auto) over one card per account. */
+.hero.multi {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'label auto' 'cards cards';
+  align-items: center;
+  gap: 14px 16px;
+}
 .hero.multi .hero-main, .hero.multi .stats { display: none; }
+.hero.multi .auto { grid-area: auto; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 8px 16px; }
+.hero.multi .auto-state { font-size: 0.8rem; }
+.hero-accounts-label { grid-area: label; display: flex; align-items: center; gap: 8px; }
 .hero-accounts {
+  grid-area: cards;
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 12px;
+  gap: 14px;
 }
 .acct {
   width: 100%;
@@ -431,7 +440,7 @@ td.action { text-align: right; white-space: nowrap; }
 }
 .acct:hover { border-color: var(--track); }
 .acct[aria-pressed='true'] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.acct-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.acct-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; }
 .acct-name { font-size: 1.1rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .acct-badge { flex: none; padding: 1px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; background: var(--card); color: var(--muted); border: 1px solid var(--border); }
 .acct-shown { margin-left: auto; flex: none; font-size: 0.75rem; font-weight: 600; color: var(--accent); }
@@ -471,7 +480,10 @@ td.action { text-align: right; white-space: nowrap; }
 .play-col-head .pace b { color: var(--fg); font-weight: 700; }
 .play-col-head .pace .pos { color: var(--pos); }
 .play-col-head .pace .neg { color: var(--neg); }
-.strip { display: flex; flex-wrap: wrap; gap: 3px; min-height: 18px; }
+/* One line, newest on the right; older results slide out on the left. */
+.strip { display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: 3px; min-height: 18px; overflow: hidden; }
+.strip i { flex: none; }
+.strip { mask-image: linear-gradient(to right, transparent, #000 48px); -webkit-mask-image: linear-gradient(to right, transparent, #000 48px); }
 .strip i { width: 16px; height: 16px; border-radius: 50%; font-style: normal; font-size: 0.55rem; font-weight: 700; color: #ffffff; display: grid; place-items: center; border: 1px solid var(--pocket-ring); }
 .strip i.red { background: var(--pocket-red); }
 .strip i.black { background: var(--pocket-black); }
@@ -490,9 +502,6 @@ td.action { text-align: right; white-space: nowrap; }
   font-size: 0.85rem;
 }
 .plays li:last-child { border-bottom: none; }
-.plays li.fresh { animation: play-in 0.6s ease-out; }
-@keyframes play-in { from { background: var(--card); } to { background: transparent; } }
-@media (prefers-reduced-motion: reduce) { .plays li.fresh { animation: none; } }
 .plays time { color: var(--muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .play-what { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .play-visual { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; min-width: 0; }
@@ -552,4 +561,59 @@ td.action { text-align: right; white-space: nowrap; }
   .play-cols { grid-template-columns: minmax(0, 1fr); }
   .plays li { grid-template-columns: 56px minmax(0, 1fr) auto; }
   .plays .play-visual { grid-column: 2 / -1; grid-row: 2; }
+}
+
+/* ---------- motion ----------
+   Everything here is decoration: prefers-reduced-motion turns it all off. */
+
+:root { --ease-out: cubic-bezier(0.22, 1, 0.36, 1); --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+button, select, input, .card, .acct, .play-col, [role='tab'] {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.25s ease, transform 0.2s var(--ease-out), opacity 0.2s ease;
+}
+button:active:not(:disabled) { transform: scale(0.97); }
+.acct:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); }
+.acct[aria-pressed='true'] { box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent); }
+.bar > span, .meter span { transition: width 0.8s var(--ease-out); }
+.auto[aria-pressed='true'] { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); animation: auto-glow 2.4s ease-in-out infinite; }
+@keyframes auto-glow { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 0%, transparent); } }
+
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pos); position: relative; display: inline-block; }
+.live-dot::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--pos); animation: ping 1.8s var(--ease-out) infinite; }
+@keyframes ping { 0% { transform: scale(1); opacity: 0.7; } 100% { transform: scale(2.6); opacity: 0; } }
+.conn .dot { position: relative; }
+
+/* Views fade up when picked; cards rise in on load, one after another. */
+.view:not([hidden]) { animation: rise 0.35s var(--ease-out); }
+.hero, .tabs { animation: rise 0.45s var(--ease-out) both; }
+.tabs { animation-delay: 0.06s; }
+.view > .card, .view > .stack > .card { animation: rise 0.5s var(--ease-out) both; }
+.view > .card:nth-child(2), .view > .stack > .card:nth-child(1) { animation-delay: 0.08s; }
+.view > .stack > .card:nth-child(2) { animation-delay: 0.16s; }
+.hero-accounts > li { animation: rise 0.5s var(--ease-out) both; }
+.hero-accounts > li:nth-child(2) { animation-delay: 0.07s; }
+.hero-accounts > li:nth-child(3) { animation-delay: 0.14s; }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* New plays slide in, the pocket spins in like the wheel stopping, results pop. */
+.plays li.enter { animation: row-in 0.45s var(--ease-out); }
+@keyframes row-in { from { opacity: 0; transform: translateY(-8px); background: color-mix(in srgb, var(--accent) 14%, transparent); } to { opacity: 1; transform: none; background: transparent; } }
+.plays li.enter .pocket { animation: spin-in 0.7s var(--ease-spring); }
+@keyframes spin-in { from { transform: rotate(-200deg) scale(0.4); opacity: 0; } to { transform: none; opacity: 1; } }
+.plays li.enter .playing-card, .plays li.enter .die { animation: deal 0.4s var(--ease-out) both; }
+.plays li.enter .playing-card:nth-child(3), .plays li.enter .die:nth-child(2) { animation-delay: 0.06s; }
+.plays li.enter .playing-card:nth-child(4), .plays li.enter .die:nth-child(3) { animation-delay: 0.12s; }
+@keyframes deal { from { transform: translateY(-6px) rotate(-8deg); opacity: 0; } to { transform: none; opacity: 1; } }
+.plays li.enter .net.pos { animation: flash-pos 0.9s ease-out; }
+.plays li.enter .net.neg { animation: flash-neg 0.9s ease-out; }
+@keyframes flash-pos { from { text-shadow: 0 0 12px var(--pos); transform: scale(1.15); } to { text-shadow: none; transform: none; } }
+@keyframes flash-neg { from { text-shadow: 0 0 12px var(--neg); } to { text-shadow: none; } }
+.play-money .net { display: inline-block; }
+.strip i.pop { animation: pop 0.5s var(--ease-spring); }
+@keyframes pop { from { transform: scale(0); } to { transform: none; } }
+.acct .v.bump { animation: bump 0.5s var(--ease-out); }
+@keyframes bump { 40% { color: var(--accent); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
 }

@@ -789,76 +789,128 @@ const el = (tag, className, text) => {
   return node;
 };
 
-function bar(fraction, className = '') {
+function bar(className = '') {
   const outer = el('span', `bar ${className}`);
   outer.setAttribute('aria-hidden', 'true');
-  const inner = el('span');
-  inner.style.width = fraction;
-  outer.append(inner);
+  outer.append(el('span'));
   return outer;
 }
+const setBar = (outer, fraction) => (outer.firstChild.style.width = fraction);
 
-function accountStat(label, value, extra) {
-  const box = el('span', 'acct-stat');
-  box.append(el('span', 'k', label), el('span', 'v', value));
-  if (extra) box.append(extra);
-  return box;
+const motion = () => !matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Counts a number shown in node up or down to value, so changes read as motion.
+function tween(node, value, format = number) {
+  const from = node.dataset.value === undefined ? null : Number(node.dataset.value);
+  node.dataset.value = String(value);
+  if (from === null || from === value || !motion() || typeof value !== 'number') {
+    node.textContent = format(value);
+    return;
+  }
+  node.classList.remove('bump');
+  void node.offsetWidth;
+  node.classList.add('bump');
+  const start = performance.now();
+  const step = (now) => {
+    if (node.dataset.value !== String(value)) return;
+    const k = Math.min(1, (now - start) / 700);
+    const eased = 1 - (1 - k) ** 3;
+    node.textContent = format(from + (value - from) * eased);
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
-// Every account runs in its own tab on the server: one card each, the
-// focused one (shown in the panel below) marked. Picking a card focuses it.
-function accountCard(tab) {
-  const player = tab.player;
+function statBox(label) {
+  const box = el('span', 'acct-stat');
+  const value = el('span', 'v', '-');
+  box.append(el('span', 'k', label), value);
+  return { box, value };
+}
+
+// One card per running account, built once and updated in place, so its
+// numbers count and its bars slide instead of the card being redrawn.
+const cards = new Map();
+
+function buildCard(tab) {
   const button = el('button', 'acct');
   button.type = 'button';
   button.dataset.id = tab.id;
-  button.setAttribute('aria-pressed', String(tab.focused));
   const head = el('span', 'acct-head');
   const dot = el('span', 'dot');
-  dot.style.background = accountColor(tab.login);
-  head.append(dot, el('span', 'acct-name', tab.login ?? tab.id));
-  if (player?.prestige) head.append(el('span', 'acct-badge', t('prestigeCount', [String(player.prestige)])));
-  if (tab.focused) head.append(el('span', 'acct-shown', t('shownBelow')));
-  const status = el('span', 'acct-status', tab.status ?? '-');
-  status.title = tab.status ?? '';
-  button.append(head, status);
-  if (player) {
-    const stats = el('span', 'acct-stats');
-    const energy = `${player.energy} / ${player.maxEnergy}`;
-    stats.append(
-      accountStat(t('level'), number(player.level)),
-      accountStat(t('credits'), number(player.credits)),
-      accountStat(t('energy'), energy, bar(pct(player.energy, player.maxEnergy))),
-    );
-    button.append(stats);
-    const goal = el('span', 'acct-goal');
-    if (player.xpNeed) {
-      const row = el('span', 'row');
-      row.append(el('span', '', t('xpToNext', [String(player.level + 1)])), el('span', '', `${number(player.xpInto)} / ${number(player.xpNeed)}`));
-      goal.append(row, bar(pct(player.xpInto, player.xpNeed)));
-    }
-    const toGo = el('span', 'row');
-    toGo.append(el('span', '', t('toPrestige')), el('span', '', `${player.level} / ${PRESTIGE_LEVEL}`));
-    goal.append(toGo, bar(pct(player.level - 1 + (player.xpNeed ? player.xpInto / player.xpNeed : 0), PRESTIGE_LEVEL - 1), 'goal'));
-    button.append(goal);
-  }
+  const name = el('span', 'acct-name');
+  const badge = el('span', 'acct-badge');
+  const shown = el('span', 'acct-shown', t('shownBelow'));
+  head.append(dot, name, badge, shown);
+  const status = el('span', 'acct-status');
+  const stats = el('span', 'acct-stats');
+  const level = statBox(t('level'));
+  const credits = statBox(t('credits'));
+  const energy = statBox(t('energy'));
+  const energyBar = bar();
+  energy.box.append(energyBar);
+  stats.append(level.box, credits.box, energy.box);
+  const goal = el('span', 'acct-goal');
+  const xpRow = el('span', 'row');
+  const xpLabel = el('span');
+  const xpText = el('span');
+  xpRow.append(xpLabel, xpText);
+  const xpBar = bar();
+  const toRow = el('span', 'row');
+  const toText = el('span');
+  toRow.append(el('span', '', t('toPrestige')), toText);
+  const toBar = bar('goal');
+  goal.append(xpRow, xpBar, toRow, toBar);
+  button.append(head, status, stats, goal);
   button.addEventListener('click', async () => {
-    if (!tab.focused) await post('/api/account/switch', { id: tab.id });
+    if (button.getAttribute('aria-pressed') !== 'true') await post('/api/account/switch', { id: tab.id });
   });
   const li = el('li');
   li.append(button);
-  return li;
+  return { li, button, dot, name, badge, shown, status, stats, level, credits, energy, energyBar, goal, xpRow, xpLabel, xpText, xpBar, toText, toBar };
+}
+
+function updateCard(card, tab) {
+  const player = tab.player;
+  card.button.setAttribute('aria-pressed', String(tab.focused));
+  card.dot.style.background = accountColor(tab.login);
+  card.name.textContent = tab.login ?? tab.id;
+  card.badge.hidden = !player?.prestige;
+  card.badge.textContent = t('prestigeCount', [String(player?.prestige ?? 0)]);
+  card.shown.hidden = !tab.focused;
+  card.status.textContent = tab.status ?? '-';
+  card.status.title = tab.status ?? '';
+  card.stats.hidden = card.goal.hidden = !player;
+  if (!player) return;
+  tween(card.level.value, player.level);
+  tween(card.credits.value, player.credits);
+  card.energy.value.textContent = `${player.energy} / ${player.maxEnergy}`;
+  setBar(card.energyBar, pct(player.energy, player.maxEnergy));
+  card.xpRow.hidden = card.xpBar.hidden = !player.xpNeed;
+  card.xpLabel.textContent = t('xpToNext', [String(player.level + 1)]);
+  card.xpText.textContent = `${number(player.xpInto)} / ${number(player.xpNeed)}`;
+  setBar(card.xpBar, pct(player.xpInto, player.xpNeed || 1));
+  card.toText.textContent = `${player.level} / ${PRESTIGE_LEVEL}`;
+  setBar(card.toBar, pct(player.level - 1 + (player.xpNeed ? player.xpInto / player.xpNeed : 0), PRESTIGE_LEVEL - 1));
 }
 
 function renderTabs(list) {
   const multi = list.length > 1;
   $('hero').classList.toggle('multi', multi);
-  $('hero-accounts').hidden = !multi;
+  $('hero-accounts').hidden = $('hero-accounts-label').hidden = !multi;
   if (!multi) return;
-  // Re-rendered every report: keep keyboard focus on the same card.
-  const focused = document.activeElement?.closest?.('.acct')?.dataset.id;
-  $('hero-accounts').replaceChildren(...list.map(accountCard));
-  if (focused) $('hero-accounts').querySelector(`.acct[data-id="${CSS.escape(focused)}"]`)?.focus();
+  const ids = new Set(list.map((tab) => tab.id));
+  for (const [id, card] of cards) {
+    if (ids.has(id)) continue;
+    card.li.remove();
+    cards.delete(id);
+  }
+  for (const tab of list) {
+    let card = cards.get(tab.id);
+    if (!card) cards.set(tab.id, (card = buildCard(tab)));
+    updateCard(card, tab);
+    $('hero-accounts').append(card.li);
+  }
 }
 
 // ---------- live play ----------
@@ -874,7 +926,6 @@ const SUITS = { h: '♥', d: '♦', c: '♣', s: '♠' };
 const clockTime = (at) => new Date(at).toLocaleTimeString(I18n.lang, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 const plays = [];
 let playsPaused = false;
-let freshUntil = 0;
 
 function accountColor(login) {
   const logins = (report?.accounts ?? []).map((account) => account.login).sort();
@@ -996,8 +1047,8 @@ function playMoney(item) {
   return box;
 }
 
-function playRow(item) {
-  const li = el('li', item.received >= freshUntil ? 'fresh' : '');
+function playRow(item, enter = false) {
+  const li = el('li', enter ? 'enter' : '');
   const time = el('time', '', clockTime(item.at));
   time.dateTime = new Date(item.at).toISOString();
   const what = el('span', 'play-what', playTitle(item));
@@ -1006,49 +1057,60 @@ function playRow(item) {
   return li;
 }
 
-// The last results of one account as a strip: roulette pockets in their
-// color, any other game as a win or a loss.
-function strip(items) {
-  const box = el('div', 'strip');
-  box.setAttribute('aria-hidden', 'true');
-  for (const item of items.filter((x) => x.kind === 'game' && x.step !== 'start').slice(0, STRIP_SHOWN).reverse()) {
-    if (item.pocket !== undefined) box.append(el('i', pocketColor(item.pocket), String(item.pocket)));
-    else box.append(el('i', item.net >= 0 ? 'win' : 'loss'));
-  }
-  return box;
+// A result in an account's strip: a roulette pocket in its color, any other
+// game as a win or a loss. Null for plays that are not a finished round.
+function stripChip(item, enter = false) {
+  if (item.kind !== 'game' || item.step === 'start') return null;
+  const chip = item.pocket !== undefined ? el('i', pocketColor(item.pocket), String(item.pocket)) : el('i', item.net >= 0 ? 'win' : 'loss');
+  if (enter) chip.classList.add('pop');
+  return chip;
 }
 
-function pace(items) {
+function paceStats(items) {
   const from = Date.now() - PACE_WINDOW_MS;
   const games = items.filter((item) => item.kind === 'game' && item.at >= from);
-  const net = games.reduce((sum, item) => sum + (item.net ?? 0), 0);
-  const xp = games.reduce((sum, item) => sum + (item.xp ?? 0), 0);
-  const box = el('span', 'pace');
-  box.title = t('paceHint');
-  const stat = (value, label, className = '') => {
-    const span = el('span');
-    span.append(el('b', className, value), ` ${label}`);
-    return span;
+  return {
+    rate: games.length / (PACE_WINDOW_MS / 60_000),
+    net: games.reduce((sum, item) => sum + (item.net ?? 0), 0),
+    xp: games.reduce((sum, item) => sum + (item.xp ?? 0), 0),
   };
-  box.append(
-    stat((games.length / (PACE_WINDOW_MS / 60_000)).toFixed(1), t('perMinute')),
-    stat(signed(net), t('netShort'), net > 0 ? 'pos' : net < 0 ? 'neg' : ''),
-    stat(number(xp), 'XP'),
-  );
-  return box;
 }
 
-function playColumn(login, items) {
+function updatePace(column, items) {
+  const { rate, net, xp } = paceStats(items);
+  column.rate.textContent = rate.toFixed(1);
+  tween(column.net, net, signed);
+  column.net.className = net > 0 ? 'pos' : net < 0 ? 'neg' : '';
+  tween(column.xp, xp);
+}
+
+// One column per account, newest play first. Built when the accounts or the
+// filters change; new plays are put on top of it as they come.
+const columns = new Map();
+let columnsKey = '';
+
+function buildColumn(login) {
   const col = el('section', 'play-col');
+  col.setAttribute('aria-label', login ?? '-');
   const head = el('div', 'play-col-head');
   const dot = el('span', 'dot');
   dot.style.background = accountColor(login);
-  head.append(dot, el('span', 'name', login ?? '-'), pace(items));
-  col.setAttribute('aria-label', login ?? '-');
-  const list = el('ol', 'plays');
-  list.append(...items.slice(0, PLAYS_SHOWN).map(playRow));
-  col.append(head, strip(items), list);
-  return col;
+  const pace = el('span', 'pace');
+  pace.title = t('paceHint');
+  const stat = (label) => {
+    const span = el('span');
+    const value = el('b');
+    span.append(value, ` ${label}`);
+    pace.append(span);
+    return value;
+  };
+  const column = { col, rate: stat(t('perMinute')), net: stat(t('netShort')), xp: stat('XP') };
+  head.append(dot, el('span', 'name', login ?? '-'), el('span', 'live-dot'), pace);
+  column.strip = el('div', 'strip');
+  column.strip.setAttribute('aria-hidden', 'true');
+  column.list = el('ol', 'plays');
+  col.append(head, column.strip, column.list);
+  return column;
 }
 
 function renderPlayAccounts() {
@@ -1061,24 +1123,63 @@ function renderPlayAccounts() {
   select.value = logins.includes(value) ? value : '';
 }
 
-// One column per account, side by side, newest first.
-function renderPlays() {
-  if (playsPaused) return;
+const playFilter = () => {
   const account = $('play-account').value;
   const actions = $('play-actions').checked;
-  const shown = plays.filter((item) => (!account || item.account === account) && (actions || item.kind !== 'action'));
+  return (item) => (!account || item.account === account) && (actions || item.kind !== 'action');
+};
+
+function renderPlays() {
+  if (playsPaused) return;
+  const shown = plays.filter(playFilter());
   const logins = [...new Set(shown.map((item) => item.account))].sort();
   $('play-empty').hidden = shown.length > 0;
-  $('play-cols').replaceChildren(...logins.map((login) => playColumn(login, shown.filter((item) => item.account === login))));
+  columns.clear();
+  columnsKey = logins.join('\u0000');
+  $('play-cols').replaceChildren(
+    ...logins.map((login) => {
+      const column = buildColumn(login);
+      columns.set(login, column);
+      const own = shown.filter((item) => item.account === login);
+      column.list.append(...own.slice(0, PLAYS_SHOWN).map((item) => playRow(item)));
+      column.strip.append(...own.map((item) => stripChip(item)).filter(Boolean).slice(0, STRIP_SHOWN).reverse());
+      updatePace(column, own);
+      return column.col;
+    }),
+  );
+}
+
+// New plays go on top of their column with an entrance; a new account or a
+// play older than what is shown redraws everything.
+function showNewPlays(items) {
+  if (playsPaused) return;
+  const fresh = items.filter(playFilter()).sort((a, b) => a.at - b.at);
+  if (!fresh.length) return;
+  const newest = plays.find(playFilter());
+  const logins = [...new Set(plays.filter(playFilter()).map((item) => item.account))].sort();
+  if (logins.join('\u0000') !== columnsKey || fresh.some((item) => item.at < (newest?.at ?? 0) - 60_000)) return renderPlays();
+  for (const item of fresh) {
+    const column = columns.get(item.account);
+    column.list.prepend(playRow(item, motion()));
+    while (column.list.children.length > PLAYS_SHOWN) column.list.lastChild.remove();
+    const chip = stripChip(item, motion());
+    if (chip) {
+      column.strip.append(chip);
+      while (column.strip.children.length > STRIP_SHOWN) column.strip.firstChild.remove();
+    }
+  }
+  for (const [login, column] of columns) updatePace(column, plays.filter((item) => item.account === login));
+  $('play-empty').hidden = true;
 }
 
 function addPlays(items) {
   const now = Date.now();
-  for (const item of items) plays.unshift({ ...item, received: now });
+  const added = items.map((item) => ({ ...item, received: now }));
+  plays.unshift(...added);
   plays.sort((a, b) => b.at - a.at);
   plays.length = Math.min(plays.length, PLAYS_KEPT);
-  freshUntil = now;
-  renderPlays();
+  if (!columnsKey) renderPlays();
+  else showNewPlays(added);
 }
 
 // Info lines of the activity log (a výpověď, a loan, a purchase) join the feed as actions.
