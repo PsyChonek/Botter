@@ -278,6 +278,21 @@ progress shows at `chrome://on-device-internals`.
     no level or cycle loan taken, as a loan open at 40 would hold the výpověď back.
     Saved accounts keep their prestige and XP in their snapshot, so rotation judges
     them the same way, priced at the logged-in account's XP price.
+  - With all five handed in (`G.prestigeMaxed`, since 2026-11-09) nothing wipes the
+    upgrades again and leveling keeps paying to about level 160 on roulette, so
+    upgrades pay back over 30 levels instead of 10 (`A.upgradeHorizon`) and only that
+    payback judges them (the per-credit `tooSmall` gate is off). On a level 40
+    account with maxed roulette that makes Kostky the final game: maxing it costs
+    about 120,000 and drops the edge from 2.7 % to 2.1 %, about 120,000 less loss
+    over the 30 levels. Baccarat (2.2 %) comes second; every slot stays above
+    roulette even maxed, so they are not bought. The dashboard hides the To výpověď
+    bar then.
+  - The grinder prices each game at the model's edge, or the loss measured at its
+    current upgrades once that is worse by more than two standard errors
+    (`A.pricedEdge` in `grindModel`). Grinding the newly upgraded game is the test:
+    if the server pays it clearly less than the model, the grinder goes back to
+    roulette on its own. A level loan is not taken while an upgrade fits
+    (`shopOffer`), so the shop gets its turn between two loans.
 - **Personal bankruptcy** (Insolvence, `/api/loan/bankrupt`, settings Auto tab, on by
   default): offered only in execution. The debt is wiped and credits are set to 500,
   but the XP into the current level is lost, as are this week's sprint points, and

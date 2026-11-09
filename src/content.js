@@ -1934,7 +1934,9 @@
     // A loan still open at level 40 would hold the výpověď back (G.prestigeReady).
     if (!settings.levelLoan || !settings.autoGames || player.loan || stats.flags.cycleLoan || prestigeNear()) return false;
     if (player.loanBlockedUntil > Date.now() || (settings.loanTrick && !stats.flags.cleanDone)) return false;
-    if ((settings.autoWork && workAvailable()) || savingFor() || learningBlaze()) return false;
+    // An upgrade that fits is bought first (buyStep): the shop sells nothing
+    // while a loan is open, and a fresh loan every repayment would starve it.
+    if ((settings.autoWork && workAvailable()) || savingFor() || learningBlaze() || shopOffer()) return false;
     if (Date.now() - (claimTried.levelLoanTake ?? 0) < CRASH_POLL_MS) return false;
     claimTried.levelLoanTake = Date.now();
     const amount = A.loanAmount(player.loanLimit);
@@ -2056,19 +2058,23 @@
     // The final game weighs what its upgrades still cost against the loss on the
     // credits wagered over the horizon (the XP to the next levels once the rate is
     // measured), so a game whose small edge gain costs far more does not win.
+    // With every výpověď handed in, upgrades pay back over a longer horizon (BotterAuto.upgradeHorizon).
+    const maxedPrestige = G.prestigeMaxed(player);
+    const horizon = A.upgradeHorizon(maxedPrestige);
     const xpRate = planXpRate();
     const price = (game) => G.upgradeRest(player.upgrades, game, Object.keys(G.SHOP[game])).price;
     const cost = xpRate > 0
-      ? { price, wagered: G.xpAhead(player, A.UPGRADE_HORIZON_LEVELS) / xpRate }
+      ? { price, wagered: G.xpAhead(player, horizon) / xpRate }
       : { price, budget: A.grindVolume(limits(), player.credits) };
     const finals = new Set(Z.SCATTER_MODES.map((rule) => A.finalGame(candidates, maxedEdge(rule), cost)));
     return A.upgradeVerdict(offer, {
       games: candidates.filter((game) => player.level >= GRIND_UNLOCKS[game]),
       finalGame: A.finalGame(candidates, maxedEdge(mode), cost),
       finalUnknown: settings.learnBlaze && !blazeRule().decided && finals.size > 1,
-      xpAhead: G.xpAhead(player, A.UPGRADE_HORIZON_LEVELS),
+      xpAhead: G.xpAhead(player, horizon),
       xpRate: planXpRate(),
       upgrades: player.upgrades,
+      minGain: maxedPrestige ? 0 : undefined,
       edge: (game, upgrades) => O.edges([game], upgrades, mode)[game] ?? null,
       rest: (keys, upTo) => G.upgradeRest(player.upgrades, offer.game, keys, upTo),
       maxLevels: Object.fromEntries(Object.entries(G.SHOP[offer.game]).map(([key, [max]]) => [key, max])),
@@ -2081,7 +2087,7 @@
   // worth buying at this level. Changes are logged, not every review.
   function reviewShop() {
     if (!settings.buyUpgrades || !player) return (shopReview = null);
-    const key = JSON.stringify([accountId, player.level, player.upgrades, resetPlanned(), blazeRule().mode, blazeRule().decided, settings.learnBlaze, settings.firstGame, Number(planXpRate()?.toFixed(3))]);
+    const key = JSON.stringify([accountId, player.level, player.prestige, player.upgrades, resetPlanned(), blazeRule().mode, blazeRule().decided, settings.learnBlaze, settings.firstGame, Number(planXpRate()?.toFixed(3))]);
     if (shopReview?.key === key && Date.now() - shopReview.at < SHOP_REVIEW_MS) return shopReview;
     const queue = G.shopQueue(G.UPGRADE_PLAN, player, upgradeSkip);
     const goal = A.shopGoal(queue, shopPriority());
@@ -2516,10 +2522,21 @@
   // Games and bet levels the grinder may pick from right now, the modelled house
   // edges at the current upgrades, and its pick.
   // Bet levels, candidate games and their modelled edges, before any limit.
+  // Each game's edge is the model's, or the loss measured at its current
+  // upgrades once that is clearly worse (BotterAuto.pricedEdge). So a game the
+  // model makes the cheapest is played, and that play is the test: if the
+  // server pays it less than the model says, the grinder goes back to the next
+  // cheapest game, such as roulette after Kostky has been upgraded.
   function grindModel() {
     const levels = G.BET_LEVELS.filter((bet) => bet <= player.maxBet);
     const candidates = settings.grindGame === 'auto' ? G.GAME_KEYS : [settings.grindGame];
-    const edges = O.edges(candidates, player.upgrades, blazeMode());
+    const model = O.edges(candidates, player.upgrades, blazeMode());
+    const variances = O.variances(candidates, player.upgrades, blazeMode());
+    const edges = {};
+    for (const [game, edge] of Object.entries(model)) {
+      const combo = O.combo(game, player.upgrades);
+      edges[game] = A.pricedEdge(edge, combo === null ? null : stats.combos[game]?.[combo], variances[game]);
+    }
     return { levels, candidates, edges };
   }
 

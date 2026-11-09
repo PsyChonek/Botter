@@ -280,6 +280,7 @@
   // is maxed. It wipes level, credits and upgrades, so not with a loan open,
   // whose debt the casino might keep.
   const PRESTIGE_LEVEL = 40;
+  const prestigeMaxed = (player) => (Number(player?.prestige) || 0) >= PRESTIGE_MAX;
   const prestigeReady = (player) => player?.level >= PRESTIGE_LEVEL && (Number(player.prestige) || 0) < PRESTIGE_MAX && !player.loan;
 
   // Level curve seen so far, shared by every account: { [level]: { xpNeed, reward } }
@@ -551,6 +552,7 @@
     xpForLevel,
     PAYROLL_RETURN,
     prestigeBonus,
+    prestigeMaxed,
     prestigeReady,
     prestigeNear,
     levelReward,

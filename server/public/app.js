@@ -794,6 +794,7 @@ $('only-problems').addEventListener('change', renderActivity);
 // ---------- running accounts ----------
 
 const PRESTIGE_LEVEL = 40;
+const PRESTIGE_MAX = 5;
 const pct = (part, whole) => `${Math.max(0, Math.min(100, (100 * part) / whole)).toFixed(1)}%`;
 
 const el = (tag, className, text) => {
@@ -875,7 +876,7 @@ function buildCard(tab) {
   button.append(head, status, stats, goal);
   const li = el('li');
   li.append(button);
-  return { li, button, dot, name, badge, status, stats, level, credits, energy, energyBar, goal, xpRow, xpLabel, xpText, xpBar, toText, toBar };
+  return { li, button, dot, name, badge, status, stats, level, credits, energy, energyBar, goal, xpRow, xpLabel, xpText, xpBar, toRow, toText, toBar };
 }
 
 function updateCard(card, tab) {
@@ -898,6 +899,8 @@ function updateCard(card, tab) {
   card.xpLabel.textContent = t('xpToNext', [String(player.level + 1)]);
   card.xpText.textContent = `${number(player.xpInto)} / ${number(player.xpNeed)}`;
   setBar(card.xpBar, pct(player.xpInto, player.xpNeed || 1));
+  // With every výpověď handed in there is no next one to count down to.
+  card.toRow.hidden = card.toBar.hidden = (player.prestige ?? 0) >= PRESTIGE_MAX;
   card.toText.textContent = `${player.level} / ${PRESTIGE_LEVEL}`;
   setBar(card.toBar, pct(player.level - 1 + (player.xpNeed ? player.xpInto / player.xpNeed : 0), PRESTIGE_LEVEL - 1));
 }

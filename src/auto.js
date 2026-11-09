@@ -395,6 +395,12 @@
   const UPGRADE_HORIZON_DAYS = 14;
   // Levels of XP an upgrade must pay back over once the XP rate is measured.
   const UPGRADE_HORIZON_LEVELS = 10;
+  // With every výpověď handed in nothing wipes the upgrades again, and leveling
+  // keeps paying far past level 40 (to about level 160 on roulette at +50 % XP),
+  // so an upgrade pays back over more levels and only that payback judges it:
+  // the UPGRADE_MIN_GAIN gate is dropped (upgradeVerdict ctx.minGain 0).
+  const UPGRADE_HORIZON_LEVELS_MAXED = 30;
+  const upgradeHorizon = (prestigeMaxed) => (prestigeMaxed ? UPGRADE_HORIZON_LEVELS_MAXED : UPGRADE_HORIZON_LEVELS);
 
   // Credits the grinder expects to lose while an upgrade has to pay off: the
   // daily budget over the horizon, what is above the minimum balance, or with
@@ -437,7 +443,8 @@
   // finalUnknown (the final game hangs on the undecided Blaze star rule),
   // xpAhead (XP to the next UPGRADE_HORIZON_LEVELS levels) and xpRate (measured
   // XP per credit wagered, or null),
-  // upgrades,
+  // upgrades, minGain (gain per credit below which an upgrade is tooSmall,
+  // default UPGRADE_MIN_GAIN),
   // edge(game, upgrades) (modelled house edge or null), rest(keys, upTo)
   // ({ price, upgrades } after buying those upgrades of the offer's game up to
   // level upTo, default max), maxLevels ({ key: max } of the game) and volume (see
@@ -460,11 +467,12 @@
     if (ctx.finalUnknown) return 'starRule';
     if (!ctx.games.includes(game)) return 'notGrinded';
 
+    const minGain = ctx.minGain ?? UPGRADE_MIN_GAIN;
     const gainPerCredit = (keys) => {
       const rest = ctx.rest(keys);
       return rest.price > 0 ? (now(game) - ctx.edge(game, rest.upgrades)) / rest.price : 0;
     };
-    if (gainPerCredit([offer.key]) < UPGRADE_MIN_GAIN) return 'tooSmall';
+    if (gainPerCredit([offer.key]) < minGain) return 'tooSmall';
     const keys = Object.keys(ctx.maxLevels);
 
     // XP per credit is the same in every game, so costs compare by edge alone.
@@ -476,7 +484,7 @@
     if (ctx.finalGame && game !== ctx.finalGame) return 'notFinal';
     const nextEdge = ctx.edge(game, ctx.rest([offer.key], offer.next).upgrades);
     if (!ctx.finalGame && now(game) > before && nextEdge > before) return 'notBest';
-    const maxed = ctx.rest(keys.filter((key) => gainPerCredit([key]) >= UPGRADE_MIN_GAIN));
+    const maxed = ctx.rest(keys.filter((key) => gainPerCredit([key]) >= minGain));
     const pays = (rest) => {
       const after = Math.min(before, ctx.edge(game, rest.upgrades));
       if (after <= 0) return true; // the player is ahead: it pays for itself
@@ -1404,6 +1412,8 @@
     levelCost,
     levelUpCushion,
     UPGRADE_HORIZON_LEVELS,
+    UPGRADE_HORIZON_LEVELS_MAXED,
+    upgradeHorizon,
     upgradeVerdict,
     shopGoal,
     spareUpgrade,

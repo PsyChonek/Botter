@@ -307,6 +307,42 @@ test('upgradeVerdict judges by the XP ahead once the XP rate is measured', () =>
   assert.equal(A.upgradeVerdict(offer('skeleton', 'team'), verdictCtx({ volume: 9000, xpAhead: 500, xpRate: 0.05 })), 'xpFarmingBetter');
 });
 
+test('with every výpověď handed in, Kostky upgrades pay back over the longer horizon and beat maxed roulette', () => {
+  const O = require('../src/odds.js');
+  const G = require('../src/games.js');
+  // A level 40 account with five výpovědi, maxed roulette and Kostky at house 1,
+  // measured 0.045 XP per credit (0.03 plain at +50 %), as on 2026-11-09.
+  const player = { level: 40, xpInto: 0, prestige: 5, upgrades: { roulette: { zeros: 2 }, dice: { house: 1 }, baccarat: { cut: 1 } } };
+  const xpRate = 0.045;
+  const games = ['roulette', 'dice', 'baccarat'];
+  const maxedEdge = (game) => O.edges([game], G.upgradeRest(player.upgrades, game, Object.keys(G.SHOP[game])).upgrades)[game];
+  const price = (game) => G.upgradeRest(player.upgrades, game, Object.keys(G.SHOP[game])).price;
+  const verdict = (horizon, minGain) => {
+    const xpAhead = G.xpAhead(player, horizon);
+    const finalGame = A.finalGame(games, maxedEdge, { price, wagered: xpAhead / xpRate });
+    const ctx = {
+      games,
+      finalGame,
+      finalUnknown: false,
+      xpAhead,
+      xpRate,
+      upgrades: player.upgrades,
+      minGain,
+      edge: (game, upgrades) => O.edges([game], upgrades)[game] ?? null,
+      rest: (keys, upTo) => G.upgradeRest(player.upgrades, 'dice', keys, upTo),
+      maxLevels: Object.fromEntries(Object.entries(G.SHOP.dice).map(([key, [max]]) => [key, max])),
+      volume: 0,
+    };
+    return { finalGame, house: A.upgradeVerdict(G.upgradeOffer(player.upgrades, 'dice', 'house'), ctx) };
+  };
+  assert.equal(A.upgradeHorizon(false), A.UPGRADE_HORIZON_LEVELS);
+  assert.equal(A.upgradeHorizon(G.prestigeMaxed(player)), A.UPGRADE_HORIZON_LEVELS_MAXED);
+  // Ten levels: roulette stays the final game, and house alone is under the per-credit gate.
+  assert.deepEqual(verdict(A.upgradeHorizon(false)), { finalGame: 'roulette', house: 'tooSmall' });
+  // Thirty levels with the gate off: maxing Kostky (2.1 % edge) beats roulette (2.7 %).
+  assert.deepEqual(verdict(A.upgradeHorizon(true), 0), { finalGame: 'dice', house: null });
+});
+
 test('planXpRate leaves the Hackathon bonus out of the XP rate', () => {
   const games = { roulette: { rounds: 100, wagered: 100_000, net: 0, xp: 15_000 } };
   assert.ok(Math.abs(A.planXpRate(games, {}) - 0.1) < 1e-12);

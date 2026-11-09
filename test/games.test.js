@@ -62,6 +62,13 @@ test('prestigeReady from level 40 until five výpovědi, never with a loan', () 
   assert.equal(G.prestigeReady(null), false);
 });
 
+test('prestigeMaxed at five výpovědi', () => {
+  assert.equal(G.prestigeMaxed({ prestige: 4 }), false);
+  assert.equal(G.prestigeMaxed({ prestige: 5 }), true);
+  assert.equal(G.prestigeMaxed({}), false);
+  assert.equal(G.prestigeMaxed(null), false);
+});
+
 test('prestigeNear once the credits fund the grind to level 40', () => {
   // Level 39 with 10,000 XP left at 1.2 credits per XP: 12,000 to finish, no rewards on the way.
   const p39 = { level: 39, xpNeed: 39_000, xpInto: 29_000, prestige: 1 };
