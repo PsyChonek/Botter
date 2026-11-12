@@ -2,15 +2,6 @@
   "extName": {
     "message": "Botter"
   },
-  "extDescription": {
-    "message": "Solves Skeleton Casino work tickets automatically."
-  },
-  "panelStart": {
-    "message": "Start"
-  },
-  "panelStop": {
-    "message": "Stop"
-  },
   "panelType": {
     "message": "Tickets"
   },
@@ -28,9 +19,6 @@
   },
   "statusIdle": {
     "message": "Stopped."
-  },
-  "statusOpening": {
-    "message": "Opening the work screen..."
   },
   "statusStarting": {
     "message": "Picking a ticket..."
@@ -97,31 +85,6 @@
   },
   "panelCost": {
     "message": "AI cost: $P1$ ($P2$ per call)",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      }
-    }
-  },
-  "panelBundleStale": {
-    "message": "Casino app updated $P1$: $P2$ model differences, the odds may be stale. $P3$",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      },
-      "p3": {
-        "content": "$3"
-      }
-    }
-  },
-  "panelBundleChanged": {
-    "message": "App updated $P1$ (changelog $P2$), models match.",
     "placeholders": {
       "p1": {
         "content": "$1"
@@ -262,7 +225,7 @@
     "message": "Games"
   },
   "optionsGamesHint": {
-    "message": "The game bot plays through the casino API with your session, so the game screen does not animate and the credit balance on the page refreshes on your next click. Blackjack uses an exact strategy solver for your table upgrades. While work has energy, work goes first."
+    "message": "The game bot plays through the casino API with each account's own session. Blackjack uses an exact strategy solver for your table upgrades. While work has energy, work goes first."
   },
   "optionsGameBet": {
     "message": "Bet per round"
@@ -283,13 +246,10 @@
     "message": "Max speed: play and work as fast as the server allows"
   },
   "optionsMaxSpeedHint": {
-    "message": "Game requests wait only as long after each game response as the server takes, learned per game: a request it refuses (\"počkej na animaci\") raises that game's wait to just past the one refused and is retried after 0.15 s, 0.3 s, 0.6 s and so on instead of the 30 s the server asks for, and every 10 accepted in a row trim it, so the bot keeps finding the shortest wait. The learned waits are shared by every casino tab. Work tickets the same way: no reading or typing delays, a typed line is entered at once, and each ticket type is submitted as soon as it has been open for the learned least time the server accepts, which a refused submit raises past the refused time and 10 accepted in a row trim. Off, every game request waits the minimum time below and work keeps the human delays."
+    "message": "Game requests wait only as long after each game response as the server takes, learned per game: a request it refuses (\"počkej na animaci\") raises that game's wait to just past the one refused and is retried after 0.15 s, 0.3 s, 0.6 s and so on instead of the 30 s the server asks for, and every 10 accepted in a row trim it, so the bot keeps finding the shortest wait. Each account learns its own waits. Work tickets the same way: no reading or typing delays, a typed line is entered at once, and each ticket type is submitted as soon as it has been open for the learned least time the server accepts, which a refused submit raises past the refused time and 10 accepted in a row trim. Off, every game request waits the minimum time below and work keeps the human delays."
   },
   "optionsGameDelay": {
     "message": "Minimum time between game requests (ms)"
-  },
-  "panelAutoParts": {
-    "message": "In auto mode"
   },
   "panelAutoGames": {
     "message": "Games"
@@ -309,17 +269,11 @@
   "statusAutoIdle": {
     "message": "Auto: nothing to do right now."
   },
-  "panelOnScreen": {
-    "message": "Play on the game screen"
-  },
   "panelHotfixForce": {
     "message": "Forbes force"
   },
   "panelHotfixForceHint": {
     "message": "Sent as force on every Forbes z Chánova spin the bot plays. Read as JSON (4, true, \"free\"); an empty field sends true."
-  },
-  "optionsPlayOnScreen": {
-    "message": "Play on the game screen: the bot opens the game and presses its buttons, so every round animates. Slower than playing through the API."
   },
   "optionsProfitHeading": {
     "message": "Profit per game"
@@ -425,24 +379,6 @@
   },
   "panelAuto": {
     "message": "Auto"
-  },
-  "panelOn": {
-    "message": "on"
-  },
-  "panelOff": {
-    "message": "off"
-  },
-  "panelHide": {
-    "message": "Hide"
-  },
-  "panelHideLabel": {
-    "message": "Hide the Botter panel"
-  },
-  "panelShowLabel": {
-    "message": "Show the Botter panel"
-  },
-  "optionsHidePanel": {
-    "message": "Hide the panel on the casino page (a small button in the corner brings it back)"
   },
   "game_crash": {
     "message": "Crash (Produkce padá)"
@@ -955,50 +891,104 @@
   "optionsAiHeading": {
     "message": "AI solver"
   },
+  "navWork": {
+    "message": "Work"
+  },
+  "navAi": {
+    "message": "AI solver"
+  },
+  "navAuto": {
+    "message": "Auto mode"
+  },
+  "navShop": {
+    "message": "Upgrades"
+  },
+  "navGames": {
+    "message": "Games"
+  },
+  "navWardrobe": {
+    "message": "Šatna"
+  },
+  "navData": {
+    "message": "Data and backup"
+  },
+  "navProfit": {
+    "message": "Profit"
+  },
+  "navChecks": {
+    "message": "Model checks"
+  },
+  "navLevels": {
+    "message": "Levels"
+  },
+  "navNet": {
+    "message": "Server speed"
+  },
+  "navOdds": {
+    "message": "Odds"
+  },
+  "settingsNavLabel": {
+    "message": "Settings sections"
+  },
+  "statsNavLabel": {
+    "message": "Statistics sections"
+  },
+  "settingsShared": {
+    "message": "These settings apply to every account. Auto, Work and Games are switched per account on the Overview."
+  },
+  "groupAutoParts": {
+    "message": "What Auto does"
+  },
+  "groupLoans": {
+    "message": "Debt and loans"
+  },
+  "groupXp": {
+    "message": "XP grinding"
+  },
+  "groupQuests": {
+    "message": "Quests and achievements"
+  },
+  "groupRounds": {
+    "message": "Crash and lottery"
+  },
+  "groupPacing": {
+    "message": "Pacing"
+  },
+  "groupLimits": {
+    "message": "Bets and limits"
+  },
+  "groupForbes": {
+    "message": "Forbes z Chánova test"
+  },
+  "optionsAutoGames": {
+    "message": "Play games: XP grinding, crash, lottery, quests and achievements"
+  },
+  "optionsAutoWork": {
+    "message": "Work tickets while there is energy"
+  },
+  "optionsAutoWheel": {
+    "message": "Spin the wheel of fortune every hour"
+  },
+  "optionsSprintProtect": {
+    "message": "Hold a bankruptcy until the sprint ends while the account is on its podium"
+  },
+  "optionsHotfixForce": {
+    "message": "Send a force value on every Forbes z Chánova spin"
+  },
+  "optionsHotfixForceValue": {
+    "message": "Force value"
+  },
+  "optionsKeySet": {
+    "message": "A key is saved. Type a new one to replace it, or clear the field to remove it."
+  },
   "optionsSolver": {
     "message": "When a ticket is not in the bank, ask"
-  },
-  "solver_local": {
-    "message": "On-device AI in Chrome (Gemini Nano, free)"
   },
   "solver_claude": {
     "message": "Claude API (needs a key, more accurate)"
   },
   "solver_off": {
     "message": "Nobody (bank and guessing only)"
-  },
-  "optionsLocalHeading": {
-    "message": "On-device AI"
-  },
-  "optionsLocalHint": {
-    "message": "Chrome 138+ built-in Prompt API. Needs about 22 GB free disk and a GPU with more than 4 GB VRAM or 16 GB RAM. Free and offline, but a small model, so expect more misses on tricky output puzzles."
-  },
-  "optionsLocalStatus": {
-    "message": "Status: $P1$",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      }
-    }
-  },
-  "optionsLocalPrepare": {
-    "message": "Download the model"
-  },
-  "optionsLocalProgress": {
-    "message": "Downloading the model: $P1$ %",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      }
-    }
-  },
-  "optionsLocalFailed": {
-    "message": "Could not prepare the model: $P1$",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      }
-    }
   },
   "localState_available": {
     "message": "ready"
@@ -1036,14 +1026,11 @@
   "optionsOpenRouterHint": {
     "message": "Any model ID from openrouter.ai/models, for example google/gemini-2.5-flash. Models with a :free suffix cost nothing but are rate limited."
   },
-  "optionsLocalFlags": {
-    "message": "If the model is not supported or will not download: open chrome://flags, set \"Enables optimization guide on device\" to \"Enabled BypassPerfRequirement\" and \"Prompt API for Gemini Nano\" to \"Enabled\", relaunch Chrome, then press the download button again. Progress is visible at chrome://on-device-internals."
-  },
   "optionsApiKey": {
     "message": "Anthropic API key"
   },
   "optionsApiKeyHint": {
-    "message": "Stored only in this browser profile (chrome.storage.local). Each unknown ticket costs one API call."
+    "message": "Kept on the Botter server and never sent back to the browser. Each unknown ticket costs one API call."
   },
   "optionsModel": {
     "message": "Model"
@@ -1072,27 +1059,6 @@
   "optionsSaved": {
     "message": "Saved."
   },
-  "optionsTabsLabel": {
-    "message": "Settings sections"
-  },
-  "tabBot": {
-    "message": "Bot"
-  },
-  "tabAi": {
-    "message": "AI"
-  },
-  "tabAuto": {
-    "message": "Auto"
-  },
-  "tabGames": {
-    "message": "Games"
-  },
-  "tabProfit": {
-    "message": "Profit"
-  },
-  "tabData": {
-    "message": "Data"
-  },
   "optionsSaveFailed": {
     "message": "Not saved: $ERROR$",
     "placeholders": {
@@ -1105,7 +1071,7 @@
     "message": "Backup"
   },
   "optionsBackupHint": {
-    "message": "Export saves settings, profit stats of every account, the answer bank, the level curve, recorded Blaze spins and saved accounts to one file. Import applies the file's settings and merges the rest: stats are added to the ones here, other data fills in what is missing. A file is never added twice: importing the same export again, or back into the browser it came from, leaves the stats alone."
+    "message": "Export saves settings, profit stats of every account, the answer bank, the level curve, recorded Blaze spins and saved accounts to one file. Import applies the file's settings and merges the rest: stats are added to the ones here, other data fills in what is missing. A file is never added twice: importing the same export again, or back into the Botter it came from, leaves the stats alone."
   },
   "optionsBackupSecrets": {
     "message": "Include API keys and saved logins"
@@ -1190,47 +1156,8 @@
   "optionsImportFailed": {
     "message": "That file is not a valid bank export."
   },
-  "panelAccount": {
-    "message": "Account"
-  },
-  "panelAccountOption": {
-    "message": "$P1$ ($P2$ energy)",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      }
-    }
-  },
-  "panelNoAccount": {
-    "message": "Not logged in"
-  },
-  "panelAddAccount": {
-    "message": "Add"
-  },
-  "panelAddAccountLabel": {
-    "message": "Log in to another account"
-  },
-  "statusSwitching": {
-    "message": "Switching to $P1$...",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      }
-    }
-  },
   "statusLoggedOut": {
     "message": "Not logged in. Log in to the casino."
-  },
-  "statusSessionExpired": {
-    "message": "The saved login for $P1$ has expired. Log in to it again.",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      }
-    }
   },
   "statusAccountBroken": {
     "message": "$P1$ cannot load its profile, so it is set aside for $P2$ min and the bot returns to another account.",
@@ -1240,57 +1167,6 @@
       },
       "p2": {
         "content": "$2"
-      }
-    }
-  },
-  "optionsRotateAccounts": {
-    "message": "Switch to another saved account when this one runs out of energy"
-  },
-  "optionsRotateHint": {
-    "message": "An account not visited today goes first, so its daily bonus and checks run. Otherwise the account with the most energy, above 15, or, in auto mode, the richest one that can still grind XP once this one cannot. After that it returns to the home account: the one picked in the panel or the one auto mode was started on. Each switch reloads the casino tab."
-  },
-  "optionsRotateCrash": {
-    "message": "Switch to accounts that have not yet bet on the running Produkce padá round"
-  },
-  "optionsRotateLottery": {
-    "message": "Switch to accounts that have not yet bought their tickets for the next lottery draw"
-  },
-  "optionsRotateRoundsHint": {
-    "message": "Once one account finds a crash bet worth it, every other saved account that has not entered that round is visited while entering still pays; each one checks the round again before it bets. Lottery visits go to every account from level 4 that has not finished buying for the next draw (with \"Feeling lucky\" or the achievement hunt on), and stop 2 minutes before the draw. An account that still owes a bet or tickets stays up to 5 minutes. A crash visit comes before everything else, a lottery visit after accounts not seen today."
-  },
-  "optionsAccountsHeading": {
-    "message": "Accounts"
-  },
-  "optionsAccountsHint": {
-    "message": "Each account keeps its own profit, achievement flags and daily budgets. The answer bank and settings are shared. To add an account, press Add in the panel and log in; switch with the dropdown next to it. Do not use the casino's Log out: it also ends the saved login. To run two accounts at once, use an incognito window for the second one (allow Botter in incognito)."
-  },
-  "optionsAccountsEmpty": {
-    "message": "No account yet. Open the casino and log in."
-  },
-  "optionsAccountNoLogin": {
-    "message": "$P1$ (login expired)",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      }
-    }
-  },
-  "optionsForget": {
-    "message": "Forget"
-  },
-  "optionsForgetLabel": {
-    "message": "Forget the saved login for $P1$",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      }
-    }
-  },
-  "optionsForgetConfirm": {
-    "message": "Forget the saved login for $P1$? Its profit stays.",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
       }
     }
   },
@@ -1310,7 +1186,7 @@
     "message": "XP each level needs and the credits paid on reaching it, recorded from every account the bot sees, to work out the pattern. The daily bonus is the client formula at a 7-day streak."
   },
   "optionsLevelsEmpty": {
-    "message": "No level seen yet. Open the casino with the extension on."
+    "message": "No level seen yet."
   },
   "colXpNeed": {
     "message": "XP needed"
@@ -1335,12 +1211,6 @@
   },
   "colEnergy": {
     "message": "Energy"
-  },
-  "colSeen": {
-    "message": "Last seen"
-  },
-  "colActions": {
-    "message": "Actions"
   },
   "panelXp": {
     "message": "XP per game"
@@ -1431,17 +1301,6 @@
   },
   "statusWaitEnergy": {
     "message": "Waiting for more than $P1$ energy before working ($P2$ now).",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      }
-    }
-  },
-  "panelAccountOptionHome": {
-    "message": "$P1$ ($P2$ energy, home)",
     "placeholders": {
       "p1": {
         "content": "$1"
@@ -1702,9 +1561,6 @@
   "colDrawErrors": {
     "message": "Draw errors"
   },
-  "panelMore": {
-    "message": "More"
-  },
   "panelRounds": {
     "message": "$P1$ rounds",
     "placeholders": {
@@ -1813,7 +1669,7 @@
     }
   },
   "optionsGameDelayHint": {
-    "message": "The shortest time from the start of one game request (a round, a blackjack move, free spins, a ticket) to the next, shared by every open casino tab. Below 700 ms the bot's tick holds it back."
+    "message": "The shortest time from the start of one game request (a round, a blackjack move, free spins, a ticket) to the next, kept for each account. Below 700 ms the bot's tick holds it back."
   },
   "optionsNetHeading": {
     "message": "Speed and server responses"
@@ -1845,7 +1701,7 @@
     "message": "Last errors"
   },
   "optionsNetEmpty": {
-    "message": "No request yet. Open the casino with the extension on."
+    "message": "No request yet."
   },
   "optionsNetReset": {
     "message": "Reset"
@@ -1882,9 +1738,6 @@
   },
   "statusHotfixFree": {
     "message": "Forbes z Chánova: playing the pending free spins"
-  },
-  "tabWardrobe": {
-    "message": "Šatna"
   },
   "optionsWardrobeHeading": {
     "message": "Šatna (wardrobe)"

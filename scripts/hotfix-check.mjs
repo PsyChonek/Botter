@@ -1,10 +1,10 @@
 // Checks the Forbes z Chánova model (scripts/hotfix-sim.mjs) against rounds
-// recorded by the extension (settings, Data tab: export Forbes rounds). Every
+// recorded by the bot (Settings, Data and backup: Export Forbes rounds). Every
 // cascade step's wins are recomputed from its grid, and what the client leaves
 // open is measured: how often the Hotfix wheel turns, which modifiers it picks
 // and how big they are, and how the free-spin multiplier grows. Forced spins are
 // left out. Then the model is simulated with the measured wheel chance.
-// The extension keeps the last 800 rounds, so exports of several tests can be
+// The bot keeps the last 800 rounds, so exports of several tests can be
 // given together; a round in more than one of them counts once.
 // --since YYYY-MM-DD drops older rounds (the tables changed on 2026-10-17).
 // Usage: node scripts/hotfix-check.mjs <export.json>... [--spins N] [--since YYYY-MM-DD]

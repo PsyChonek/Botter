@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { Runner } from '../src/runner.mjs';
 import { Store } from '../src/store.mjs';
 
-const extensionDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const botDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const UID = 'user-1';
 
 const b64 = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -64,10 +64,10 @@ function setup(casino, accountSession) {
   const dir = mkdtempSync(join(tmpdir(), 'botter-runner-'));
   const store = new Store(join(dir, 'storage.json'));
   store.set({
-    settings: { enabled: true, taskType: 'output', aiSolver: 'off', guessUnknown: true, maxSpeed: true, autoClaim: false, rotateAccounts: false, logLevel: 'warn' },
+    settings: { enabled: true, taskType: 'output', aiSolver: 'off', guessUnknown: true, maxSpeed: true, autoClaim: false, logLevel: 'warn' },
     [`account:${UID}`]: { login: 'tester', session: accountSession, storageKey: 'sb-fake-auth-token' },
   });
-  const runner = new Runner({ extensionDir, store, casinoUrl: `${casino.url}/`, supabaseUrl: casino.url, supabaseKey: 'anon', locale: 'en' });
+  const runner = new Runner({ botDir, store, casinoUrl: `${casino.url}/`, supabaseUrl: casino.url, supabaseKey: 'anon', locale: 'en' });
   return { runner, store, cleanup: () => (runner.stop(), rmSync(dir, { recursive: true, force: true })) };
 }
 
@@ -107,19 +107,26 @@ test('refreshes a session about to expire and files it under the account', async
   }
 });
 
-test('builds the real panel and replays clicks on it', async () => {
+test('switches Work and Auto per account through commands', async () => {
   const casino = await fakeCasino();
   const { runner, store, cleanup } = setup(casino, session(3600));
+  const other = JSON.stringify({ access_token: `${b64({ alg: 'none' })}.${b64({ sub: 'user-2', n: 0 })}.sig`, refresh_token: 'refresh-b', expires_at: Math.round(Date.now() / 1000) + 3600 });
+  store.set({ settings: { ...store.get('settings').settings, enabled: false }, 'account:user-2': { login: 'second', session: other, storageKey: 'sb-fake-auth-token' } });
   try {
-    store.set({ settings: { ...store.get('settings').settings, enabled: false } });
     await runner.start();
-    await until(() => runner.panelHtml().includes('tester'));
-    const root = runner.page.document.getElementById('botter-panel').shadowRoot;
-    const button = root.querySelector('.work-toggle');
-    const path = [];
-    for (let node = button; node !== root; node = node.parentNode) path.unshift([...node.parentNode.children].indexOf(node));
-    assert.equal(runner.panelEvent({ path, type: 'click' }), true);
-    await until(() => store.get('settings').settings.enabled === true);
+    const tab = (id) => runner.report()?.tabs.find((item) => item.id === id);
+    await until(() => tab(UID)?.player && tab('user-2')?.player);
+    assert.equal(runner.command(UID, 'nope', true), false, 'an unknown command is refused');
+    assert.equal(runner.command(UID, 'work', true), true);
+    assert.equal(runner.command('user-2', 'auto', true), true);
+    await until(() => store.get(`run:${UID}`)[`run:${UID}`]?.enabled === true);
+    assert.equal(store.get('run:user-2')['run:user-2'].autoMode, true);
+    assert.notEqual(store.get(`run:${UID}`)[`run:${UID}`].autoMode, true, 'Auto stays off on the other account');
+    assert.equal(store.get('settings').settings.autoMode, undefined, 'run switches never land in the shared settings');
+    assert.equal(tab(UID).run.enabled, true);
+    assert.equal(tab('user-2').run.autoMode, true);
+    assert.equal(tab(UID).run.autoMode, false);
+    await until(() => casino.calls.some((call) => call.path === '/api/work/submit' && call.auth === `Bearer ${token(0)}`));
   } finally {
     cleanup();
     casino.server.close();

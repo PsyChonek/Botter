@@ -6,7 +6,7 @@
 // win as in baccarat, and Pojištění proti trojici returns half the Malá /
 // Velká / Lichá / Sudá stakes on a triple. The dice are rolled on the server,
 // so fair dice and the commission rule are what the recorded rolls check
-// (addRoll). Classic script: globalThis.BotterDice in the extension, require()
+// (addRoll). Classic script: globalThis.BotterDice in the bot's contexts and the dashboard, require()
 // in Node.
 (function (root) {
   // Same mapping as the shop: Daňový poradce levels index into COMMISSIONS.

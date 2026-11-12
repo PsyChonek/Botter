@@ -2,9 +2,9 @@
 // copy: shop catalog, unlock levels, bet levels, roulette zeros, the payroll
 // fund's share, and every slot, table game and case table the odds models
 // were built from. A table the bundle no longer contains means the game math
-// changed and the model is stale. Used by the content script whenever the
+// changed and the model is stale. Used by the bot (content.js) whenever the
 // bundle's file name changes, and by scripts/bundle.mjs. Classic script:
-// globalThis.BotterBundle in the extension, require() in Node.
+// globalThis.BotterBundle in the bot's contexts and the dashboard, require() in Node.
 (function (root) {
   // Minifiers write 1000 as 1e3 and 0.1 as .1, so numbers are compared by value.
   const canon = (text) =>

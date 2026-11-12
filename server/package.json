@@ -2,7 +2,7 @@
   "name": "botter-server",
   "version": "0.1.0",
   "private": true,
-  "description": "Runs the Botter extension scripts headless against the casino API and serves a login-protected dashboard.",
+  "description": "Runs the Botter bot for every saved account against the casino API and serves its login-protected dashboard.",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -10,8 +10,5 @@
   "scripts": {
     "start": "node src/index.mjs",
     "test": "node --test test/*.test.mjs"
-  },
-  "dependencies": {
-    "linkedom": "0.18.12"
   }
 }

@@ -2,7 +2,7 @@
   "name": "botter",
   "version": "0.1.0",
   "private": true,
-  "description": "Chrome extension that solves Skeleton Casino work tickets.",
+  "description": "Plays Skeleton Casino for every saved account, with a login-protected dashboard.",
   "scripts": {
     "check": "node scripts/check.mjs && node --test test/*.test.js"
   }

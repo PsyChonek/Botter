@@ -7,7 +7,7 @@
 // scarab and the cobra, Posunutá deadline adds a free spin per level. Every
 // cell is drawn on its own, so the client's "free spins 1 in ~300 rounds, ~250
 // with every upgrade" is the chance of 3 or more books among the 15 cells.
-// Classic script: globalThis.BotterEgypt in the extension, require() in Node.
+// Classic script: globalThis.BotterEgypt in the bot's contexts and the dashboard, require() in Node.
 (function (root) {
   const SYMBOLS = ['scarab', 'cobra', 'urn', 'cat', 'eye', 'anubis', 'horus', 'mummy', 'pharaoh', 'book'];
   const WEIGHTS = { scarab: 24, cobra: 24, urn: 23, cat: 19, eye: 19, anubis: 6, horus: 6, mummy: 4, pharaoh: 3, book: 2.7 };

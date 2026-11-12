@@ -1,6 +1,6 @@
 // Pure decision helpers for the full auto mode: crash betting from the round
 // history, debt repayment and choosing the cheapest game to grind XP on.
-// Classic script: globalThis.BotterAuto in the extension, require() in Node.
+// Classic script: globalThis.BotterAuto in the bot's contexts and the dashboard, require() in Node.
 (function (root) {
   const BAC = root.BotterBaccarat ?? require('./baccarat.js');
   const DICE = root.BotterDice ?? require('./dice.js');
@@ -231,7 +231,7 @@
     wheelNextAt !== undefined && (wheelNextAt === null || wheelNextAt + WHEEL_GRACE_MS <= now);
 
   // XP per credit wagered on a game, measured from its tracked rounds, or null
-  // before it has earned any. Shown on the panel and used to price XP, never to
+  // before it has earned any. Shown on the dashboard and used to price XP, never to
   // pick a game: XP per round is proportional to the bet the same way in every
   // game, so the simulated edge alone decides.
   const xpRate = (row) => (row?.wagered > 0 && row.xp > 0 ? row.xp / row.wagered : null);
@@ -368,7 +368,7 @@
     return levels[Math.min(levels.length - 1, Math.max(0, fit) + Math.max(0, Math.trunc(bump) || 0))];
   }
 
-  // What the XP grinder knows per game, for the panel: the simulated edge, XP
+  // What the XP grinder knows per game, for the dashboard: the simulated edge, XP
   // per credit wagered and credits lost per XP point, with the account's XP
   // bonus (GameData.prestigeBonus) on the XP tracked without it.
   function grindReport(games, level, stats, unlocks, edges = {}, bonus = 1) {

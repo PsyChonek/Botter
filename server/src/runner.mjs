@@ -1,31 +1,48 @@
-// Runs the extension's own scripts with no browser. Every saved account gets a
-// tab of its own: page-hook.js and the content scripts run in one vm context
-// per account that stands in for a casino tab logged in as it, all at once and
-// each pinned to its account (no rotation). The service worker's solvers run in
-// another context. chrome.storage is the shared Store, each tab has its own
+// Runs the bot. Every saved account gets a tab of its own: page-hook.js and
+// the bot scripts run in one vm context per account, all at once and each
+// pinned to its account. storage is the shared Store, each tab has its own
 // localStorage (session, pacing, learned speeds), and API calls go straight to
-// the casino with that tab's session. The dashboard mirrors the home tab's panel.
+// the casino with that tab's session. The dashboard reads every tab's report
+// and sends its switches to the tab they belong to (command).
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import vm from 'node:vm';
-import { createDom } from './dom.mjs';
 import { memoryStorage } from './store.mjs';
 import { log } from './log.mjs';
+import { createSolver } from './solver.mjs';
 
 const require = createRequire(import.meta.url);
 
 const ACTIVITY_LIMIT = 500;
 const PLAY_LIMIT = 300;
-// The tab that runs while no account is saved, showing the logged-out panel.
+// The tab that runs while no account is saved, reporting the logged-out state.
 const LOGIN_TAB = '';
 const REFRESH_EVERY_MS = 30_000;
 // A session is refreshed this long before its access token runs out.
 const REFRESH_AHEAD_MS = 5 * 60_000;
 const SESSION_KEY = /^sb-.+-auth-token$/;
 const ACCOUNT_PREFIX = 'account:';
+// The bot scripts, in load order, each run in every tab's context.
+const SCRIPTS = [
+  'src/page-hook.js',
+  'src/core.js',
+  'src/games.js',
+  'src/blackjack.js',
+  'src/baccarat.js',
+  'src/dice.js',
+  'src/cases.js',
+  'src/egypt.js',
+  'src/mines.js',
+  'src/blaze.js',
+  'src/odds-table.js',
+  'src/odds.js',
+  'src/bundle.js',
+  'src/auto.js',
+  'src/content.js',
+];
 // A GitHub sign-in the dashboard started has this long to come back.
 const GITHUB_FLOW_MS = 15 * 60_000;
 const GITHUB_FLOWS_MAX = 20;
@@ -61,19 +78,19 @@ const WEB_GLOBALS = {
   performance,
 };
 
-// chrome.i18n.getMessage: $name$ placeholders resolve to their content, then
+// The bot's messages: $name$ placeholders resolve to their content, then
 // $1..$9 to the substitutions.
-function i18n(extensionDir, locale) {
+function i18n(botDir, locale) {
   const read = (lang) => {
     try {
-      return JSON.parse(readFileSync(join(extensionDir, '_locales', lang, 'messages.json'), 'utf8'));
+      return JSON.parse(readFileSync(join(botDir, '_locales', lang, 'messages.json'), 'utf8'));
     } catch {
       return {};
     }
   };
   const table = { ...read('en'), ...read(locale) };
   return {
-    getUILanguage: () => locale,
+    locale,
     getMessage(key, subs) {
       const entry = table[key];
       if (!entry) return '';
@@ -86,22 +103,21 @@ function i18n(extensionDir, locale) {
 }
 
 export class Runner extends EventEmitter {
-  constructor({ extensionDir, store, casinoUrl, supabaseUrl, supabaseKey, locale = 'cs' }) {
+  constructor({ botDir, store, casinoUrl, supabaseUrl, supabaseKey, locale = 'cs' }) {
     super();
-    this.extensionDir = extensionDir;
+    this.botDir = botDir;
     this.store = store;
     this.casinoUrl = new URL(casinoUrl);
     this.supabaseUrl = supabaseUrl;
     this.supabaseKey = supabaseKey;
     this.locale = locale;
-    this.i18n = i18n(extensionDir, locale);
-    this.core = require(join(extensionDir, 'src', 'core.js'));
-    this.manifest = JSON.parse(readFileSync(join(extensionDir, 'manifest.json'), 'utf8'));
+    this.i18n = i18n(botDir, locale);
+    this.core = require(join(botDir, 'src', 'core.js'));
     this.activity = [];
     this.plays = [];
     // id -> { id, localStorage, sessionStorage, page }
     this.tabs = new Map();
-    this.solve = null;
+    this.solve = createSolver({ store, core: this.core, console: this.console('solver') });
     this.refreshTimer = null;
     this.bundleSrc = null;
     this.reloadTimer = null;
@@ -121,7 +137,6 @@ export class Runner extends EventEmitter {
 
   async start() {
     this.started = true;
-    this.bootBackground();
     this.adoptLegacyPage();
     await this.syncTabs();
     this.refreshTimer = setInterval(() => this.tick().catch((error) => log.warn('session_refresh_error', { error: error.message })), REFRESH_EVERY_MS);
@@ -193,8 +208,8 @@ export class Runner extends EventEmitter {
     this.tabs.delete(id);
   }
 
-  // The tab whose panel the dashboard mirrors: home, else any. Every tab
-  // runs either way; the panel's controls are shared settings.
+  // The tab the dashboard's top-level report and casino lookups come from:
+  // home, else any. Every tab runs either way.
   focusTab() {
     const { settings = {} } = this.store.get('settings');
     return this.tabs.get(settings.homeAccount) ?? this.tabs.values().next().value ?? null;
@@ -217,7 +232,7 @@ export class Runner extends EventEmitter {
   }
 
   script(name) {
-    return readFileSync(join(this.extensionDir, name), 'utf8');
+    return readFileSync(join(this.botDir, name), 'utf8');
   }
 
   // Timers owned by one context, so a reload can stop everything it started.
@@ -269,46 +284,15 @@ export class Runner extends EventEmitter {
     return { log: write('log'), info: write('info'), debug: write('debug'), warn: write('warn'), error: write('error') };
   }
 
-  chromeStorage(subscribe) {
+  // The shared storage as the bot scripts see it; subscribe adds a change listener.
+  storage(subscribe) {
     const store = this.store;
     return {
-      local: {
-        get: async (keys) => store.get(keys),
-        set: async (items) => store.set(items),
-        remove: async (keys) => store.remove(keys),
-      },
-      onChanged: { addListener: (fn) => subscribe(fn) },
+      get: async (keys) => store.get(keys),
+      set: async (items) => store.set(items),
+      remove: async (keys) => store.remove(keys),
+      onChanged: (fn) => subscribe(fn),
     };
-  }
-
-  // The service worker's solvers (Claude, OpenRouter; Gemini Nano has no
-  // runtime here and fails over to the next answer source).
-  bootBackground() {
-    let handler = null;
-    const unavailable = async () => {
-      throw new Error('local_model_unavailable');
-    };
-    const context = vm.createContext({
-      ...WEB_GLOBALS,
-      setTimeout,
-      clearTimeout,
-      fetch,
-      console: this.console('background'),
-      chrome: {
-        storage: this.chromeStorage(() => {}),
-        runtime: { onMessage: { addListener: (fn) => (handler = fn) }, sendMessage: unavailable },
-        offscreen: { hasDocument: async () => false, createDocument: unavailable },
-        sidePanel: { setPanelBehavior: async () => {} },
-      },
-    });
-    for (const name of ['src/core.js', 'src/local-model.js']) vm.runInContext(this.script(name), context, { filename: name });
-    // background.js is a module whose imports are the two scripts above.
-    const source = this.script('src/background.js').replace(/^import .*$/gm, '');
-    vm.runInContext(source, context, { filename: 'src/background.js' });
-    this.solve = (message) =>
-      new Promise((resolve) => {
-        if (!handler || !handler(message, {}, resolve)) resolve(undefined);
-      });
   }
 
   async bootPage(tab) {
@@ -323,12 +307,16 @@ export class Runner extends EventEmitter {
     const listeners = { message: new Set() };
     const unsubscribers = [];
     const casino = this.casinoUrl;
-    const dom = createDom(this.bundleSrc);
 
     const window = {
       ...WEB_GLOBALS,
       ...timers.globals,
-      BotterHeadless: { pinned: true, play: (item) => alive && this.addPlay(tab, item) },
+      BotterHeadless: {
+        account: tab.id || null,
+        bundleSrc: this.bundleSrc,
+        play: (item) => alive && this.addPlay(tab, item),
+        solve: (task) => this.solve(task),
+      },
       console: this.console('page', tab),
       navigator: { language: this.locale, languages: [this.locale] },
       location: {
@@ -353,27 +341,18 @@ export class Runner extends EventEmitter {
           for (const fn of listeners.message) fn({ source: global, origin, data: copy });
         });
       },
-      document: dom.document,
-      Option: dom.window.Option,
-      Event: dom.window.Event,
-      KeyboardEvent: dom.window.KeyboardEvent ?? dom.window.Event,
-      chrome: {
-        i18n: this.i18n,
-        storage: this.chromeStorage((fn) => unsubscribers.push(this.store.onChanged((changes, area) => alive && fn(changes, area)))),
-        runtime: { sendMessage: (message) => this.solve(message) },
-      },
+      i18n: this.i18n,
+      storage: this.storage((fn) => unsubscribers.push(this.store.onChanged((changes) => alive && fn(changes)))),
     };
     window.window = window;
     window.self = window;
 
     const context = vm.createContext(window);
     global = vm.runInContext('globalThis', context);
-    const scripts = this.manifest.content_scripts.flatMap((entry) => entry.js);
-    for (const name of scripts) vm.runInContext(this.script(name), context, { filename: name });
+    for (const name of SCRIPTS) vm.runInContext(this.script(name), context, { filename: name });
 
     tab.page = {
       window,
-      document: dom.document,
       dispose: () => {
         alive = false;
         timers.clearAll();
@@ -394,36 +373,19 @@ export class Runner extends EventEmitter {
     await this.bootPage(tab);
   }
 
-  // The home tab's panel, as HTML for the dashboard to mirror.
-  panelHtml() {
-    return this.page?.document.getElementById('botter-panel')?.shadowRoot?.innerHTML ?? '';
-  }
-
-  // Replays one dashboard interaction on the panel. path is the list of
-  // element-child indexes from the panel's shadow root to the target.
-  panelEvent({ path, type, value, open }) {
-    let element = this.page?.document.getElementById('botter-panel')?.shadowRoot;
-    for (const index of path) element = element?.children[index];
-    if (!element || element === this.page.document) return false;
-    const { Event } = this.page.window;
-    if (type === 'click') element.click();
-    else if (type === 'change') {
-      element.value = value;
-      element.dispatchEvent(new Event('change'));
-    } else if (type === 'toggle') {
-      element.open = open;
-      element.dispatchEvent(new Event('toggle'));
-    } else return false;
-    return true;
+  // Runs one dashboard switch (BotterHeadless.command) in the tab of account id.
+  command(id, name, value) {
+    const page = this.tabs.get(id)?.page;
+    return !!page?.window.BotterHeadless.command?.(name, value);
   }
 
   async setLocale(locale) {
     this.locale = locale;
-    this.i18n = i18n(this.extensionDir, locale);
+    this.i18n = i18n(this.botDir, locale);
     for (const tab of [...this.tabs.values()]) await this.reload(tab);
   }
 
-  // The home tab's report, with every tab's status and player.
+  // The home tab's report, with every tab's own report under tabs.
   report() {
     const report = this.page?.window.BotterHeadless.report?.() ?? null;
     if (!report) return null;
@@ -431,8 +393,9 @@ export class Runner extends EventEmitter {
     report.tabs = [...this.tabs.values()]
       .filter((tab) => tab.id)
       .map((tab) => {
-        const own = tab === focus ? report : tab.page?.window.BotterHeadless.report?.();
-        return { id: tab.id, login: own?.player?.login ?? this.loginOf(tab.id), status: own?.status ?? null, player: own?.player ?? null };
+        const own = tab === focus ? report : (tab.page?.window.BotterHeadless.report?.() ?? null);
+        const { tabs, accounts, bundle, ...rest } = own ?? {};
+        return { ...rest, id: tab.id, login: own?.player?.login ?? this.loginOf(tab.id), status: own?.status ?? null, player: own?.player ?? null };
       });
     return report;
   }

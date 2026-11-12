@@ -20,8 +20,11 @@ async function post(path, body) {
 
 const tabs = [...document.querySelectorAll('[role="tab"]')];
 
+// name is a view, or a view and its section for Settings and Statistics
+// (settings/auto), as the address keeps it.
 function selectTab(name, focus = false) {
-  const tab = tabs.find((item) => item.id === `tab-${name}`) ?? tabs[0];
+  const [view, section] = name.split('/');
+  const tab = tabs.find((item) => item.id === `tab-${view}`) ?? tabs[0];
   for (const item of tabs) {
     const on = item === tab;
     item.setAttribute('aria-selected', String(on));
@@ -33,7 +36,8 @@ function selectTab(name, focus = false) {
   watchHistory(key === 'progress');
   watchBoards(key === 'boards');
   if (key === 'changes') loadChanges();
-  if (location.hash.slice(1) !== key) history.replaceState(null, '', key === 'overview' ? location.pathname : `#${key}`);
+  const shown = key === 'settings' ? `settings/${BotterSettings.showSettings(section)}` : key === 'stats' ? `stats/${BotterSettings.showStats(section)}` : key;
+  if (location.hash.slice(1) !== shown) history.replaceState(null, '', key === 'overview' ? location.pathname : `#${shown}`);
 }
 
 for (const tab of tabs) {
@@ -46,118 +50,22 @@ for (const tab of tabs) {
     selectTab(next.id.slice(4), true);
   });
 }
+// Links into a view or a settings section (#settings/auto) open it.
+addEventListener('hashchange', () => selectTab(location.hash.slice(1) || 'overview'));
 for (const link of document.querySelectorAll('[data-goto]')) link.addEventListener('click', () => selectTab(link.dataset.goto, true));
 
-// ---------- the bot's panel ----------
+// ---------- Auto on every account ----------
 
-// The panel content.js builds on the server, mirrored here. Clicks, picks and
-// opened sections go back by element path and the server re-renders it. These
-// rules turn the floating casino widget into a card that matches the page:
-// the title row, status and Auto move to the account strip above.
-const PANEL_OVERRIDES = `
-  .panel { position: static !important; width: 100% !important; max-height: none !important; overflow: visible !important;
-    background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important;
-    font: 14px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif !important; color: var(--fg) !important; }
-  .panel[hidden] { display: block !important; }
-  .panel > .row:first-child, .panel > .status, .show, .hide, .add-account { display: none !important; }
-  .row { gap: 8px; margin-bottom: 10px; }
-  .name { width: 64px; }
-  button, select, input { background: var(--card); color: var(--fg); border: 1px solid var(--border); border-radius: 8px;
-    padding: 6px 10px; min-height: 36px; }
-  button { font-weight: 600; }
-  button:hover:not(:disabled), select:hover { border-color: var(--accent); }
-  button.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-  button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--focus); }
-  .auto-switches { gap: 6px; margin: 2px 0 12px; }
-  .auto-switches button { min-height: 30px; padding: 2px 12px; font-size: 13px; }
-  .muted { color: var(--muted); }
-  details { border-top: 1px solid var(--border); padding: 4px 0; margin: 0; }
-  summary { padding: 8px 0; font-size: 15px; }
-  table { margin: 4px 0 8px; }
-  th { color: var(--muted); border-bottom-color: var(--border); font-size: 12px; padding: 4px; }
-  td { padding: 5px 4px; }
-  tfoot td { border-top-color: var(--border); }
-  .pos { color: var(--pos); }
-  .neg { color: var(--neg); }
-  tr.pick td { color: var(--accent); }
-  .note, .stats, .cost, .bundle { font-size: 13px; }
-`;
-const panelRoot = $('panel').attachShadow({ mode: 'open' });
-let panelHtml = '';
-let panelPending = null;
+// The strip's Auto button switches every running account at once: on unless
+// all of them already are. Each account also has its own switch.
+const runningTabs = () => (report?.tabs ?? []).filter((tab) => tab.player);
+const autoOn = (tab) => BotterControls.shown(tab, 'auto', !!tab.run?.autoMode);
 
-function editing() {
-  const active = panelRoot.activeElement;
-  return !!active && (active.tagName === 'SELECT' || active.tagName === 'INPUT');
-}
-
-function showPanel(html) {
-  if (editing()) {
-    panelPending = html;
-    return;
-  }
-  panelPending = null;
-  if (html === panelHtml) return;
-  panelHtml = html;
-  $('panel-empty').hidden = !!html;
-  const next = document.createElement('div');
-  next.innerHTML = `${html}<style>${PANEL_OVERRIDES}</style>`;
-  morph(panelRoot, next);
-  $('auto').disabled = !panelRoot.querySelector('.auto-toggle');
-}
-
-// Brings target's children in line with source's, touching only what
-// differs, so a panel update changes a few text nodes instead of rebuilding
-// every element (and restyling the page) several times a second.
-function morph(target, source) {
-  const before = [...target.childNodes];
-  const after = [...source.childNodes];
-  after.forEach((to, i) => {
-    const from = before[i];
-    if (!from) target.append(to);
-    else if (from.nodeType !== to.nodeType || from.nodeName !== to.nodeName) from.replaceWith(to);
-    else if (from.nodeType !== Node.ELEMENT_NODE) {
-      if (from.nodeValue !== to.nodeValue) from.nodeValue = to.nodeValue;
-    } else {
-      for (const { name } of [...from.attributes]) if (!to.hasAttribute(name)) from.removeAttribute(name);
-      for (const { name, value } of [...to.attributes]) if (from.getAttribute(name) !== value) from.setAttribute(name, value);
-      morph(from, to);
-      // A select shows the option the server marked, unless it is being used.
-      if (from.nodeName === 'SELECT' && from !== document.activeElement) {
-        const picked = [...to.options].findIndex((option) => option.hasAttribute('selected'));
-        if (picked >= 0 && from.selectedIndex !== picked) from.selectedIndex = picked;
-      }
-    }
-  });
-  for (const extra of before.slice(after.length)) extra.remove();
-}
-
-function pathOf(element) {
-  const path = [];
-  for (let node = element; node && node !== panelRoot; node = node.parentNode) {
-    path.unshift([...node.parentNode.children].indexOf(node));
-  }
-  return path;
-}
-
-const panelEvent = (element, type, extra = {}) => post('/api/panel/event', { path: pathOf(element), type, ...extra });
-
-panelRoot.addEventListener('click', (event) => {
-  const button = event.target.closest('button');
-  if (button && !button.disabled) panelEvent(button, 'click');
-});
-panelRoot.addEventListener('change', (event) => {
-  const field = event.target;
-  if (field.matches('select, input')) panelEvent(field, 'change', { value: field.value });
-});
-// toggle does not bubble, so it is caught on the way down.
-panelRoot.addEventListener('toggle', (event) => panelEvent(event.target, 'toggle', { open: event.target.open }), true);
-panelRoot.addEventListener('focusout', () => setTimeout(() => panelPending !== null && showPanel(panelPending)));
-
-// Auto is the panel's own switch, pressed through the mirror.
 $('auto').addEventListener('click', () => {
-  const toggle = panelRoot.querySelector('.auto-toggle');
-  if (toggle) panelEvent(toggle, 'click');
+  const list = runningTabs();
+  const on = !list.every(autoOn);
+  for (const tab of list) BotterControls.command(tab.id, 'auto', on);
+  renderReport();
 });
 
 // ---------- account strip and accounts ----------
@@ -171,11 +79,15 @@ function renderReport() {
   $('stat-credits').textContent = number(player?.credits);
   $('stat-energy').textContent = player ? `${player.energy} / ${player.maxEnergy}` : '-';
   $('energy-bar').style.width = player ? `${Math.round((100 * player.energy) / player.maxEnergy)}%` : '0';
-  const auto = !!report?.settings?.autoMode;
-  $('auto').setAttribute('aria-pressed', String(auto));
-  $('auto-state').textContent = t(auto ? 'on' : 'off');
+  const list = runningTabs();
+  const on = list.filter(autoOn).length;
+  $('auto').disabled = !list.length;
+  $('auto').setAttribute('aria-pressed', String(!!list.length && on === list.length));
+  $('auto-label').textContent = t(list.length > 1 ? 'autoAll' : 'auto');
+  $('auto-state').textContent = list.length > 1 && on && on < list.length ? t('autoSome', [String(on), String(list.length)]) : t(on ? 'on' : 'off');
   renderAccounts(report?.accounts ?? []);
   renderTabs(report?.tabs ?? []);
+  BotterControls.render(report);
   renderShark();
   renderUpdateWarn();
 }
@@ -329,15 +241,29 @@ function renderAccounts(accounts) {
         cell.textContent = value;
         row.append(cell);
       }
+      const state = document.createElement('td');
+      if (account.brokenUntil > now) state.append(badge(t('setAside')));
+      else if (!account.session) state.append(badge(t('noSession')));
+      else state.append(badge(t('running'), true));
       const action = document.createElement('td');
       action.className = 'action';
-      if (account.brokenUntil > now) action.append(badge(t('setAside')));
-      else if (!account.session) action.append(badge(t('noSession')));
-      else action.append(badge(t('running'), true));
-      row.append(action);
+      const forget = document.createElement('button');
+      forget.type = 'button';
+      forget.className = 'danger small-button';
+      forget.textContent = t('forget');
+      forget.setAttribute('aria-label', t('forgetLabel', [account.login]));
+      forget.addEventListener('click', () => forgetAccount(account));
+      action.append(forget);
+      row.append(state, action);
       return row;
     }),
   );
+}
+
+// Drops a saved login and its tab; its stats stay in the books.
+async function forgetAccount(account) {
+  if (!confirm(t('forgetConfirm', [account.login]))) return;
+  await BotterStorage.remove(`account:${account.id}`);
 }
 
 function badge(text, on = false) {
@@ -862,6 +788,13 @@ function buildCard(tab) {
   const energyBar = bar();
   energy.box.append(energyBar);
   stats.append(level.box, credits.box, energy.box);
+  const auto = el('label', 'switch-field acct-auto');
+  const autoInput = el('input');
+  autoInput.type = 'checkbox';
+  autoInput.setAttribute('role', 'switch');
+  autoInput.addEventListener('change', () => BotterControls.command(tab.id, 'auto', autoInput.checked));
+  auto.append(autoInput, el('span', '', t('auto')));
+  head.append(auto);
   const goal = el('span', 'acct-goal');
   const xpRow = el('span', 'row');
   const xpLabel = el('span');
@@ -876,7 +809,7 @@ function buildCard(tab) {
   button.append(head, status, stats, goal);
   const li = el('li');
   li.append(button);
-  return { li, button, dot, name, badge, status, stats, level, credits, energy, energyBar, goal, xpRow, xpLabel, xpText, xpBar, toRow, toText, toBar };
+  return { li, button, dot, name, badge, auto, autoInput, status, stats, level, credits, energy, energyBar, goal, xpRow, xpLabel, xpText, xpBar, toRow, toText, toBar };
 }
 
 function updateCard(card, tab) {
@@ -889,6 +822,9 @@ function updateCard(card, tab) {
     card.status.textContent = tab.status ?? '-';
     card.status.title = tab.status ?? '';
   }
+  card.autoInput.checked = autoOn(tab);
+  card.autoInput.disabled = !player;
+  card.autoInput.setAttribute('aria-label', `${t('auto')}: ${tab.login ?? tab.id}`);
   card.stats.hidden = card.goal.hidden = !player;
   if (!player) return;
   tween(card.level.value, player.level);
@@ -1204,7 +1140,6 @@ $('play-pause').addEventListener('click', () => {
 function connect() {
   const source = new EventSource('/api/events');
   source.addEventListener('open', () => setConnected(true));
-  source.addEventListener('panel', (event) => showPanel(JSON.parse(event.data)));
   source.addEventListener('report', (event) => {
     report = JSON.parse(event.data);
     renderReport();
@@ -1283,24 +1218,13 @@ $('github-finish').addEventListener('submit', async (event) => {
   }
 });
 
-const loadSettings = () => ($('settings').src = `/ext/options.html?lang=${I18n.lang}`);
-
-// The settings frame takes the height of its page, which changes with its
-// tabs and open sections, so the dashboard scrolls once instead of twice.
-let settingsObserver = null;
-$('settings').addEventListener('load', () => {
-  const frame = $('settings');
-  const doc = frame.contentDocument;
-  if (!doc) return;
-  const fit = () => (frame.style.height = `${Math.ceil(doc.body.getBoundingClientRect().height)}px`);
-  settingsObserver?.disconnect();
-  settingsObserver = new frame.contentWindow.ResizeObserver(fit);
-  settingsObserver.observe(doc.body);
-  fit();
-});
-
+// Cards and rows built in the old language are rebuilt in the new one.
 function relabel() {
   apply();
+  for (const card of cards.values()) card.li.remove();
+  cards.clear();
+  BotterControls.relabel();
+  BotterSettings.relabel();
   setConnected(connected);
   renderReport();
   renderActivity();
@@ -1309,12 +1233,11 @@ function relabel() {
   renderChanges();
 }
 
-// One language for everything: the server renders the panel in it too.
+// One language for everything: the bot writes its status lines in it too.
 $('lang').addEventListener('click', async () => {
   const locale = I18n.lang === 'cs' ? 'en' : 'cs';
   I18n.set(locale);
   relabel();
-  loadSettings();
   await post('/api/locale', { locale });
 });
 $('logout').addEventListener('click', async () => {
@@ -1327,7 +1250,6 @@ async function start() {
   if (config.locale) I18n.set(config.locale);
   relabel();
   selectTab(location.hash.slice(1) || 'overview');
-  loadSettings();
   connect();
 }
 

@@ -9,7 +9,7 @@
 // quest or achievement the shape that reaches its multiplier cheapest.
 // Return to player is 82 % plus 2 points per Unit testy level and 5/3 points
 // per Gumová kachnička level (95 % maxed), all copied from the client.
-// Classic script: globalThis.BotterMines in the extension, require() in Node.
+// Classic script: globalThis.BotterMines in the bot's contexts and the dashboard, require() in Node.
 (function (root) {
   const CELLS = 25;
   const BUG_COUNTS = [1, 3, 5, 10, 15, 20, 24];

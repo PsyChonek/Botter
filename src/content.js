@@ -1,7 +1,9 @@
-// Isolated-world content script: owns the work bot, the game bot, the answer
-// bank, profit tracking and the in-page control panel.
-// Work tickets are answered by clicking the app's own buttons; casino games are
-// played through the API via the page hook, so they run on any screen.
+// The bot for one casino account: the work bot, the game bot, auto mode, the
+// answer bank and profit tracking. The server (server/src/runner.mjs) runs it
+// once per saved account in a context of its own, with page-hook.js holding
+// the session; work tickets and games go straight to the casino API. The
+// dashboard reads it through BotterHeadless.report and drives it through
+// BotterHeadless.command.
 (() => {
   const C = globalThis.BotterCore;
   const G = globalThis.BotterGames;
@@ -13,17 +15,16 @@
   const A = globalThis.BotterAuto;
   const O = globalThis.BotterOdds;
   const Z = globalThis.BotterBlaze;
-  const S = globalThis.BotterScreen;
   const B = globalThis.BotterBundle;
-  const msg = (key, subs) => chrome.i18n.getMessage(key, subs) || key;
-  // Set by the Docker runner (server/src/runner.mjs), which runs this script
-  // with no casino page: work tickets go through the API instead of the app's
-  // buttons and games never use the game screen.
-  const HEADLESS = !!globalThis.BotterHeadless;
-  // The runner can also run one page per saved account at once, each pinned
-  // to its account: it never rotates or switches, and picking another account
-  // in the panel only asks the runner to show that page (BotterHeadless.focus).
-  const PINNED = HEADLESS && !!globalThis.BotterHeadless.pinned;
+  const msg = (key, subs) => i18n.getMessage(key, subs) || key;
+  // Set by the runner: the play feed, the report and command hooks, and the
+  // account this context runs for.
+  const H = globalThis.BotterHeadless;
+  // What starts and stops the bot is kept per account (run:<id>), so every
+  // account has its own Auto, Work and Games switch and picks. The rest of the
+  // settings are shared by every account.
+  const RUN_KEYS = ['autoMode', 'enabled', 'gamesEnabled', 'taskType', 'game'];
+  const RUN_KEY = H.account ? `run:${H.account}` : null;
 
   const DEFAULT_SETTINGS = {
     enabled: false,
@@ -31,7 +32,7 @@
     minDelayMs: 1500,
     maxDelayMs: 4000,
     stopAtNorm: false,
-    aiSolver: 'local',
+    aiSolver: 'off',
     guessUnknown: true,
     gamesEnabled: false,
     game: 'blaze',
@@ -42,7 +43,6 @@
     reserve: 0,
     gameDelayMs: 1500,
     maxSpeed: true, // game requests wait only what the server takes (learnSpeed), not gameDelayMs
-    playOnScreen: false,
     hotfixForce: false, // test switch: send hotfixForceValue as force on every Forbes z Chánova spin
     hotfixForceValue: '',
     autoClaim: true,
@@ -90,12 +90,6 @@
     learnBlaze: true,
     captureDebug: false,
     logLevel: 'info',
-    panelHidden: false,
-    panelOpen: [], // panel sections left open (data-section names)
-    rotateAccounts: true,
-    rotateCrash: true, // visit accounts that still owe the running crash round a bet
-    rotateLottery: true, // visit accounts that still owe the next draw their tickets
-    homeAccount: '', // user id rotation returns to; the account picked in the panel
   };
   const EMPTY_STATS = {
     bank: { correct: 0, wrong: 0 },
@@ -113,7 +107,7 @@
     cases: {}, // upgrade combination -> Case opening model check (BotterCases.addOpen)
     plainXp: {}, // rows like games, only rounds played off Hackathon weekends (BotterAuto.planXpRate)
     hotfixTest: null, // { spins, done } of the Forbes z Chánova test (hotfixTestStep)
-    profitBase: null, // where the panel's Profit table starts counting (BotterGames.profitBase)
+    profitBase: null, // where the dashboard's Profit table starts counting (BotterGames.profitBase)
     work: { tickets: 0, net: 0, xp: 0 },
     free: { daily: 0, bailout: 0 },
     crashBooked: [],
@@ -128,7 +122,7 @@
   // ticket is on the way.
   const WORK_FAST_TICK_MS = 150;
   const CARD_WAIT_MS = 3000;
-  // Enough for React to render a click or an input before the next one.
+  // Shortest wait before sending a typed line at max speed.
   const RENDER_MS = 50;
   const CRASH_UNLOCK = 3;
   const CRASH_POLL_MS = 60_000;
@@ -179,24 +173,17 @@
   const timeoutFor = (path) => SLOW_TIMEOUT_MS[path] ?? API_TIMEOUT_MS;
   const STATS_PREFIX = 'stats:';
   const ACCOUNT_PREFIX = 'account:';
-  const SWITCH_KEY = 'botter-switch'; // sessionStorage: { from, to } of a switch in progress
   const ACCOUNT_SAVE_MS = 30_000;
-  const PLAYER_REFRESH_MS = 60_000; // headless only, while the bot is stopped
-  const ROTATE_DWELL_MS = 60_000;
-  // Another account is worth a switch (a page reload) only above this much energy.
-  const ROTATE_MIN_ENERGY = 15;
+  const PLAYER_REFRESH_MS = 60_000; // while the bot is stopped
   // Other accounts are sent to the running crash round this long after one
   // found entering it worth it; each account that bets there extends it.
   const CRASH_OPEN_MS = 10 * 60_000;
-  // An account that still owes a crash bet or lottery tickets is not left for
-  // up to this long, so a quick visit always finishes them.
-  const ROUNDS_STAY_MS = 5 * 60_000;
   // A work run starts only above this much energy and then drains it, so single
   // refilled points do not keep interrupting the grinder.
   const WORK_MIN_ENERGY = 5;
   const LOGGED_OUT_WAIT_MS = 10_000;
   // A saved account whose profile fails to load this many times in a row is
-  // set aside for BROKEN_ACCOUNT_MS and the page returns to one that works.
+  // set aside for BROKEN_ACCOUNT_MS.
   const LOAD_FAIL_LIMIT = 3;
   const BROKEN_ACCOUNT_MS = 30 * 60_000;
   // The speedy achievement wants a right answer within 3 seconds of the task
@@ -218,13 +205,10 @@
 
   let player = null;
   let accountId = null; // supabase user id of the logged-in player
-  let accountSince = 0; // when this page started working for that account
   let accountSavedAt = 0;
   let accounts = {}; // id -> saved login session and last player snapshot
   let statsCache = {}; // id -> stored stats of every account
   let legacyStats = null; // stats saved before accounts existed
-  let accountOptions = ''; // what the account dropdown currently lists
-  let switching = false;
   let loadFails = 0; // failed profile loads in a row on this page
   let early = []; // page-hook responses received before load() finished
   let task = null; // current task as returned by /api/work/start
@@ -259,9 +243,8 @@
   let grindHeldLevel = null; // level the grinder holds at because it does not pay (grindChoice)
   let busy = false;
   let status = { key: 'statusIdle' };
-  let ui = null;
 
-  const locale = chrome.i18n.getUILanguage();
+  const locale = i18n.locale;
   const usd = new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: 'USD',
@@ -271,7 +254,6 @@
   const num = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
   const eventStart = new Intl.DateTimeFormat(locale, { weekday: 'short', hour: '2-digit', minute: '2-digit' });
   const signed = new Intl.NumberFormat(locale, { maximumFractionDigits: 0, signDisplay: 'exceptZero' });
-  const decimal = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
   const pct = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 });
   const signedPct = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1, signDisplay: 'exceptZero' });
 
@@ -302,14 +284,26 @@
         .map(([key, value]) => [key.slice(prefix.length), value]),
     );
 
+  // Shared settings with this account's run state on top. An account with no
+  // run state yet starts from the one the shared settings held before Auto
+  // went per account.
+  const pick = (from, keys) => Object.fromEntries(keys.filter((key) => from && key in from).map((key) => [key, from[key]]));
+  let run = {};
+  function mergeSettings(shared = {}, own = null) {
+    run = own ?? pick(shared, RUN_KEYS);
+    return { ...DEFAULT_SETTINGS, ...shared, ...run };
+  }
+  let sharedSettings = {};
+
   async function load() {
-    const stored = await chrome.storage.local.get(null);
+    const stored = await storage.get(null);
     spins = stored.spins ?? [];
     hotfixRounds = stored.hotfixRounds ?? [];
     capture = stored.capture ?? [];
     bundle = stored.bundle ?? null;
     bundleLog = stored.bundleLog ?? [];
-    settings = { ...DEFAULT_SETTINGS, ...stored.settings };
+    sharedSettings = stored.settings ?? {};
+    settings = mergeSettings(sharedSettings, RUN_KEY ? stored[RUN_KEY] : null);
     bank = stored.bank ?? {};
     statsCache = byPrefix(stored, STATS_PREFIX);
     accounts = byPrefix(stored, ACCOUNT_PREFIX);
@@ -318,10 +312,10 @@
     log = C.createLogger(settings.logLevel);
   }
 
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'local') return;
-    if (changes.settings) {
-      settings = { ...DEFAULT_SETTINGS, ...changes.settings.newValue };
+  storage.onChanged((changes) => {
+    if (changes.settings || (RUN_KEY && changes[RUN_KEY])) {
+      if (changes.settings) sharedSettings = changes.settings.newValue ?? {};
+      settings = mergeSettings(sharedSettings, RUN_KEY && changes[RUN_KEY] ? (changes[RUN_KEY].newValue ?? {}) : run);
       log = C.createLogger(settings.logLevel);
     }
     if (changes.bank) bank = changes.bank.newValue ?? {};
@@ -347,16 +341,25 @@
       net = emptyNet();
       netDirty = true;
     }
-    render();
   });
 
-  const saveSettings = (patch) => chrome.storage.local.set({ settings: { ...settings, ...patch } });
+  // Run keys go to this account's own entry, the rest to the shared settings.
+  // Both apply here at once, so a read right after sees them.
+  function saveSettings(patch) {
+    const own = pick(patch, RUN_KEYS);
+    const shared = Object.fromEntries(Object.entries(patch).filter(([key]) => !RUN_KEYS.includes(key)));
+    const items = {};
+    if (Object.keys(shared).length) items.settings = sharedSettings = { ...sharedSettings, ...shared };
+    if (Object.keys(own).length && RUN_KEY) items[RUN_KEY] = run = { ...run, ...own };
+    settings = { ...settings, ...patch };
+    return storage.set(items);
+  }
   // Nothing is saved until a response says whose stats these are.
   const statsEntry = () => (accountId ? { [STATS_PREFIX + accountId]: stats } : {});
-  const saveStats = () => chrome.storage.local.set(statsEntry());
+  const saveStats = () => storage.set(statsEntry());
   const saveRounds = (patch) => {
     rounds = { ...rounds, ...patch };
-    return chrome.storage.local.set({ rounds });
+    return storage.set({ rounds });
   };
 
   // ---------- messages from the page hook ----------
@@ -365,12 +368,11 @@
   let apiSeq = 0;
 
   // Game requests (every path in G.PATH_GAME: rounds, blackjack actions,
-  // Forbes free spins, lottery tickets, rounds on the game screen) start at
+  // Forbes free spins, lottery tickets) start at
   // least settings.gameDelayMs apart, or with max speed (settings.maxSpeed)
   // only as long after the last game response as the server takes (see
-  // learnSpeed). The earliest next start is kept in the page's localStorage,
-  // which every casino tab shares, so a second tab or another code path never
-  // plays faster.
+  // learnSpeed). The earliest next start is kept in the account's
+  // localStorage, so a reload or another code path never plays faster.
   const PACE_KEY = 'botter:nextGameAt';
   let nextGameAt = 0;
   function readNextGame() {
@@ -561,44 +563,12 @@
     });
   }
 
-  // Rounds played on the game screen are sent by the app, so their result is
-  // the next response the page sees on that path.
-  const screenWaiters = new Set();
-  function waitResponse(path) {
-    return new Promise((resolve) => {
-      const waiter = { path, resolve };
-      screenWaiters.add(waiter);
-      setTimeout(() => {
-        if (screenWaiters.delete(waiter)) resolve({ ok: false, status: 0, data: { error: 'timeout' } });
-      }, timeoutFor(path));
-    });
-  }
-
-  function resolveScreenWaiters({ path, ok, status, data }) {
-    for (const waiter of screenWaiters) {
-      if (waiter.path !== path) continue;
-      screenWaiters.delete(waiter);
-      waiter.resolve({ ok, status, data });
-    }
-  }
-
-  // Waits until the page hook has no token refresh in flight.
-  function hookIdle() {
-    const id = ++apiSeq;
-    return new Promise((resolve) => {
-      apiWaiters.set(id, resolve);
-      window.postMessage({ source: 'botter-content', kind: 'idle', id }, location.origin);
-      setTimeout(() => {
-        if (apiWaiters.delete(id)) resolve();
-      }, API_TIMEOUT_MS);
-    });
-  }
 
   const onHookEvent = (data) => (data.kind === 'session' ? onSession(data.data) : onResponse(data));
 
   window.addEventListener('message', (event) => {
     if (event.source !== window || event.data?.source !== 'botter-hook') return;
-    if (event.data.kind === 'api-result' || event.data.kind === 'idle') {
+    if (event.data.kind === 'api-result') {
       const resolve = apiWaiters.get(event.data.id);
       apiWaiters.delete(event.data.id);
       resolve?.(event.data);
@@ -610,15 +580,12 @@
     else onHookEvent(event.data);
     if (event.data.kind === 'response') {
       noteResponse(event.data.path, event.data.status, event.data.data);
-      resolveScreenWaiters(event.data);
     }
   });
 
-  // One played round, ticket, spin or reward for the Docker dashboard's play
-  // feed (BotterHeadless.play). The extension has no feed, so it sends nothing.
+  // One played round, ticket, spin or reward for the dashboard's play feed.
   function play(item) {
-    if (!HEADLESS) return;
-    globalThis.BotterHeadless.play?.({ at: Date.now(), account: player?.login ?? accounts[accountId]?.login ?? null, ...item });
+    H.play?.({ at: Date.now(), account: player?.login ?? accounts[accountId]?.login ?? null, ...item });
   }
 
   // Every /api/ response the page sees, from the app or from the bot.
@@ -633,7 +600,7 @@
     if (data?.player) syncProfitBase(data.player);
     if (settings.captureDebug && CAPTURE_PATHS.test(path)) {
       capture = [...capture, { at: Date.now(), path, ok, request, data }].slice(-MAX_CAPTURE);
-      chrome.storage.local.set({ capture });
+      storage.set({ capture });
     }
     if (!ok) {
       if (path === '/api/work/submit') onSubmitRejected(request?.id, data);
@@ -649,7 +616,6 @@
     }
     if (path === '/api/profile/reset') {
       resetStats();
-      render();
       return;
     }
     bookRewards(data);
@@ -710,13 +676,12 @@
         play({ kind: 'game', game: delta.game, step: path.split('/').pop(), bet: delta.wagered, net: delta.net, xp: delta.xp * xpBonus(), ...G.playOutcome(path, request, data) });
       }
     }
-    render();
   }
 
   // Level curve shared by all accounts (G.recordLevel), saved only on a change.
   // Every update reads the stored table afresh and the updates run one at a
-  // time: a copy kept from earlier, or by another casino tab, would write back
-  // a table without the reward another tab has just recorded.
+  // time: a copy kept from earlier, or by another account, would write back
+  // a table without the reward another account has just recorded.
   let levelWrites = Promise.resolve();
   function trackLevel(data) {
     if (!data?.player && !data?.levelUp) return;
@@ -726,9 +691,9 @@
     }
     levelWrites = levelWrites
       .then(async () => {
-        const { levels = {} } = await chrome.storage.local.get('levels');
+        const { levels = {} } = await storage.get('levels');
         const next = G.recordLevel(levels, data.player, data.levelUp);
-        if (next !== levels) await chrome.storage.local.set({ levels: next });
+        if (next !== levels) await storage.set({ levels: next });
       })
       .catch((err) => log.warn('levels_save_failed', { error: String(err) }));
   }
@@ -743,7 +708,7 @@
     log.info('profile_reset', { account: accountId });
   }
 
-  // Restarts the panel's Profit table after a výpověď, and a game's row after
+  // Restarts the dashboard's Profit table after a výpověď, and a game's row after
   // its upgrades change (bought by the bot or by hand), before the response's
   // own round is booked. Only the table starts over: stats.games keeps every
   // round for the XP rates and the settings Profit tab.
@@ -800,7 +765,7 @@
     if (spins.length > MAX_SPINS) spins = spins.slice(-MAX_SPINS);
     if (++unsavedSpins >= SPIN_FLUSH_EVERY) {
       unsavedSpins = 0;
-      chrome.storage.local.set({ spins });
+      storage.set({ spins });
     }
   }
 
@@ -824,7 +789,7 @@
     }
     if (path === '/api/hotfix/free' || ++unsavedHotfix >= SPIN_FLUSH_EVERY) {
       unsavedHotfix = 0;
-      chrome.storage.local.set({ hotfixRounds });
+      storage.set({ hotfixRounds });
     }
   }
 
@@ -904,7 +869,7 @@
       pending = null;
       log.info('task_result', { ticket: C.ticketLabel(task.id), type: task.type, source: 'typed', correct: result.correct });
     }
-    chrome.storage.local.set({ bank, ...statsEntry() });
+    storage.set({ bank, ...statsEntry() });
   }
 
   // The app only toasts a rejected submit and leaves the task open, so without
@@ -917,7 +882,7 @@
     const fields = { ticket: C.ticketLabel(task.id), type: task.type, code: data?.code, error: data?.error };
     if (data?.code === 'expired' || data?.code === 'already_solved') {
       log.warn('submit_rejected', fields);
-      if (HEADLESS) closeTask();
+      closeTask();
       return;
     }
     // At max speed the time at the submit teaches the wait; otherwise the
@@ -973,21 +938,12 @@
     return null;
   }
 
-  function readSwitch() {
-    try {
-      return JSON.parse(sessionStorage.getItem(SWITCH_KEY));
-    } catch {
-      return null;
-    }
-  }
-
   // Every response names the account its token belongs to. A new one means the
   // page is logged in as someone else: load that account's stats and forget
   // everything known about the previous player.
   function useAccount(id) {
     if (id === accountId) return;
     accountId = id;
-    accountSince = Date.now();
     accountSavedAt = 0;
     stats = mergeStats(statsCache[id] ?? adoptLegacyStats(id));
     sessionBase = G.totalNet(stats.games);
@@ -1001,8 +957,6 @@
     crashNextPoll = 0;
     grindPausedUntil = 0;
     for (const kind of Object.keys(claimTried)) delete claimTried[kind];
-    if (readSwitch()?.to === id) sessionStorage.removeItem(SWITCH_KEY);
-    if (!settings.homeAccount) saveSettings({ homeAccount: id });
     log.info('account', { id });
   }
 
@@ -1012,13 +966,13 @@
     const adopted = legacyStats;
     legacyStats = null;
     statsCache[id] = adopted;
-    chrome.storage.local.set({ [STATS_PREFIX + id]: adopted });
-    chrome.storage.local.remove('stats');
+    storage.set({ [STATS_PREFIX + id]: adopted });
+    storage.remove('stats');
     return adopted;
   }
 
-  // Keeps the account's login session and a snapshot of its player, so the panel
-  // can switch back to it and rotation can project its energy.
+  // Keeps a snapshot of the account's player next to its login, for the
+  // dashboard and for other accounts' plans.
   function saveAccount(force = false) {
     if (!accountId || !player) return Promise.resolve();
     // A profile that loads ends the account's time set aside (loadFailed).
@@ -1050,7 +1004,7 @@
       ...(own ? { storageKey: session.key, session: session.raw } : {}),
     };
     accounts[accountId] = record;
-    return chrome.storage.local.set({ [ACCOUNT_PREFIX + accountId]: record });
+    return storage.set({ [ACCOUNT_PREFIX + accountId]: record });
   }
 
   // A session the auth server issued, reported by the page hook. It goes into the
@@ -1062,7 +1016,7 @@
     const saved = id && accounts[id];
     if (!raw || !saved?.session || raw === saved.session || !C.isNewerSession(raw, saved.session)) return;
     accounts[id] = { ...saved, session: raw };
-    chrome.storage.local.set({ [ACCOUNT_PREFIX + id]: accounts[id] });
+    storage.set({ [ACCOUNT_PREFIX + id]: accounts[id] });
     log.debug('session_refreshed', { login: saved.login });
   }
 
@@ -1072,56 +1026,10 @@
     const saved = accounts[accountId];
     if (!saved || Object.entries(patch).every(([key, value]) => saved[key] === value)) return;
     accounts[accountId] = { ...saved, ...patch };
-    chrome.storage.local.set({ [ACCOUNT_PREFIX + accountId]: accounts[accountId] });
+    storage.set({ [ACCOUNT_PREFIX + accountId]: accounts[accountId] });
   }
 
-  // What an account still owes the shared crash and lottery rounds
-  // (BotterAuto.roundsDue), from its saved record or the live player.
-  function dueRounds(saved, now = Date.now()) {
-    const games = settings.autoMode && settings.autoGames && settings.rotateAccounts;
-    return A.roundsDue(saved, rounds, {
-      now,
-      crash: games && settings.rotateCrash && settings.crashEnabled,
-      lottery: games && settings.rotateLottery && (huntOn() || settings.lotteryLucky),
-      lucky: settings.lotteryLucky,
-      reserve: settings.reserve,
-      crashLevel: CRASH_UNLOCK,
-      lotteryLevel: G.LOTTERY_UNLOCK,
-      crashStake: G.CRASH_LEVELS[0],
-    });
-  }
-
-  // Logs the page in as a saved account: its session goes where the app keeps
-  // it, then the page reloads. The current session is saved first so it can return,
-  // after any refresh in flight has landed, or the saved copy would hold a
-  // refresh token the server has just revoked.
-  async function switchAccount(id) {
-    if (PINNED) return globalThis.BotterHeadless.focus?.(id);
-    const target = accounts[id];
-    if (switching || id === accountId || !target?.session) return;
-    switching = true;
-    setStatus('statusSwitching', [target.login ?? id]);
-    await hookIdle();
-    await saveAccount(true);
-    sessionStorage.setItem(SWITCH_KEY, JSON.stringify({ from: accountId, to: id }));
-    localStorage.setItem(target.storageKey, target.session);
-    location.reload();
-  }
-
-  // Detaches the current session and reloads to the login screen. The app's own
-  // log out would revoke the session on the server, and with it the saved copy.
-  async function addAccount() {
-    if (switching || PINNED) return;
-    switching = true;
-    await hookIdle();
-    await saveAccount(true);
-    const session = readSession();
-    if (session) localStorage.removeItem(session.key);
-    location.reload();
-  }
-
-  // Asks for the player snapshot. With no session left the page is on the login
-  // screen; if a switch just landed there, that saved login has expired.
+  // Asks for the player snapshot. With no session left the account has no login.
   async function loadPlayer() {
     setStatus('statusLoading');
     const res = await api('/api/me');
@@ -1131,48 +1039,24 @@
     }
     const session = readSession();
     if (session) return loadFailed(session.uid, res);
-    const marker = readSwitch();
-    sessionStorage.removeItem(SWITCH_KEY);
-    const expired = marker && accounts[marker.to];
-    if (!expired) {
-      setStatus('statusLoggedOut');
-      return sleep(LOGGED_OUT_WAIT_MS);
-    }
-    const kept = { ...expired };
-    delete kept.session;
-    delete kept.storageKey;
-    accounts[marker.to] = kept;
-    await chrome.storage.local.set({ [ACCOUNT_PREFIX + marker.to]: kept });
-    log.warn('session_expired', { login: expired.login });
-    setStatus('statusSessionExpired', [expired.login ?? marker.to]);
-    if (!PINNED && accounts[marker.from]?.session) await switchAccount(marker.from);
-  }
-
-  // A saved account to go to instead of one that cannot load: the one the
-  // switch came from, then home, then any other saved login not set aside.
-  function fallbackAccount(skip, from) {
-    const now = Date.now();
-    const usable = (id) => id && id !== skip && accounts[id]?.session && !(accounts[id].brokenUntil > now);
-    return [from, settings.homeAccount, ...Object.keys(accounts)].find(usable) ?? null;
+    setStatus('statusLoggedOut');
+    return sleep(LOGGED_OUT_WAIT_MS);
   }
 
   // The page is logged in but the profile does not load (the casino failing
   // for this account). After LOAD_FAIL_LIMIT tries in a row the account is set
-  // aside for BROKEN_ACCOUNT_MS, so rotation skips it, and the page switches
-  // back to an account that works instead of retrying this one forever.
+  // aside for BROKEN_ACCOUNT_MS and the bot waits instead of retrying it
+  // every tick.
   async function loadFailed(id, res) {
     loadFails += 1;
     log.warn('profile_load_failed', { id, status: res.status, error: res.data?.error, attempt: loadFails });
     const saved = accounts[id];
     if (loadFails < LOAD_FAIL_LIMIT || !saved) return sleep(LOGGED_OUT_WAIT_MS);
     accounts[id] = { ...saved, brokenUntil: Date.now() + BROKEN_ACCOUNT_MS };
-    await chrome.storage.local.set({ [ACCOUNT_PREFIX + id]: accounts[id] });
-    const fallback = PINNED ? null : fallbackAccount(id, readSwitch()?.from);
-    log.warn('account_set_aside', { login: saved.login, minutes: BROKEN_ACCOUNT_MS / 60_000, to: fallback && accounts[fallback].login });
+    await storage.set({ [ACCOUNT_PREFIX + id]: accounts[id] });
+    log.warn('account_set_aside', { login: saved.login, minutes: BROKEN_ACCOUNT_MS / 60_000 });
     setStatus('statusAccountBroken', [saved.login ?? id, String(BROKEN_ACCOUNT_MS / 60_000)]);
-    if (!fallback) return sleep(LOGGED_OUT_WAIT_MS);
-    loadFails = 0;
-    await switchAccount(fallback);
+    return sleep(LOGGED_OUT_WAIT_MS);
   }
 
   // Whether the grinder holds for a coming XP weekend (BotterAuto.grindHold),
@@ -1181,115 +1065,29 @@
   // the credits. who is a saved account's snapshot, else the logged-in player.
   const eventHold = (event, now, who = player) => settings.grindEventHold && !prestigeNear(who) && A.grindHold(event, now);
 
-  // Whether a saved account could still place the smallest XP grinding bet,
-  // judged from its last snapshot and today's grind loss in its stats.
-  function canGrind(id, saved) {
-    const unlock = settings.grindGame === 'auto' ? Math.min(...Object.values(GRIND_UNLOCKS)) : GRIND_UNLOCKS[settings.grindGame];
-    if (!settings.autoMode || !(saved.level >= unlock)) return false;
-    const now = Date.now();
-    const event = A.weekendEvent(now);
-    if (eventHold(event, now, saved)) return false;
-    // One whose grinder last found its level not paying (grindChoice) waits for
-    // a level-up, unless its výpověď is near and the level's pay no longer matters.
-    if (settings.grindPays && saved.grindHeldLevel === saved.level && !prestigeNear(saved)) return false;
-    const { budget, lost } = A.grindBudget(statsCache[id]?.grind ?? EMPTY_STATS.grind, settings.xpBudget, event, now);
-    return A.grindBets({ ...settings, xpBudget: budget }, saved.credits ?? 0, lost, [G.BET_LEVELS[0]]).length > 0;
-  }
-
-  // An account with nothing left to do hands over to another saved account
-  // instead of idling while its energy refills, and returns home afterwards.
-  // urgent only leaves for free credits waiting elsewhere (A.urgentAccount), so
-  // work and grinding here do not hold up another account's wheel or daily bonus.
-  // An account left within CLAIM_RETRY_MS already tried its wheel, so a refused
-  // spin there does not pull the bot back and forth.
-  async function rotateStep(urgent = false) {
-    if (PINNED || !settings.rotateAccounts || !player || Date.now() - accountSince < ROTATE_DWELL_MS) return false;
-    if (urgent && taskOpen()) return false;
-    const now = Date.now();
-    const here = dueRounds({ ...accounts[accountId], level: player.level, credits: player.credits }, now);
-    if ((here.crash || here.lottery) && now - accountSince < ROUNDS_STAY_MS) return false;
-    const today = A.dayKey(now);
-    const candidates = Object.entries(accounts)
-      .filter(([id, saved]) => id !== accountId && saved.session && !(saved.brokenUntil > now))
-      .map(([id, saved]) => ({
-        id,
-        seenAt: saved.seenAt ?? 0,
-        seenDay: saved.seenDay,
-        energy: G.energyNow(saved.work, now),
-        normDone: settings.stopAtNorm && saved.seenDay === today && A.normDone(saved.work, saved.prestigeDay, today),
-        credits: saved.credits ?? 0,
-        canGrind: canGrind(id, saved),
-        wheel: settings.autoClaim && A.wheelReady(saved.wheelNextAt, now) && now - (saved.seenAt ?? 0) > CLAIM_RETRY_MS,
-        ...dueRounds(saved, now),
-      }));
-    const home = settings.homeAccount && settings.homeAccount !== accountId ? settings.homeAccount : null;
-    const id = urgent ? A.urgentAccount(candidates, today) : A.pickAccount(candidates, today, ROTATE_MIN_ENERGY, home);
-    if (!id) return false;
-    const picked = candidates.find((c) => c.id === id);
-    log.info('account_rotate', {
-      to: accounts[id].login,
-      urgent,
-      home: id === settings.homeAccount,
-      energy: G.energyNow(accounts[id].work, now),
-      credits: accounts[id].credits,
-      wheel: A.wheelReady(accounts[id].wheelNextAt, now),
-      crash: picked.crash,
-      lottery: picked.lottery,
-    });
-    await switchAccount(id);
-    return true;
-  }
-
   // ---------- work bot ----------
 
-  // Whether a ticket is open: on the page, its task section; headless, a
-  // started task that is not answered, given up or expired yet.
+  // Whether a ticket is open: a started task that is not answered, given up or
+  // expired yet.
   function taskOpen() {
-    if (!HEADLESS) return !!document.querySelector('.work-screen section.task');
     return !!task && !task.closed && task.expiresAt > Date.now();
   }
 
-  // Leaves the open ticket: the app closes it on Escape, headless just drops it.
+  // Leaves the open ticket.
   function closeTask() {
-    if (HEADLESS) {
-      if (task) task.closed = true;
-    } else {
-      pressKey('Escape');
-    }
+    if (task) task.closed = true;
   }
 
-  function pressKey(key) {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
-  }
-
-  // Level-up and daily-bonus modals block the work screen; dismiss them.
-  function dismissModal() {
-    const button =
-      document.querySelector('.modal .sheet.levelup .btn-primary') ||
-      document.querySelector('.modal .sheet.daily .close');
-    if (!button) return false;
-    button.click();
-    return true;
-  }
-
-  function answerButton(taskEl, current, index) {
-    if (current.type === 'bughunt') {
-      return taskEl.querySelectorAll('ol.code.lines > li')[index]?.querySelector('button');
-    }
-    return taskEl.querySelectorAll('.options button')[index];
-  }
+  const AI_SOLVERS = ['claude', 'openrouter'];
 
   async function pickAnswer(current) {
     const known = C.answerFromBank(current, bank[C.taskKey(current)]);
     if (known !== null) return { index: known, source: 'bank' };
 
-    if (settings.aiSolver !== 'off') {
+    if (AI_SOLVERS.includes(settings.aiSolver)) {
       const source = settings.aiSolver;
       setStatus('statusThinking', [C.ticketLabel(current.id), msg(`source_${source}`)]);
-      const res = await chrome.runtime.sendMessage({ kind: 'solve', task: current }).catch((err) => ({
-        ok: false,
-        error: String(err),
-      }));
+      const res = await H.solve(current).catch((err) => ({ ok: false, error: String(err) }));
       if (res?.ok) recordSpend(res.cost);
       if (res?.ok && C.isValidAnswer(current, res.index)) return { index: res.index, source };
       if (res?.error !== 'no_api_key') log.warn('ai_failed', { error: res?.error ?? 'invalid_index' });
@@ -1299,10 +1097,10 @@
     return { index: null, source: null };
   }
 
-  async function solve(taskEl) {
+  async function solve() {
     const current = task;
     answeredTaskId = current.id;
-    if (current.type === 'typing') return HEADLESS ? typeCodeApi(current) : typeCode(taskEl, current);
+    if (current.type === 'typing') return typeCodeApi(current);
     const started = Date.now();
     const { index, source } = await pickAnswer(current);
     if (index === null) {
@@ -1327,54 +1125,10 @@
     await sleep(Math.min(wait, timeLeft));
     if (!workOn() || task?.id !== current.id) return;
 
-    if (HEADLESS) return submitAnswer(current, { answer: index }, source);
-    if (current.type === 'ticket') {
-      await fileTicket(taskEl, current, index, source);
-      return;
-    }
-    const button = answerButton(taskEl, current, index);
-    if (!button || button.disabled) {
-      log.warn('answer_button_missing', { ticket: C.ticketLabel(current.id), index });
-      return;
-    }
-    pending = { taskId: current.id, source, openMs: Date.now() - taskOpenedAt };
-    button.click();
+    return submitAnswer(current, { answer: index }, source);
   }
 
-  // "Přepiš kód": the line is in the task, so it is typed out key by key at a
-  // human pace (the app blocks pasting) and sent with Enter. The value is set
-  // through the native setter, which React's change tracking sees as typing.
-  const setInputValue = HEADLESS ? null : Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-  async function typeCode(taskEl, current) {
-    const input = taskEl.querySelector('.typing-input');
-    const code = String(current.code ?? '');
-    if (!input || input.disabled || !code) {
-      log.warn('answer_button_missing', { ticket: C.ticketLabel(current.id), field: 'typing' });
-      return;
-    }
-    setStatus('statusTyping', [C.ticketLabel(current.id), num.format([...code].length)]);
-    input.focus();
-    setInputValue.call(input, '');
-    // The server only sees the finished line, so max speed enters it at once.
-    for (const chunk of settings.maxSpeed ? [code] : code) {
-      setInputValue.call(input, input.value + chunk);
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      await sleep(settings.maxSpeed ? RENDER_MS : C.delayBetween(TYPING_MIN_MS, TYPING_MAX_MS));
-      if (!workOn() || task?.id !== current.id) return;
-    }
-    const dwellLeft = workDwell(current) - (Date.now() - taskOpenedAt);
-    await sleep(Math.max(dwellLeft, settings.maxSpeed ? RENDER_MS : C.delayBetween(200, 500)));
-    if (!workOn() || task?.id !== current.id) return;
-    if (input.value !== code) {
-      log.warn('typing_mismatch', { ticket: C.ticketLabel(current.id) });
-      answeredTaskId = null;
-      return;
-    }
-    pending = { taskId: current.id, source: 'typed', openMs: Date.now() - taskOpenedAt };
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
-  }
-
-  // Headless: the answer goes to the API the way the app sends it, the index
+  // The answer goes to the API the way the app sends it, the index
   // for every type but "Přepiš kód", which sends the typed line. A ticket
   // that went through, or that the server says is over, is closed.
   async function submitAnswer(current, fields, source) {
@@ -1383,7 +1137,7 @@
     if (res.ok || res.data?.code === 'expired' || res.data?.code === 'already_solved') current.closed = true;
   }
 
-  // Headless "Přepiš kód": waits as long as typing the line would take, then
+  // "Přepiš kód": waits as long as typing the line would take, then
   // sends it.
   async function typeCodeApi(current) {
     const code = String(current.code ?? '');
@@ -1397,30 +1151,6 @@
     await sleep(Math.max(workDwell(current) - (Date.now() - taskOpenedAt), typing));
     if (!workOn() || task?.id !== current.id) return;
     await submitAnswer(current, { text: code }, 'typed');
-  }
-
-  // A ticket is answered by picking one option per field, then submitting. React
-  // enables the submit button only after it re-renders with all three picks.
-  async function fileTicket(taskEl, current, index, source) {
-    const fields = taskEl.querySelectorAll('.ticket-field');
-    const digits = C.decodeTicket(index);
-    for (const [i, digit] of digits.entries()) {
-      const button = fields[i]?.querySelectorAll('.ticket-options button')[digit];
-      if (!button || button.disabled) {
-        log.warn('answer_button_missing', { ticket: C.ticketLabel(current.id), index, field: i });
-        return;
-      }
-      button.click();
-      await sleep(settings.maxSpeed ? RENDER_MS : C.delayBetween(150, 400));
-      if (!workOn() || task?.id !== current.id) return;
-    }
-    const submit = taskEl.querySelector('.ticket-submit');
-    if (!submit || submit.disabled) {
-      log.warn('answer_button_missing', { ticket: C.ticketLabel(current.id), index, field: 'submit' });
-      return;
-    }
-    pending = { taskId: current.id, source, openMs: Date.now() - taskOpenedAt };
-    submit.click();
   }
 
   const normDone = () => settings.stopAtNorm && !!player && A.normDone(player.work, A.prestigeDay(accounts[accountId], player.prestige, A.dayKey()), A.dayKey());
@@ -1451,7 +1181,7 @@
   const grindReady = () => settings.autoMode && Date.now() >= grindPausedUntil && grindChoice().plan !== null;
 
   // The upgrade goal that alone keeps the grinder from betting, or null: the
-  // credits are kept for it (see savingFor), so the panel says so instead of
+  // credits are kept for it (see savingFor), so the status says so instead of
   // looking idle.
   function grindHeldFor() {
     if (!settings.autoMode) return null;
@@ -1475,10 +1205,6 @@
   }
 
   async function workStep() {
-    if (dismissModal()) return;
-
-    const screen = HEADLESS ? null : document.querySelector('.work-screen');
-    const taskEl = screen?.querySelector('section.task');
     // With no ticket open and nothing to work on, leave the user on whatever
     // screen they are on instead of pulling them back to work every tick. In
     // auto mode the status says why the grinder is idle too, not only the work.
@@ -1493,58 +1219,14 @@
       }
     }
 
-    if (HEADLESS) return apiWorkStep();
-    if (!screen) {
-      setStatus('statusOpening');
-      document.querySelectorAll('nav.views button')[1]?.click();
-      return;
-    }
-
-    if (taskEl) {
-      // Typing tickets have no answer buttons to mark, so the result panel is
-      // the only sign that a "Přepiš kód" ticket is done.
-      if (screen.querySelector('section.work-result') || taskEl.querySelector('button.right, button.wrong')) {
-        await sleep(workPause());
-        pressKey('Escape');
-        return;
-      }
-      const label = taskEl.querySelector('.ticket')?.textContent ?? '';
-      if (!task || !label.includes(C.ticketLabel(task.id))) {
-        // Task opened before the extension loaded: we have no data for it.
-        pressKey('Escape');
-        return;
-      }
-      if (answeredTaskId !== task.id) await solve(taskEl);
-      return;
-    }
-
-    const pick = screen.querySelector('.work-pick');
-    if (!pick) return;
-    const type = C.nextType(settings.taskType, lastType);
-    const card = pick.querySelectorAll('.job-card')[C.TYPES.indexOf(type)];
-    if (!card || card.disabled) {
-      setStatus('statusNoEnergy');
-      return;
-    }
-    // Fast polling sees the lobby again before the picked ticket arrives.
-    if (Date.now() - cardClickedAt < CARD_WAIT_MS && taskOpenedAt < cardClickedAt) return;
-    setStatus('statusStarting');
-    if (Date.now() - taskOpenedAt < startWait()) return;
-    await sleep(workPause());
-    if (!workOn()) return;
-    lastType = type;
-    cardClickedAt = Date.now();
-    // A gap since a start long ago says nothing about the server's limit.
-    const gap = cardClickedAt - taskOpenedAt;
-    startGap = taskOpenedAt && gap <= MAX_WORK_DWELL_MS ? gap : null;
-    card.click();
+    return apiWorkStep();
   }
 
-  // Headless work: answers the open ticket, or starts the next one with
-  // /api/work/start, keeping the same type order and start gap as the cards.
+  // Answers the open ticket, or starts the next one with /api/work/start,
+  // keeping the type order and the start gap the server allows.
   async function apiWorkStep() {
     if (taskOpen()) {
-      if (answeredTaskId !== task.id) await solve(null);
+      if (answeredTaskId !== task.id) await solve();
       return;
     }
     if (player && G.energyNow(player.work, Date.now()) < 1) {
@@ -1568,14 +1250,6 @@
 
   const credits = (n) => num.format(n);
 
-  const screenPlay = S.create({
-    waitResponse,
-    dismissModal,
-    active: gamesOn,
-    decide: (hand, data) =>
-      BJ.decide(hand, BJ.rulesFromUpgrades(player.upgrades?.blackjack), data?.player?.credits ?? player.credits),
-  });
-
   const openHand = () => (player.blackjack && !player.blackjack.done ? player.blackjack : null);
 
   async function playBlackjack(bet) {
@@ -1590,48 +1264,9 @@
     return res;
   }
 
-  function playOnScreen(game, bet, spot) {
-    if (game === 'blackjack') {
-      const open = openHand();
-      if (open) bjStake = open.stake ?? bjStake;
-      return screenPlay.blackjack(bet, open);
-    }
-    if (game === 'roulette') return screenPlay.roulette(spot, bet);
-    if (game === 'baccarat') return screenPlay.baccarat(BAC.SPOTS.includes(spot) ? spot : BAC.bestSpot(player.upgrades?.baccarat), bet);
-    if (game === 'dice') return screenPlay.dice(DICE.SPOTS.includes(spot) ? spot : DICE.BEST_SPOT, bet);
-    if (game === 'hotfix') return screenPlay.hotfix(bet, HOTFIX_CHOICE, !!player.hotfixFree);
-    return screenPlay.slot(game, bet);
-  }
-
-  // Screen failures that happen before the app sends the bet. Only these fall
-  // back to the API: after a timeout the spin may have gone through unseen,
-  // and a blackjack button can go missing mid-hand, so retrying would bet twice.
-  const SCREEN_UNSENT = ['screen_missing', 'bet_unavailable', 'spot_missing', 'chip_missing'];
-  const screenUnsent = (game, error) =>
-    SCREEN_UNSENT.includes(error) || (error === 'button_missing' && game !== 'blackjack');
-
-  // Whether a round goes to the game screen: with the setting on, except bets
-  // the screen has no spot for (roulette's straight numbers) and Forbes spins
-  // with the test switch, which only the API sends.
-  const onScreen = (game, spot) =>
-    !HEADLESS &&
-    settings.playOnScreen &&
-    game !== 'mines' &&
-    (game !== 'roulette' || G.ROULETTE_BETS.includes(spot)) &&
-    (game !== 'hotfix' || !settings.hotfixForce);
-
-  // spot is the roulette, baccarat or Kostky bet; the screen can only lay chips
-  // on the even-money roulette spots, so other bets always go through the API.
-  // Baccarat bets the better of Hráč and Bankéř and Kostky bets Malá unless
+  // spot is the roulette, baccarat or Kostky bet. Baccarat bets the better of Hráč and Bankéř and Kostky bets Malá unless
   // another spot is asked for.
   async function playRound(game, bet, spot = settings.rouletteBet) {
-    if (onScreen(game, spot)) {
-      await pace();
-      const res = await playOnScreen(game, bet, spot);
-      if (res.ok || res.status !== 0) return res;
-      log.warn('screen_play_failed', { game, bet, error: res.data?.error });
-      if (!screenUnsent(game, res.data?.error)) return res;
-    }
     if (game === 'blackjack') return playBlackjack(bet);
     if (game === 'roulette') return api('/api/roulette/spin', { bets: { [spot]: bet } });
     if (game === 'baccarat') {
@@ -2712,7 +2347,6 @@
     stats.hotfixTest = running ? { ...stats.hotfixTest, done: true } : { spins: 0, done: false };
     log.info(running ? 'hotfix_test_stopped' : 'hotfix_test_started', { spins: stats.hotfixTest.spins });
     saveStats();
-    render();
   }
 
   // Plays the Forbes test at the smallest bet, recording every round
@@ -2724,7 +2358,6 @@
       stats.hotfixTest = { ...test, done: true };
       saveStats();
       log.info('hotfix_test_done', { spins: test.spins });
-      render();
       return false;
     }
     const bet = G.BET_LEVELS[0];
@@ -2745,7 +2378,6 @@
     if (await bankruptStep()) return;
     if (await claimFreebies()) return;
     if (settings.autoGames && (await hotfixFreeStep())) return;
-    if (await rotateStep(true)) return;
     if (await repayStep()) return;
     if (await loanTrickStep()) return;
     if (await levelLoanStep()) return;
@@ -2762,7 +2394,6 @@
     if (games && (await hotfixTestStep())) return;
     if (games && (await huntStep())) return;
     if (games && (await grindStep())) return;
-    if (await rotateStep()) return;
     if (settings.autoWork) return workStep();
     setStatus(...((games ? grindIdleStatus() : null) ?? ['statusAutoIdle']));
   }
@@ -2772,16 +2403,13 @@
     if (!player) return loadPlayer();
     if (await claimFreebies()) return;
     if (settings.gamesEnabled && (await hotfixFreeStep())) return;
-    // The game bot would gamble the other account's credits, so only the work bot leaves.
-    if (settings.enabled && !settings.gamesEnabled && (await rotateStep(true))) return;
     if (settings.enabled && workAvailable()) return workStep();
     if (settings.gamesEnabled) return gameStep();
-    if (settings.enabled && (await rotateStep())) return;
     if (settings.enabled) return workStep();
   }
 
   async function tick() {
-    if ((!settings.enabled && !settings.gamesEnabled && !settings.autoMode) || busy || switching) return;
+    if ((!settings.enabled && !settings.gamesEnabled && !settings.autoMode) || busy) return;
     busy = true;
     const sent = gameRequests;
     try {
@@ -2794,7 +2422,7 @@
     // At max speed a step that played goes again at once instead of on the next
     // tick, and the work screen is polled faster than the tick.
     if (settings.maxSpeed && gameRequests !== sent) setTimeout(tick);
-    else if (settings.maxSpeed && workOn() && !fastTick && (HEADLESS ? taskOpen() : document.querySelector('.work-screen'))) {
+    else if (settings.maxSpeed && workOn() && !fastTick && taskOpen()) {
       fastTick = setTimeout(() => {
         fastTick = null;
         tick();
@@ -2823,338 +2451,60 @@
     setStatus(reasonKey, subs);
   }
 
-  // ---------- control panel ----------
+  // ---------- status, report and commands ----------
 
   function setStatus(key, subs) {
     status = { key, subs };
-    render();
   }
 
-  function mountPanel() {
-    const host = document.createElement('div');
-    host.id = 'botter-panel';
-    const shadow = host.attachShadow({ mode: 'open' });
-    shadow.innerHTML = `
-      <style>
-        :host { all: initial; }
-        [hidden] { display: none !important; }
-        .panel { position: fixed; left: 12px; bottom: 12px; z-index: 2147483647; width: 300px;
-          max-height: calc(100vh - 24px); overflow: hidden auto; box-sizing: border-box;
-          font: 12px/1.4 system-ui, sans-serif; color: #e8f5c8; background: #101a08f2;
-          border: 1px solid #7aa02c; border-radius: 10px; padding: 10px; box-shadow: 0 4px 16px #0008; }
-        .row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
-        .title { font-weight: 700; flex: 1; }
-        .grow { flex: 1; min-width: 0; }
-        .name { width: 52px; flex: none; }
-        button, select, input { font: inherit; color: inherit; background: #1f3010; border: 1px solid #7aa02c;
-          border-radius: 6px; padding: 3px 8px; cursor: pointer; }
-        select { min-width: 0; }
-        input { cursor: text; width: 70px; }
-        button:disabled { opacity: 0.5; cursor: default; }
-        button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid #d4ff6a; outline-offset: 1px; }
-        button.on { background: #7aa02c; color: #101a08; }
-        .auto-switches { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
-        .auto-switches button { padding: 1px 8px; border-radius: 999px; font-size: 11px; }
-        .show { position: fixed; left: 12px; bottom: 12px; z-index: 2147483647; font-weight: 700;
-          background: #101a08f2; box-shadow: 0 4px 16px #0008; }
-        .status { min-height: 1.4em; margin: 2px 0 6px; padding: 4px 6px; border-radius: 6px; background: #1f3010; font-weight: 600; }
-        .muted { color: #b5c99a; }
-        .note { margin: 4px 0; }
-        details { border-top: 1px solid #3d5420; padding-top: 4px; margin-top: 4px; }
-        summary { cursor: pointer; font-weight: 600; padding: 2px 0; }
-        table { width: 100%; border-collapse: collapse; margin-top: 4px; font-variant-numeric: tabular-nums; }
-        th, td { padding: 2px 3px; text-align: right; white-space: nowrap; }
-        th:first-child, td:first-child { text-align: left; white-space: normal; }
-        th { color: #b5c99a; font-weight: 600; border-bottom: 1px solid #3d5420; }
-        tfoot td { border-top: 1px solid #3d5420; font-weight: 600; }
-        .pos { color: #a6e05a; }
-        .neg { color: #ff8f7a; }
-        .bundle { margin-top: 6px; font-size: 11px; }
-        .bundle.neg { font-weight: 600; font-size: 12px; }
-        tr.pick td { color: #d4ff6a; font-weight: 700; }
-        .panel { scrollbar-width: thin; scrollbar-color: #7aa02c transparent; }
-        .panel::-webkit-scrollbar { width: 8px; }
-        .panel::-webkit-scrollbar-track { background: transparent; margin: 8px 0; }
-        .panel::-webkit-scrollbar-thumb { background: #4c6a1c; border-radius: 4px; border: 2px solid #101a08; }
-        .panel::-webkit-scrollbar-thumb:hover { background: #7aa02c; }
-      </style>
-      <div class="panel" role="region">
-        <div class="row">
-          <span class="title"></span>
-          <button type="button" class="auto-toggle"></button>
-          <button type="button" class="hide"></button>
-        </div>
-        <div class="row">
-          <label class="muted name" for="account"></label>
-          <select id="account" class="grow"></select>
-          <button type="button" class="add-account"></button>
-        </div>
-        <div class="status" role="status" aria-live="polite"></div>
-        <div class="row">
-          <label class="muted name" for="type"></label>
-          <select id="type" class="grow">
-            <option value="alternate"></option>
-            <option value="bughunt"></option>
-            <option value="output"></option>
-            <option value="ticket"></option>
-            <option value="typing"></option>
-          </select>
-          <button type="button" class="work-toggle"></button>
-        </div>
-        <div class="row">
-          <label class="muted name" for="game"></label>
-          <select id="game" class="grow"></select>
-          <button type="button" class="games-toggle"></button>
-        </div>
-        <div class="auto-switches" role="group"></div>
-        <details data-section="profit" class="profit">
-          <summary></summary>
-          <table>
-            <thead><tr><th scope="col"></th><th scope="col"></th><th scope="col"></th></tr></thead>
-            <tbody></tbody>
-            <tfoot></tfoot>
-          </table>
-        </details>
-        <details data-section="xp" class="xp">
-          <summary></summary>
-          <table>
-            <thead><tr><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col"></th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </details>
-        <details data-section="shop" class="shop">
-          <summary></summary>
-          <p class="note shop-goal"></p>
-          <table>
-            <thead><tr><th scope="col"></th><th scope="col"></th><th scope="col"></th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </details>
-        <details data-section="more" class="more">
-          <summary></summary>
-          <div class="row note">
-            <span class="muted grow screen-label"></span>
-            <button type="button" class="screen-toggle"></button>
-          </div>
-          <div class="row">
-            <span class="muted grow hotfix-label"></span>
-            <button type="button" class="hotfix-toggle"></button>
-          </div>
-          <p class="muted note hotfix-note"></p>
-          <div class="row">
-            <label class="muted grow" for="hotfix-force"></label>
-            <input id="hotfix-force" type="text" autocomplete="off" spellcheck="false" />
-            <button type="button" class="force-toggle"></button>
-          </div>
-          <div class="stats muted"></div>
-          <div class="cost muted"></div>
-        </details>
-        <div class="bundle muted" role="status"></div>
-      </div>
-      <button type="button" class="show"></button>`;
-    const $ = (sel) => shadow.querySelector(sel);
-    ui = {
-      panel: $('.panel'),
-      title: $('.title'),
-      typeLabel: $('label[for="type"]'),
-      type: $('#type'),
-      autoToggle: $('.auto-toggle'),
-      hide: $('.hide'),
-      accountLabel: $('label[for="account"]'),
-      account: $('#account'),
-      addAccount: $('.add-account'),
-      show: $('.show'),
-      workToggle: $('.work-toggle'),
-      gameLabel: $('label[for="game"]'),
-      game: $('#game'),
-      gamesToggle: $('.games-toggle'),
-      screenLabel: $('.screen-label'),
-      screenToggle: $('.screen-toggle'),
-      forceLabel: $('label[for="hotfix-force"]'),
-      forceValue: $('#hotfix-force'),
-      forceToggle: $('.force-toggle'),
-      autoSwitches: $('.auto-switches'),
-      status: $('.status'),
-      stats: $('.stats'),
-      cost: $('.cost'),
-      bundle: $('.bundle'),
-      summary: $('.profit summary'),
-      head: [...shadow.querySelectorAll('.profit th')],
-      body: $('.profit tbody'),
-      foot: $('.profit tfoot'),
-      xpSummary: $('.xp summary'),
-      xpTable: $('.xp table'),
-      xpHead: [...shadow.querySelectorAll('.xp th')],
-      xpBody: $('.xp tbody'),
-      hotfixLabel: $('.hotfix-label'),
-      hotfixNote: $('.hotfix-note'),
-      hotfixToggle: $('.hotfix-toggle'),
-      shop: $('.shop'),
-      moreSummary: $('.more summary'),
-      sections: [...shadow.querySelectorAll('details[data-section]')],
-      shopSummary: $('.shop summary'),
-      shopGoal: $('.shop-goal'),
-      shopHead: [...shadow.querySelectorAll('.shop th')],
-      shopBody: $('.shop tbody'),
-    };
-    ui.panel.setAttribute('aria-label', msg('extName'));
-    ui.title.textContent = msg('extName');
-    ui.hide.textContent = msg('panelHide');
-    ui.hide.setAttribute('aria-label', msg('panelHideLabel'));
-    ui.show.textContent = msg('extName');
-    ui.show.setAttribute('aria-label', msg('panelShowLabel'));
-    ui.accountLabel.textContent = msg('panelAccount');
-    ui.addAccount.textContent = msg('panelAddAccount');
-    ui.addAccount.setAttribute('aria-label', msg('panelAddAccountLabel'));
-    ui.typeLabel.textContent = msg('panelWork');
-    ui.gameLabel.textContent = msg('panelGames');
-    ui.screenLabel.textContent = msg('panelOnScreen');
-    ui.forceLabel.textContent = msg('panelHotfixForce');
-    ui.forceValue.placeholder = 'true';
-    ui.forceValue.title = msg('panelHotfixForceHint');
-    ui.autoSwitches.setAttribute('aria-label', msg('panelAutoParts'));
-    for (const [name, key] of AUTO_SWITCHES) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.dataset.setting = name;
-      button.textContent = msg(key);
-      button.addEventListener('click', () => saveSettings({ [name]: !settings[name] }));
-      ui.autoSwitches.append(button);
-    }
-    ui.summary.textContent = msg('panelProfit');
-    ['colGame', 'colNet', 'colRtp'].forEach((key, i) => (ui.head[i].textContent = msg(key)));
-    ui.xpSummary.textContent = msg('panelXp');
-    ui.xpTable.title = msg('panelXpNote');
-    ['colGame', 'colEdge', 'colCostPerXp', 'colState'].forEach((key, i) => (ui.xpHead[i].textContent = msg(key)));
-    ui.hotfixLabel.textContent = msg('panelHotfixTest');
-    ui.hotfixToggle.addEventListener('click', toggleHotfixTest);
-    ui.shopSummary.textContent = msg('panelShop');
-    ['colUpgrade', 'colPrice', 'colState'].forEach((key, i) => (ui.shopHead[i].textContent = msg(key)));
-    ui.moreSummary.textContent = msg('panelMore');
-    // Open sections stay open across reloads.
-    for (const section of ui.sections) {
-      section.open = settings.panelOpen.includes(section.dataset.section);
-      section.addEventListener('toggle', () => {
-        const open = ui.sections.filter((d) => d.open).map((d) => d.dataset.section);
-        if (open.join() !== settings.panelOpen.join()) saveSettings({ panelOpen: open });
-      });
-    }
-    for (const option of ui.type.options) option.textContent = msg(`type_${option.value}`);
-    for (const game of G.GAME_KEYS) ui.game.add(new Option(msg(`game_${game}`), game));
-    ui.autoToggle.addEventListener('click', () => {
-      // The account auto mode is started on is the one rotation returns to.
-      saveSettings({ autoMode: !settings.autoMode, ...(accountId && !settings.autoMode ? { homeAccount: accountId } : {}) });
-      setStatus(settings.autoMode ? 'statusIdle' : 'statusStarting');
-    });
-    ui.hide.addEventListener('click', () => setPanelHidden(true));
-    ui.account.addEventListener('change', () => {
-      saveSettings({ homeAccount: ui.account.value });
-      switchAccount(ui.account.value);
-    });
-    ui.addAccount.addEventListener('click', addAccount);
-    // Pinned to one account among several running at once: nothing to pick.
-    if (PINNED) ui.account.closest('.row').hidden = true;
-    ui.show.addEventListener('click', () => setPanelHidden(false));
-    ui.workToggle.addEventListener('click', () => (settings.enabled ? stopWork() : startWork()));
-    ui.gamesToggle.addEventListener('click', () => (settings.gamesEnabled ? stopGames() : startGames()));
-    ui.screenToggle.addEventListener('click', () => saveSettings({ playOnScreen: !settings.playOnScreen }));
-    ui.forceToggle.addEventListener('click', () => saveSettings({ hotfixForce: !settings.hotfixForce }));
-    ui.forceValue.addEventListener('change', () => saveSettings({ hotfixForceValue: ui.forceValue.value }));
-    ui.type.addEventListener('change', () => saveSettings({ taskType: ui.type.value }));
-    ui.game.addEventListener('change', () => saveSettings({ game: ui.game.value }));
-    document.documentElement.appendChild(host);
-    render();
-  }
-
-  // Applied locally right away so focus can move to the button that stays visible.
-  function setPanelHidden(hidden) {
-    saveSettings({ panelHidden: hidden });
-    settings.panelHidden = hidden;
-    render();
-    (hidden ? ui.show : ui.hide).focus();
-  }
-
-  function cell(text, className) {
-    const td = document.createElement('td');
-    td.textContent = text;
-    if (className) td.className = className;
-    return td;
-  }
-
-  const tone = (n) => (n > 0 ? 'pos' : n < 0 ? 'neg' : '');
-
-  // Net per game, work and free income, with the rounds in each row's tooltip,
-  // counted from the last výpověď and each game from its last upgrade
-  // (syncProfitBase). Free income is one row; its parts are in the settings
-  // Profit tab.
-  function renderProfit() {
+  // Net per game, work and free income, counted from the last výpověď and each
+  // game from its last upgrade (syncProfitBase). Free income is one row; its
+  // parts are in the statistics.
+  function profitSummary() {
     const base = stats.profitBase ?? { games: {}, work: { tickets: 0, net: 0 }, free: 0 };
     const rows = G.profitRows(G.rowsSince(stats.games, base.games)).map((row) => ({
       name: msg(`game_${row.game}`),
       net: row.net,
       rtp: row.rtp,
-      title: msg('panelRounds', [num.format(row.rounds)]),
+      rounds: row.rounds,
     }));
     const tickets = stats.work.tickets - base.work.tickets;
-    if (tickets > 0) {
-      rows.push({ name: msg('panelWork'), net: stats.work.net - base.work.net, rtp: null, title: msg('panelTickets', [num.format(tickets)]) });
-    }
+    if (tickets > 0) rows.push({ name: msg('panelWork'), net: stats.work.net - base.work.net, rtp: null, rounds: tickets });
     const free = Object.values(stats.free).reduce((sum, amount) => sum + amount, 0) - base.free;
-    if (free) rows.push({ name: msg('panelFree'), net: free, rtp: null, title: '' });
-    ui.body.replaceChildren(
-      ...rows.map((row) => {
-        const tr = document.createElement('tr');
-        tr.title = row.title;
-        tr.append(cell(row.name), cell(signed.format(row.net), tone(row.net)), cell(row.rtp === null ? '' : pct.format(row.rtp)));
-        return tr;
-      }),
-    );
-    const total = rows.reduce((sum, row) => sum + row.net, 0);
-    const foot = document.createElement('tr');
-    foot.append(cell(msg('colTotal')), cell(signed.format(total), tone(total)), cell(''));
-    ui.foot.replaceChildren(...(rows.length ? [foot] : []));
+    if (free) rows.push({ name: msg('panelFree'), net: free, rtp: null, rounds: null });
+    return rows;
   }
 
-  // XP grinding measurements per game, with the grinder's pick.
-  function renderXp() {
-    if (!player) {
-      ui.xpBody.replaceChildren();
-      return;
-    }
+  // XP grinding measurements per game, with the grinder's pick. Locked games
+  // past the next unlock add nothing to decide on.
+  function xpSummary() {
+    if (!player) return [];
     const { candidates, edges, plan } = grindChoice();
     const report = A.grindReport(candidates, player.level, stats.games, GRIND_UNLOCKS, edges, xpBonus());
-    // Locked games past the next unlock add nothing to decide on.
     const next = Math.min(...report.filter((game) => game.locked).map((game) => game.unlock));
-    ui.xpBody.replaceChildren(
-      ...report.filter((game) => !game.locked || game.unlock === next).map((game) => {
+    return report
+      .filter((game) => !game.locked || game.unlock === next)
+      .map((game) => {
+        const pick = plan?.game === game.game;
         let state = '';
         if (game.locked) state = msg('xpLocked', [String(game.unlock)]);
-        else if (plan?.game === game.game) state = msg('xpPick', [credits(plan.bet)]);
-        const tr = document.createElement('tr');
-        if (plan?.game === game.game) tr.className = 'pick';
-        tr.append(
-          cell(msg(`game_${game.game}`)),
-          cell(game.edge === null ? '-' : pct.format(game.edge)),
-          cell(game.cost === null ? '-' : decimal.format(game.cost)),
-          cell(state, game.locked ? 'muted' : undefined),
-        );
-        return tr;
-      }),
-    );
+        else if (pick) state = msg('xpPick', [credits(plan.bet)]);
+        return { name: msg(`game_${game.game}`), edge: game.edge, cost: game.cost, state, pick, locked: !!game.locked };
+      });
   }
 
   // Forbes z Chánova test: its progress and what has been recorded so far.
-  function renderHotfixTest() {
+  function hotfixSummary() {
     const test = stats.hotfixTest;
     const running = Boolean(test && !test.done);
-    ui.hotfixToggle.textContent = msg(running ? 'hotfixTestStop' : 'hotfixTestStart');
-    ui.hotfixToggle.disabled = !player || player.level < G.GAMES.hotfix.unlock;
     const free = hotfixRounds.filter((round) => round.path === '/api/hotfix/free').length;
     const recorded = msg('hotfixRecorded', [num.format(hotfixRounds.length - free), num.format(free)]);
-    ui.hotfixNote.textContent = running
-      ? `${msg('hotfixTestRunning', [num.format(test.spins), num.format(HOTFIX_TEST_SPINS)])} ${recorded}`
-      : recorded;
-    ui.hotfixToggle.title = msg('hotfixTestNote', [num.format(HOTFIX_TEST_SPINS), credits(G.BET_LEVELS[0])]);
+    return {
+      running,
+      available: !!player && player.level >= G.GAMES.hotfix.unlock,
+      note: running ? `${msg('hotfixTestRunning', [num.format(test.spins), num.format(HOTFIX_TEST_SPINS)])} ${recorded}` : recorded,
+      hint: msg('hotfixTestNote', [num.format(HOTFIX_TEST_SPINS), credits(G.BET_LEVELS[0])]),
+    };
   }
 
   // The upgrade bought next and the balance it is bought at, or null: the goal
@@ -3172,23 +2522,19 @@
 
   // The shop queue from the last review: the next upgrade with the balance it is
   // bought at, then every upgrade left in the plan and why it waits.
-  function renderShop() {
+  function shopSummary() {
     const review = settings.buyUpgrades && player ? shopReview : null;
-    ui.shop.hidden = !review;
-    if (!review) return;
+    if (!review) return null;
     const { goal, queue } = review;
     const next = nextBuy(review);
     const name = (offer) => `${offer.game}:${offer.key} ${offer.next}`;
-    ui.shopGoal.title = '';
-    if (!next) ui.shopGoal.textContent = msg('shopNoGoal');
-    else if (next.need === null) ui.shopGoal.textContent = msg('shopNextUnmeasured', [name(next.offer), credits(next.offer.price)]);
+    let text;
+    let detail = '';
+    if (!next) text = msg('shopNoGoal');
+    else if (next.need === null) text = msg('shopNextUnmeasured', [name(next.offer), credits(next.offer.price)]);
     else {
-      ui.shopGoal.textContent = msg('shopNextShort', [
-        name(next.offer),
-        credits(next.offer.price),
-        credits(Math.max(0, next.need - player.credits)),
-      ]);
-      ui.shopGoal.title = msg('shopNext', [
+      text = msg('shopNextShort', [name(next.offer), credits(next.offer.price), credits(Math.max(0, next.need - player.credits))]);
+      detail = msg('shopNext', [
         name(next.offer),
         credits(next.offer.price),
         credits(next.need),
@@ -3198,115 +2544,40 @@
         credits(Math.max(0, next.need - player.credits)),
       ]);
     }
-    ui.shopBody.replaceChildren(
-      ...queue.map((offer) => {
-        const tr = document.createElement('tr');
-        if (offer === next?.offer) tr.className = 'pick';
+    return {
+      text,
+      detail,
+      queue: queue.map((offer) => {
         let state = msg('shopState_queued');
         if (offer === goal) state = msg('shopState_goal');
         else if (offer === next?.offer) state = msg('shopState_spare');
         else if (offer.reason === 'level') state = msg('shopNeedsLevel', [String(offer.minLevel)]);
         else if (offer.reason) state = msg(`shopState_${offer.reason}`);
-        tr.append(cell(`${offer.game}:${offer.key} ${offer.next}`), cell(credits(offer.price)), cell(state));
-        return tr;
+        return { name: name(offer), price: offer.price, state, pick: offer === next?.offer };
       }),
-    );
+    };
   }
 
-  // Rebuilt only when the list changes, so a render does not close an open dropdown.
-  function renderAccounts() {
-    const now = Date.now();
-    const list = Object.entries(accounts).map(([id, saved]) => ({
-      id,
-      login: saved.login ?? id,
-      work: id === accountId ? (player?.work ?? saved.work) : saved.work,
-      session: Boolean(saved.session),
-    }));
-    if (accountId && !accounts[accountId] && player) list.push({ id: accountId, login: player.login, work: player.work });
-    list.sort((a, b) => a.login.localeCompare(b.login));
-    const options = list.map((a) => ({
-      value: a.id,
-      text: msg(a.id === settings.homeAccount ? 'panelAccountOptionHome' : 'panelAccountOption', [
-        a.login,
-        String(G.energyNow(a.work, now)),
-      ]),
-      disabled: a.id !== accountId && !a.session,
-    }));
-    if (!accountId) options.unshift({ value: '', text: msg('panelNoAccount'), disabled: true });
-    const signature = JSON.stringify(options);
-    if (signature !== accountOptions) {
-      accountOptions = signature;
-      ui.account.replaceChildren(
-        ...options.map(({ value, text, disabled }) => Object.assign(new Option(text, value), { disabled })),
-      );
-    }
-    ui.account.value = accountId ?? '';
-    ui.account.disabled = switching;
-    ui.addAccount.disabled = switching;
+  // What the dashboard can do to this account.
+  const TASK_TYPES = ['alternate', ...C.TYPES];
+  const COMMANDS = {
+    auto(on) {
+      saveSettings({ autoMode: !!on });
+      setStatus(on ? 'statusStarting' : 'statusIdle');
+    },
+    work: (on) => (on ? startWork() : stopWork()),
+    games: (on) => (on ? startGames() : stopGames()),
+    taskType: (value) => TASK_TYPES.includes(value) && saveSettings({ taskType: value }),
+    game: (value) => G.GAME_KEYS.includes(value) && saveSettings({ game: value }),
+    hotfixTest: () => toggleHotfixTest(),
+  };
+
+  function command(name, value) {
+    if (!Object.hasOwn(COMMANDS, name)) return false;
+    COMMANDS[name](value);
+    return true;
   }
 
-  // Parts of auto mode that can be switched off from the panel: [setting, label].
-  const AUTO_SWITCHES = [
-    ['autoGames', 'panelAutoGames'],
-    ['autoWork', 'panelAutoWork'],
-    ['autoWheel', 'panelAutoWheel'],
-    ['achievementHunt', 'panelAutoHunt'],
-    ['sprintProtect', 'panelAutoSprint'],
-  ];
-
-  function setToggle(button, on) {
-    button.textContent = msg(on ? 'panelStop' : 'panelStart');
-    button.classList.toggle('on', on);
-    button.setAttribute('aria-pressed', String(on));
-  }
-
-  function render() {
-    if (!ui) return;
-    ui.panel.hidden = settings.panelHidden;
-    ui.show.hidden = !settings.panelHidden;
-    ui.show.classList.toggle('on', workOn() || gamesOn());
-    setToggle(ui.autoToggle, settings.autoMode);
-    ui.autoToggle.textContent = `${msg('panelAuto')}: ${msg(settings.autoMode ? 'panelOn' : 'panelOff')}`;
-    setToggle(ui.workToggle, settings.enabled);
-    setToggle(ui.gamesToggle, settings.gamesEnabled);
-    ui.workToggle.setAttribute('aria-label', `${msg('panelWork')}: ${ui.workToggle.textContent}`);
-    ui.gamesToggle.setAttribute('aria-label', `${msg('panelGames')}: ${ui.gamesToggle.textContent}`);
-    ui.screenToggle.textContent = msg(settings.playOnScreen ? 'panelOn' : 'panelOff');
-    ui.screenToggle.classList.toggle('on', settings.playOnScreen);
-    ui.screenToggle.setAttribute('aria-pressed', String(settings.playOnScreen));
-    ui.screenToggle.setAttribute('aria-label', msg('panelOnScreen'));
-    ui.forceToggle.textContent = msg(settings.hotfixForce ? 'panelOn' : 'panelOff');
-    ui.forceToggle.classList.toggle('on', settings.hotfixForce);
-    ui.forceToggle.setAttribute('aria-pressed', String(settings.hotfixForce));
-    ui.forceToggle.setAttribute('aria-label', msg('panelHotfixForce'));
-    if (ui.forceValue !== ui.forceValue.getRootNode().activeElement) ui.forceValue.value = settings.hotfixForceValue;
-    for (const button of ui.autoSwitches.children) {
-      const on = !!settings[button.dataset.setting];
-      button.classList.toggle('on', on);
-      button.setAttribute('aria-pressed', String(on));
-    }
-    renderAccounts();
-    ui.type.value = settings.taskType;
-    ui.game.value = settings.game;
-    ui.status.textContent = msg(status.key, status.subs);
-    const sum = (s) => `${s.correct}/${s.correct + s.wrong}`;
-    ui.stats.textContent = msg('panelStats', [
-      String(Object.keys(bank).length),
-      sum(stats.bank),
-      sum(stats[settings.aiSolver] ?? stats.local),
-      sum(stats.guess),
-    ]);
-    const { usd: spent, calls } = stats.spend;
-    ui.cost.textContent = msg('panelCost', [usd.format(spent), usd.format(calls ? spent / calls : 0)]);
-    renderBundle();
-    renderProfit();
-    renderXp();
-    renderHotfixTest();
-    renderShop();
-  }
-
-  // What the Docker runner's dashboard shows: the status line, the current
-  // account and every saved one, and the counters the panel shows.
   // Why the open loan was taken: by the level loan, the bankruptcy cycle or
   // the clean-loan trick, or 'other' for one the bot did not take.
   function loanKind() {
@@ -3317,12 +2588,23 @@
     return 'other';
   }
 
+  // What the dashboard shows: the status line, the run switches, the player,
+  // every saved account and the account's books.
   function report() {
     const sum = (s) => ({ correct: s.correct, total: s.correct + s.wrong });
+    const tally = (s) => `${s.correct}/${s.correct + s.wrong}`;
     const now = Date.now();
+    const { usd: spent, calls } = stats.spend;
     return {
       status: msg(status.key, status.subs),
       settings: { autoMode: settings.autoMode, enabled: settings.enabled, gamesEnabled: settings.gamesEnabled, aiSolver: settings.aiSolver },
+      run: { autoMode: settings.autoMode, enabled: settings.enabled, gamesEnabled: settings.gamesEnabled, taskType: settings.taskType, game: settings.game },
+      profit: profitSummary(),
+      xp: xpSummary(),
+      shop: shopSummary(),
+      hotfix: hotfixSummary(),
+      counters: msg('panelStats', [String(Object.keys(bank).length), tally(stats.bank), tally(stats[settings.aiSolver] ?? stats.local), tally(stats.guess)]),
+      cost: msg('panelCost', [usd.format(spent), usd.format(calls ? spent / calls : 0)]),
       accountId,
       player: player && {
         login: player.login,
@@ -3373,7 +2655,7 @@
   const BUNDLE_NEWS_MS = 24 * 3600_000;
   const BUNDLE_LOG_MAX = 50;
   async function trackBundle() {
-    const src = document.querySelector('script[src*="/assets/index-"]')?.src;
+    const src = H.bundleSrc;
     const name = B.bundleName(src);
     const recheck = name === bundle?.name;
     if (!name || (recheck && !bundle.problems?.length && bundle.changes)) return;
@@ -3394,24 +2676,10 @@
     // The log has one row per deploy; a recheck updates its row once the models catch up.
     const row = { name, at: bundle.at, from, changelog: bundle.changelog, problems: result.problems, checkedAt: Date.now() };
     bundleLog = [...bundleLog.filter((entry) => entry.name !== name), row].slice(-BUNDLE_LOG_MAX);
-    chrome.storage.local.set({ bundle, bundleLog });
+    storage.set({ bundle, bundleLog });
     const fields = { name, from, changelog: bundle.changelog, problems: result.problems };
     if (result.problems.length) log.warn('bundle_models_stale', fields);
     else log.info(from ? 'bundle_changed' : 'bundle_seen', fields);
-    render();
-  }
-
-  // A stale model stays on the panel; a harmless update shows for a day.
-  function renderBundle() {
-    const stale = bundle?.problems?.length > 0;
-    const news = bundle?.from && Date.now() - bundle.at < BUNDLE_NEWS_MS;
-    ui.bundle.hidden = !stale && !news;
-    ui.bundle.classList.toggle('neg', stale);
-    if (ui.bundle.hidden) return;
-    const when = new Date(bundle.at).toLocaleString(locale, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
-    ui.bundle.textContent = stale
-      ? msg('panelBundleStale', [when, String(bundle.problems.length), bundle.problems.join('; ')])
-      : msg('panelBundleChanged', [when, bundle.changelog ?? '-']);
   }
 
   // ---------- boot ----------
@@ -3419,27 +2687,19 @@
   load().then(() => {
     for (const data of early.splice(0)) onHookEvent(data);
     early = null;
-    const ready = () => {
-      // Headless, the panel is built in the runner's DOM and mirrored to its dashboard.
-      if (HEADLESS) globalThis.BotterHeadless.report = report;
-      mountPanel();
-      trackBundle();
-    };
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready);
-    else ready();
+    H.report = report;
+    H.command = command;
+    trackBundle();
     setInterval(tick, TICK_MS);
-    // The casino app loads the player itself; headless there is no app, so
-    // the panel gets it here and keeps it fresh while the bot is stopped.
-    if (HEADLESS) {
-      api('/api/me');
-      setInterval(() => {
-        if (!busy && !switching && !workOn() && !gamesOn()) api('/api/me');
-      }, PLAYER_REFRESH_MS);
-    }
+    // The player is loaded here and kept fresh while the bot is stopped.
+    api('/api/me');
+    setInterval(() => {
+      if (!busy && !workOn() && !gamesOn()) api('/api/me');
+    }, PLAYER_REFRESH_MS);
     setInterval(() => {
       if (!netDirty) return;
       netDirty = false;
-      chrome.storage.local.set({ net });
+      storage.set({ net });
     }, NET_SAVE_MS);
   });
 })();

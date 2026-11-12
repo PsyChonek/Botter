@@ -3,8 +3,8 @@
 // odds, then an item of that rarity by weight. Lepší dodavatel moves 2.02 %
 // per level from blue to purple, Známá v kuchyňce 0.02 % per level from blue
 // to gold. The drop is drawn on the server, so these odds are what the
-// recorded drops check. Classic script: globalThis.BotterCases in the
-// extension, require() in Node.
+// recorded drops check. Classic script: globalThis.BotterCases in the bot's
+// contexts and the dashboard, require() in Node.
 (function (root) {
   const ODDS = { blue: 0.7992, purple: 0.1598, pink: 0.032, red: 0.0064, gold: 0.0026 };
   const SUPPLIER_SHIFT = 0.0202;

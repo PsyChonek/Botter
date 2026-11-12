@@ -2,15 +2,6 @@
   "extName": {
     "message": "Botter"
   },
-  "extDescription": {
-    "message": "Automaticky řeší pracovní tickety ve Skeleton Casinu."
-  },
-  "panelStart": {
-    "message": "Spustit"
-  },
-  "panelStop": {
-    "message": "Zastavit"
-  },
   "panelType": {
     "message": "Tickety"
   },
@@ -28,9 +19,6 @@
   },
   "statusIdle": {
     "message": "Zastaveno."
-  },
-  "statusOpening": {
-    "message": "Otevírám Práci..."
   },
   "statusStarting": {
     "message": "Beru ticket..."
@@ -97,31 +85,6 @@
   },
   "panelCost": {
     "message": "Cena AI: $P1$ ($P2$ za dotaz)",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      }
-    }
-  },
-  "panelBundleStale": {
-    "message": "Kasino má novou verzi ($P1$): $P2$ rozdílů proti modelům, šance můžou být zastaralé. $P3$",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      },
-      "p3": {
-        "content": "$3"
-      }
-    }
-  },
-  "panelBundleChanged": {
-    "message": "Aplikace aktualizována $P1$ (changelog $P2$), modely sedí.",
     "placeholders": {
       "p1": {
         "content": "$1"
@@ -262,7 +225,7 @@
     "message": "Hry"
   },
   "optionsGamesHint": {
-    "message": "Herní bot hraje přes API kasina s tvým přihlášením, takže se hra na obrazovce neanimuje a kredit na stránce se obnoví při dalším kliknutí. Blackjack hraje přesně spočítanou strategii pro vylepšení tvého stolu. Dokud je energie na práci, má práce přednost."
+    "message": "Herní bot hraje přes API kasina s přihlášením každého účtu. Blackjack hraje přesně spočítanou strategii pro vylepšení tvého stolu. Dokud je energie na práci, má práce přednost."
   },
   "optionsGameBet": {
     "message": "Sázka na kolo"
@@ -283,13 +246,10 @@
     "message": "Maximální rychlost: hrát a pracovat tak rychle, jak server dovolí"
   },
   "optionsMaxSpeedHint": {
-    "message": "Herní požadavky čekají po každé herní odpovědi jen tak dlouho, kolik server potřebuje, naučeno pro každou hru zvlášť: požadavek, který odmítne („počkej na animaci“), zvedne čekání té hry těsně nad odmítnuté a zkusí se znovu po 0,15 s, 0,3 s, 0,6 s a dál místo 30 s, které chce server, a každých 10 přijatých za sebou čekání zkrátí, takže bot pořád hledá nejkratší. Naučená čekání sdílí všechny otevřené karty kasina. Pracovní tikety stejně: bez prodlev na čtení a psaní, řádek k přepsání se vloží najednou a každý typ tiketu se odešle hned, jak je otevřený naučenou nejkratší dobu, kterou server přijme; odmítnuté odeslání ji zvedne nad odmítnutou dobu a 10 přijatých za sebou ji zkrátí. Vypnuté: každý herní požadavek čeká minimální dobu níže a práce drží lidské prodlevy."
+    "message": "Herní požadavky čekají po každé herní odpovědi jen tak dlouho, kolik server potřebuje, naučeno pro každou hru zvlášť: požadavek, který odmítne („počkej na animaci“), zvedne čekání té hry těsně nad odmítnuté a zkusí se znovu po 0,15 s, 0,3 s, 0,6 s a dál místo 30 s, které chce server, a každých 10 přijatých za sebou čekání zkrátí, takže bot pořád hledá nejkratší. Každý účet se je učí sám. Pracovní tikety stejně: bez prodlev na čtení a psaní, řádek k přepsání se vloží najednou a každý typ tiketu se odešle hned, jak je otevřený naučenou nejkratší dobu, kterou server přijme; odmítnuté odeslání ji zvedne nad odmítnutou dobu a 10 přijatých za sebou ji zkrátí. Vypnuté: každý herní požadavek čeká minimální dobu níže a práce drží lidské prodlevy."
   },
   "optionsGameDelay": {
     "message": "Minimální odstup her (ms)"
-  },
-  "panelAutoParts": {
-    "message": "V automatickém režimu"
   },
   "panelAutoGames": {
     "message": "Hry"
@@ -309,17 +269,11 @@
   "statusAutoIdle": {
     "message": "Auto: teď není co dělat."
   },
-  "panelOnScreen": {
-    "message": "Hrát na obrazovce hry"
-  },
   "panelHotfixForce": {
     "message": "Forbes force"
   },
   "panelHotfixForceHint": {
     "message": "Posílá se jako force při každém točení Forbes z Chánova, které hraje bot. Čte se jako JSON (4, true, \"free\"); prázdné pole pošle true."
-  },
-  "optionsPlayOnScreen": {
-    "message": "Hrát na obrazovce hry: bot otevře hru a mačká její tlačítka, takže každé kolo je vidět. Pomalejší než hraní přes API."
   },
   "optionsProfitHeading": {
     "message": "Zisk podle hry"
@@ -425,24 +379,6 @@
   },
   "panelAuto": {
     "message": "Auto"
-  },
-  "panelOn": {
-    "message": "zapnuto"
-  },
-  "panelOff": {
-    "message": "vypnuto"
-  },
-  "panelHide": {
-    "message": "Skrýt"
-  },
-  "panelHideLabel": {
-    "message": "Skrýt panel Botter"
-  },
-  "panelShowLabel": {
-    "message": "Zobrazit panel Botter"
-  },
-  "optionsHidePanel": {
-    "message": "Skrýt panel na stránce kasina (zpět ho vrátí malé tlačítko v rohu)"
   },
   "game_crash": {
     "message": "Crash (Produkce padá)"
@@ -955,50 +891,104 @@
   "optionsAiHeading": {
     "message": "Řešení přes AI"
   },
+  "navWork": {
+    "message": "Práce"
+  },
+  "navAi": {
+    "message": "AI řešitel"
+  },
+  "navAuto": {
+    "message": "Auto režim"
+  },
+  "navShop": {
+    "message": "Vylepšení"
+  },
+  "navGames": {
+    "message": "Hry"
+  },
+  "navWardrobe": {
+    "message": "Šatna"
+  },
+  "navData": {
+    "message": "Data a záloha"
+  },
+  "navProfit": {
+    "message": "Zisk"
+  },
+  "navChecks": {
+    "message": "Kontrola modelů"
+  },
+  "navLevels": {
+    "message": "Levely"
+  },
+  "navNet": {
+    "message": "Rychlost serveru"
+  },
+  "navOdds": {
+    "message": "Šance"
+  },
+  "settingsNavLabel": {
+    "message": "Části nastavení"
+  },
+  "statsNavLabel": {
+    "message": "Části statistik"
+  },
+  "settingsShared": {
+    "message": "Tato nastavení platí pro všechny účty. Auto, Práci a Hry přepínáš u každého účtu zvlášť v Přehledu."
+  },
+  "groupAutoParts": {
+    "message": "Co Auto dělá"
+  },
+  "groupLoans": {
+    "message": "Dluhy a půjčky"
+  },
+  "groupXp": {
+    "message": "Grindování XP"
+  },
+  "groupQuests": {
+    "message": "Úkoly a achievementy"
+  },
+  "groupRounds": {
+    "message": "Crash a loterie"
+  },
+  "groupPacing": {
+    "message": "Tempo"
+  },
+  "groupLimits": {
+    "message": "Sázky a limity"
+  },
+  "groupForbes": {
+    "message": "Test Forbes z Chánova"
+  },
+  "optionsAutoGames": {
+    "message": "Hrát hry: grindování XP, crash, loterie, úkoly a achievementy"
+  },
+  "optionsAutoWork": {
+    "message": "Dělat tikety, dokud je energie"
+  },
+  "optionsAutoWheel": {
+    "message": "Točit kolem štěstí každou hodinu"
+  },
+  "optionsSprintProtect": {
+    "message": "Odložit bankrot do konce sprintu, dokud je účet na stupních vítězů"
+  },
+  "optionsHotfixForce": {
+    "message": "Posílat hodnotu force při každém spinu Forbes z Chánova"
+  },
+  "optionsHotfixForceValue": {
+    "message": "Hodnota force"
+  },
+  "optionsKeySet": {
+    "message": "Klíč je uložený. Napiš nový, pokud ho chceš nahradit, nebo pole vymaž, pokud ho chceš odebrat."
+  },
   "optionsSolver": {
     "message": "Když ticket není v bance, zeptat se"
-  },
-  "solver_local": {
-    "message": "AI v Chromu na tomto zařízení (Gemini Nano, zdarma)"
   },
   "solver_claude": {
     "message": "Claude API (potřebuje klíč, přesnější)"
   },
   "solver_off": {
     "message": "Nikoho (jen banka a hádání)"
-  },
-  "optionsLocalHeading": {
-    "message": "AI v prohlížeči"
-  },
-  "optionsLocalHint": {
-    "message": "Vestavěné Prompt API v Chromu 138+. Potřebuje asi 22 GB volného místa a GPU s více než 4 GB VRAM nebo 16 GB RAM. Zdarma a offline, ale je to malý model, takže u záludných výstupů bude chybovat častěji."
-  },
-  "optionsLocalStatus": {
-    "message": "Stav: $P1$",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      }
-    }
-  },
-  "optionsLocalPrepare": {
-    "message": "Stáhnout model"
-  },
-  "optionsLocalProgress": {
-    "message": "Stahuji model: $P1$ %",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      }
-    }
-  },
-  "optionsLocalFailed": {
-    "message": "Model se nepodařilo připravit: $P1$",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      }
-    }
   },
   "localState_available": {
     "message": "připraveno"
@@ -1036,14 +1026,11 @@
   "optionsOpenRouterHint": {
     "message": "Libovolné ID modelu z openrouter.ai/models, třeba google/gemini-2.5-flash. Modely s příponou :free jsou zdarma, ale mají omezený počet volání."
   },
-  "optionsLocalFlags": {
-    "message": "Pokud model není podporovaný nebo se nechce stáhnout: otevři chrome://flags, nastav \"Enables optimization guide on device\" na \"Enabled BypassPerfRequirement\" a \"Prompt API for Gemini Nano\" na \"Enabled\", restartuj Chrome a stiskni znovu tlačítko pro stažení. Průběh je vidět na chrome://on-device-internals."
-  },
   "optionsApiKey": {
     "message": "Anthropic API klíč"
   },
   "optionsApiKeyHint": {
-    "message": "Uloží se jen v tomto profilu prohlížeče (chrome.storage.local). Každý neznámý ticket stojí jedno volání API."
+    "message": "Zůstane na serveru Botteru a do prohlížeče se už nevrací. Každý neznámý tiket stojí jedno volání API."
   },
   "optionsModel": {
     "message": "Model"
@@ -1072,27 +1059,6 @@
   "optionsSaved": {
     "message": "Uloženo."
   },
-  "optionsTabsLabel": {
-    "message": "Sekce nastavení"
-  },
-  "tabBot": {
-    "message": "Bot"
-  },
-  "tabAi": {
-    "message": "AI"
-  },
-  "tabAuto": {
-    "message": "Auto"
-  },
-  "tabGames": {
-    "message": "Hry"
-  },
-  "tabProfit": {
-    "message": "Zisk"
-  },
-  "tabData": {
-    "message": "Data"
-  },
   "optionsSaveFailed": {
     "message": "Neuloženo: $ERROR$",
     "placeholders": {
@@ -1105,7 +1071,7 @@
     "message": "Záloha"
   },
   "optionsBackupHint": {
-    "message": "Export uloží do jednoho souboru nastavení, statistiky zisku všech účtů, banku odpovědí, křivku levelů, zaznamenané spiny Blaze a uložené účty. Import použije nastavení ze souboru a zbytek sloučí: statistiky se přičtou k těm zdejším, ostatní data doplní, co chybí. Soubor se nikdy nepřičte dvakrát: opakovaný import stejného exportu nebo import zpět do prohlížeče, ze kterého pochází, statistiky nechá být."
+    "message": "Export uloží do jednoho souboru nastavení, statistiky zisku všech účtů, banku odpovědí, křivku levelů, zaznamenané spiny Blaze a uložené účty. Import použije nastavení ze souboru a zbytek sloučí: statistiky se přičtou k těm zdejším, ostatní data doplní, co chybí. Soubor se nikdy nepřičte dvakrát: opakovaný import stejného exportu nebo import zpět do Botteru, ze kterého pochází, statistiky nechá být."
   },
   "optionsBackupSecrets": {
     "message": "Přidat API klíče a uložená přihlášení"
@@ -1190,47 +1156,8 @@
   "optionsImportFailed": {
     "message": "Soubor není platný export banky."
   },
-  "panelAccount": {
-    "message": "Účet"
-  },
-  "panelAccountOption": {
-    "message": "$P1$ (energie $P2$)",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      }
-    }
-  },
-  "panelNoAccount": {
-    "message": "Nepřihlášeno"
-  },
-  "panelAddAccount": {
-    "message": "Přidat"
-  },
-  "panelAddAccountLabel": {
-    "message": "Přihlásit další účet"
-  },
-  "statusSwitching": {
-    "message": "Přepínám na $P1$...",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      }
-    }
-  },
   "statusLoggedOut": {
     "message": "Nepřihlášeno. Přihlas se do kasina."
-  },
-  "statusSessionExpired": {
-    "message": "Uložené přihlášení k účtu $P1$ vypršelo. Přihlas se k němu znovu.",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      }
-    }
   },
   "statusAccountBroken": {
     "message": "Účtu $P1$ se nedaří načíst profil, bot ho na $P2$ min odloží a vrátí se na jiný účet.",
@@ -1240,57 +1167,6 @@
       },
       "p2": {
         "content": "$2"
-      }
-    }
-  },
-  "optionsRotateAccounts": {
-    "message": "Přepnout na jiný uložený účet, když tomuhle dojde energie"
-  },
-  "optionsRotateHint": {
-    "message": "Přednost má účet, který dnes ještě nebyl otevřený, aby si vybral denní bonus a proběhly kontroly. Jinak účet s nejvíc energií, víc než 15, nebo v auto režimu nejbohatší účet, který ještě může grindovat XP, když tento už nemůže. Potom se vrátí na hlavní účet: ten vybraný v panelu, nebo ten, na kterém byl auto režim zapnutý. Každé přepnutí znovu načte záložku kasina."
-  },
-  "optionsRotateCrash": {
-    "message": "Přepnout na účty, které ještě nevsadily na běžící kolo Produkce padá"
-  },
-  "optionsRotateLottery": {
-    "message": "Přepnout na účty, které ještě nekoupily tikety na další tah loterie"
-  },
-  "optionsRotateRoundsHint": {
-    "message": "Jakmile jeden účet najde sázku na crash, která se vyplatí, navštíví se každý další uložený účet, který do kola ještě nevstoupil, dokud se vstup vyplácí; každý kolo před sázkou znovu ověří. Kvůli loterii se navštíví každý účet od úrovně 4, který ještě nedokoupil tikety na další tah (se zapnutým „Mám štěstí“ nebo lovem achievementů), nejpozději 2 minuty před tahem. Účet, který ještě dluží sázku nebo tikety, zůstane až 5 minut. Návštěva kvůli crashi má přednost před vším, kvůli loterii přijde po účtech, které dnes ještě nebyly otevřené."
-  },
-  "optionsAccountsHeading": {
-    "message": "Účty"
-  },
-  "optionsAccountsHint": {
-    "message": "Každý účet má vlastní zisk, příznaky achievementů a denní rozpočty. Banka odpovědí a nastavení jsou společné. Účet přidáš tlačítkem Přidat v panelu a přihlášením, přepínáš výběrem vedle něj. Nepoužívej Odhlásit v kasinu: ukončí i uložené přihlášení. Pro dva účty najednou otevři druhý v anonymním okně (povol Botter v anonymním režimu)."
-  },
-  "optionsAccountsEmpty": {
-    "message": "Zatím žádný účet. Otevři kasino a přihlas se."
-  },
-  "optionsAccountNoLogin": {
-    "message": "$P1$ (přihlášení vypršelo)",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      }
-    }
-  },
-  "optionsForget": {
-    "message": "Zapomenout"
-  },
-  "optionsForgetLabel": {
-    "message": "Zapomenout uložené přihlášení k účtu $P1$",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      }
-    }
-  },
-  "optionsForgetConfirm": {
-    "message": "Zapomenout uložené přihlášení k účtu $P1$? Jeho zisk zůstane.",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
       }
     }
   },
@@ -1310,7 +1186,7 @@
     "message": "Kolik XP který level potřebuje a kolik kreditů dal level-up, zaznamenané ze všech účtů, které bot vidí, aby šel najít vzorec. Denní bonus je vzorec z klienta při 7denní sérii."
   },
   "optionsLevelsEmpty": {
-    "message": "Zatím žádný level. Otevři kasino se zapnutým rozšířením."
+    "message": "Zatím žádný level."
   },
   "colXpNeed": {
     "message": "Potřeba XP"
@@ -1335,12 +1211,6 @@
   },
   "colEnergy": {
     "message": "Energie"
-  },
-  "colSeen": {
-    "message": "Naposledy"
-  },
-  "colActions": {
-    "message": "Akce"
   },
   "panelXp": {
     "message": "XP podle hry"
@@ -1431,17 +1301,6 @@
   },
   "statusWaitEnergy": {
     "message": "Čekám na víc než $P1$ energie, pak začnu pracovat (teď $P2$).",
-    "placeholders": {
-      "p1": {
-        "content": "$1"
-      },
-      "p2": {
-        "content": "$2"
-      }
-    }
-  },
-  "panelAccountOptionHome": {
-    "message": "$P1$ (energie $P2$, hlavní)",
     "placeholders": {
       "p1": {
         "content": "$1"
@@ -1702,9 +1561,6 @@
   "colDrawErrors": {
     "message": "Chyby dobírání"
   },
-  "panelMore": {
-    "message": "Další"
-  },
   "panelRounds": {
     "message": "$P1$ kol",
     "placeholders": {
@@ -1813,7 +1669,7 @@
     }
   },
   "optionsGameDelayHint": {
-    "message": "Nejkratší doba od začátku jednoho herního požadavku (kolo, tah v blackjacku, free spiny, tiket) do dalšího, společná pro všechny otevřené karty kasina. Pod 700 ms ji zdržuje takt bota."
+    "message": "Nejkratší doba od začátku jednoho herního požadavku (kolo, tah v blackjacku, free spiny, tiket) do dalšího, pro každý účet zvlášť. Pod 700 ms ji zdržuje takt bota."
   },
   "optionsNetHeading": {
     "message": "Rychlost a odpovědi serveru"
@@ -1845,7 +1701,7 @@
     "message": "Poslední chyby"
   },
   "optionsNetEmpty": {
-    "message": "Zatím žádný požadavek. Otevři kasino se zapnutým rozšířením."
+    "message": "Zatím žádný požadavek."
   },
   "optionsNetReset": {
     "message": "Vynulovat"
@@ -1882,9 +1738,6 @@
   },
   "statusHotfixFree": {
     "message": "Forbes z Chánova: hraji čekající free spiny"
-  },
-  "tabWardrobe": {
-    "message": "Šatna"
   },
   "optionsWardrobeHeading": {
     "message": "Šatna"

@@ -1,21 +1,22 @@
-// Fast sanity check: every script parses, the manifest and locales are valid JSON,
-// and every message key used in code exists in both locales.
+// Fast sanity check: every script parses, the locales are valid JSON with the
+// same keys, and every bot message key used in code or in the dashboard
+// markup exists in both locales.
 import { readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
-const sources = readdirSync('src').filter((f) => f.endsWith('.js')).map((f) => `src/${f}`);
-for (const file of sources) execFileSync(process.execPath, ['--check', file], { stdio: 'inherit' });
+const dir = (path) => readdirSync(path).filter((f) => /\.m?js$/.test(f)).map((f) => `${path}/${f}`);
+const sources = dir('src');
+const dashboard = dir('server/public');
+const server = dir('server/src');
+for (const file of [...sources, ...dashboard, ...server]) execFileSync(process.execPath, ['--check', file], { stdio: 'inherit' });
 
-const manifest = JSON.parse(readFileSync('manifest.json', 'utf8'));
 const locales = readdirSync('_locales');
-const messages = Object.fromEntries(
-  locales.map((l) => [l, JSON.parse(readFileSync(`_locales/${l}/messages.json`, 'utf8'))]),
-);
+const messages = Object.fromEntries(locales.map((l) => [l, JSON.parse(readFileSync(`_locales/${l}/messages.json`, 'utf8'))]));
 
 const used = new Set();
-const code = [...sources.map((f) => readFileSync(f, 'utf8')), readFileSync('src/options.html', 'utf8'), JSON.stringify(manifest)];
+const code = [...sources, 'server/public/settings.js', 'server/public/controls.js', 'server/public/app.html'].map((f) => readFileSync(f, 'utf8'));
 for (const text of code) {
-  for (const m of text.matchAll(/(?:(?:msg|setStatus|stop)\(['`]|data-i18n="|__MSG_)([A-Za-z]\w*)/g)) {
+  for (const m of text.matchAll(/(?:(?:msg|setStatus|stop)\(['`]|data-msg(?:-label)?=")([A-Za-z]\w*)/g)) {
     if (!m[1].endsWith('_')) used.add(m[1]);
   }
   for (const m of text.matchAll(/msg\([^)]*\? '(\w+)' : '(\w+)'/g)) used.add(m[1]).add(m[2]);
@@ -31,8 +32,6 @@ for (const [locale, table] of Object.entries(messages)) {
     console.error(`_locales/${locale} does not have the same keys as _locales/en`);
     failed = true;
   }
-}
-for (const [locale, table] of Object.entries(messages)) {
   for (const key of used) {
     if (!table[key]) {
       console.error(`missing message "${key}" in _locales/${locale}`);
@@ -41,4 +40,4 @@ for (const [locale, table] of Object.entries(messages)) {
   }
 }
 if (failed) process.exit(1);
-console.log(`check ok: ${sources.length} scripts, ${used.size} message keys, locales ${locales.join(', ')}`);
+console.log(`check ok: ${sources.length + dashboard.length + server.length} scripts, ${used.size} message keys, locales ${locales.join(', ')}`);

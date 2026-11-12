@@ -1,4 +1,4 @@
-// Full backup of the extension's storage: export everything, and on import
+// Full backup of the bot's storage: export everything, and on import
 // apply the settings and merge the rest (stats added up, bank, levels, spins
 // and accounts filled in). API keys and saved logins are left out unless asked
 // for, since the file is plain JSON.
@@ -18,7 +18,7 @@
   const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
   const withoutSession = (record) => Object.fromEntries(Object.entries(record).filter(([key]) => !SESSION_FIELDS.includes(key)));
 
-  // The backup of everything in storage (chrome.storage.local.get(null)). id
+  // The backup of everything in storage (storage.get(null)). id
   // names this export and source the install it came from, so importing it
   // twice, or back into the same install, does not add the stats again.
   function buildBackup(stored, { secrets = false, id, source, now = Date.now() } = {}) {

@@ -4,11 +4,27 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
-  <meta name="description" content="Botter dashboard: the bot's panel, its settings and its log">
+  <meta name="description" content="Botter dashboard: every account's bot, its settings, statistics and log">
   <title>Botter dashboard</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/style.css">
+  <script src="/lib/messages.js" defer></script>
+  <script src="/lib/core.js" defer></script>
+  <script src="/lib/games.js" defer></script>
+  <script src="/lib/blackjack.js" defer></script>
+  <script src="/lib/baccarat.js" defer></script>
+  <script src="/lib/dice.js" defer></script>
+  <script src="/lib/cases.js" defer></script>
+  <script src="/lib/egypt.js" defer></script>
+  <script src="/lib/mines.js" defer></script>
+  <script src="/lib/blaze.js" defer></script>
+  <script src="/lib/odds-table.js" defer></script>
+  <script src="/lib/odds.js" defer></script>
+  <script src="/lib/auto.js" defer></script>
   <script src="/i18n.js" defer></script>
+  <script src="/storage.js" defer></script>
+  <script src="/controls.js" defer></script>
+  <script src="/settings.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body class="app">
@@ -38,8 +54,8 @@
         <dd><span id="stat-energy">-</span><span class="meter" aria-hidden="true"><span id="energy-bar"></span></span></dd>
       </div>
     </dl>
-    <button type="button" id="auto" class="auto" aria-pressed="false">
-      <span class="auto-label" data-i18n="auto">Auto</span>
+    <button type="button" id="auto" class="auto" aria-pressed="false" aria-describedby="auto-state">
+      <span class="auto-label" id="auto-label" data-i18n="auto">Auto</span>
       <span id="auto-state" class="auto-state"></span>
     </button>
     <p id="hero-accounts-label" class="eyebrow hero-accounts-label" hidden><span class="live-dot" aria-hidden="true"></span><span data-i18n="runningAccounts">Running now</span></p>
@@ -55,11 +71,12 @@
   <nav class="tabs" role="tablist" data-i18n-label="sections">
     <button type="button" role="tab" id="tab-overview" aria-controls="view-overview" aria-selected="true" data-i18n="overview">Overview</button>
     <button type="button" role="tab" id="tab-progress" aria-controls="view-progress" aria-selected="false" tabindex="-1" data-i18n="progress">Progress</button>
+    <button type="button" role="tab" id="tab-stats" aria-controls="view-stats" aria-selected="false" tabindex="-1" data-i18n="stats">Statistics</button>
     <button type="button" role="tab" id="tab-boards" aria-controls="view-boards" aria-selected="false" tabindex="-1" data-i18n="boards">Leaderboards</button>
     <button type="button" role="tab" id="tab-changes" aria-controls="view-changes" aria-selected="false" tabindex="-1"><span data-i18n="changes">Changes</span><span id="changes-dot" class="tab-dot" hidden></span></button>
-    <button type="button" role="tab" id="tab-settings" aria-controls="view-settings" aria-selected="false" tabindex="-1" data-i18n="settings">Settings</button>
-    <button type="button" role="tab" id="tab-accounts" aria-controls="view-accounts" aria-selected="false" tabindex="-1" data-i18n="accounts">Accounts</button>
     <button type="button" role="tab" id="tab-activity" aria-controls="view-activity" aria-selected="false" tabindex="-1" data-i18n="activity">Activity</button>
+    <button type="button" role="tab" id="tab-accounts" aria-controls="view-accounts" aria-selected="false" tabindex="-1" data-i18n="accounts">Accounts</button>
+    <button type="button" role="tab" id="tab-settings" aria-controls="view-settings" aria-selected="false" tabindex="-1" data-i18n="settings">Settings</button>
   </nav>
 
   <main>
@@ -75,11 +92,25 @@
         <p id="play-empty" class="muted" data-i18n="playEmpty">Nothing played yet.</p>
         <div id="play-cols" class="play-cols"></div>
       </section>
-      <section class="card" aria-labelledby="panel-heading">
-        <h2 id="panel-heading" data-i18n="panel">Bot</h2>
-        <p id="panel-empty" class="muted" data-i18n="panelNone"></p>
-        <div id="panel"></div>
+      <div class="stack">
+      <section class="card" aria-labelledby="controls-heading">
+        <div class="card-head">
+          <h2 id="controls-heading" data-i18n="controls">Bot controls</h2>
+          <button type="button" class="link" data-goto="settings" data-i18n="allSettings">All settings</button>
+        </div>
+        <p class="muted small" data-i18n="controlsNote"></p>
+        <p id="controls-empty" class="muted" data-i18n="panelNone"></p>
+        <ul id="controls-list" class="ctl-list"></ul>
       </section>
+      <section class="card" aria-labelledby="books-heading">
+        <div class="card-head">
+          <h2 id="books-heading" data-i18n="books">Account books</h2>
+          <div id="books-pick" class="range" role="group" data-i18n-label="accounts"></div>
+        </div>
+        <p id="books-empty" class="muted" data-i18n="panelNone"></p>
+        <div id="books-body" class="books"></div>
+      </section>
+      </div>
       <div class="stack">
       <section class="card shark" id="shark" aria-labelledby="shark-heading">
         <h2 id="shark-heading" data-i18n="shark">Loan shark</h2>
@@ -201,8 +232,287 @@
       </section>
     </div>
 
-    <div role="tabpanel" id="view-settings" aria-labelledby="tab-settings" class="view" hidden>
-      <iframe id="settings" class="settings" data-i18n-title="settings" title="Settings"></iframe>
+    <div role="tabpanel" id="view-settings" aria-labelledby="tab-settings" class="view side-layout" hidden>
+      <nav class="side-nav" id="settings-nav" data-msg-label="settingsNavLabel">
+        <a href="#settings/work" data-section="work" data-msg="navWork"></a>
+        <a href="#settings/ai" data-section="ai" data-msg="navAi"></a>
+        <a href="#settings/auto" data-section="auto" data-msg="navAuto"></a>
+        <a href="#settings/shop" data-section="shop" data-msg="navShop"></a>
+        <a href="#settings/games" data-section="games" data-msg="navGames"></a>
+        <a href="#settings/wardrobe" data-section="wardrobe" data-msg="navWardrobe"></a>
+        <a href="#settings/data" data-section="data" data-msg="navData"></a>
+      </nav>
+      <form class="side-body" id="settings-form" novalidate>
+        <div class="side-head">
+          <p class="muted small" data-msg="settingsShared"></p>
+          <p id="saved" class="save-state" role="status" aria-live="polite"></p>
+        </div>
+
+        <section class="card settings-section" data-section="work" aria-labelledby="set-work-heading">
+          <h2 id="set-work-heading" data-msg="optionsBotHeading"></h2>
+          <label class="setting"><span class="setting-title" data-msg="optionsGuess"></span><input type="checkbox" role="switch" name="guessUnknown"></label>
+          <label class="setting"><span class="setting-title" data-msg="optionsStopAtNorm"></span><input type="checkbox" role="switch" name="stopAtNorm"></label>
+          <label class="setting"><span class="setting-title" data-msg="optionsAutoClaim"></span><input type="checkbox" role="switch" name="autoClaim"></label>
+          <h3 data-msg="groupPacing"></h3>
+          <div class="setting"><label class="setting-title" for="set-minDelayMs" data-msg="optionsMinDelay"></label><input id="set-minDelayMs" name="minDelayMs" type="number" min="0" step="100" inputmode="numeric"></div>
+          <div class="setting"><label class="setting-title" for="set-maxDelayMs" data-msg="optionsMaxDelay"></label><input id="set-maxDelayMs" name="maxDelayMs" type="number" min="0" step="100" inputmode="numeric"></div>
+          <div class="setting"><label class="setting-title" for="set-logLevel" data-msg="optionsLogLevel"></label>
+            <select id="set-logLevel" name="logLevel"><option value="debug">debug</option><option value="info">info</option><option value="warn">warn</option><option value="error">error</option></select></div>
+        </section>
+
+        <section class="card settings-section" data-section="ai" aria-labelledby="set-ai-heading">
+          <h2 id="set-ai-heading" data-msg="optionsAiHeading"></h2>
+          <div class="setting"><label class="setting-title" for="set-aiSolver" data-msg="optionsSolver"></label>
+            <select id="set-aiSolver" name="aiSolver"><option value="claude" data-msg="solver_claude"></option><option value="openrouter" data-msg="solver_openrouter"></option><option value="off" data-msg="solver_off"></option></select></div>
+          <div data-when="aiSolver:claude">
+            <h3 data-msg="optionsClaudeHeading"></h3>
+            <div class="setting"><span class="setting-text"><label class="setting-title" for="set-apiKey" data-msg="optionsApiKey"></label><span class="setting-hint" id="set-apiKey-hint" data-msg="optionsApiKeyHint"></span></span>
+              <input id="set-apiKey" data-secret="apiKey" type="password" autocomplete="off" spellcheck="false" aria-describedby="set-apiKey-hint"></div>
+            <div class="setting"><label class="setting-title" for="set-model" data-msg="optionsModel"></label>
+              <select id="set-model" name="model"><option value="claude-opus-5-5">Claude Opus 5.5</option><option value="claude-sonnet-5-5">Claude Sonnet 5.5</option><option value="claude-haiku-4-5">Claude Haiku 4.5</option></select></div>
+            <div class="setting"><label class="setting-title" for="set-effort" data-msg="optionsEffort"></label>
+              <select id="set-effort" name="effort"><option value="low">low</option><option value="medium">medium</option><option value="high">high</option></select></div>
+          </div>
+          <div data-when="aiSolver:openrouter">
+            <h3 data-msg="optionsOpenRouterHeading"></h3>
+            <div class="setting"><span class="setting-text"><label class="setting-title" for="set-openrouterKey" data-msg="optionsOpenRouterKey"></label><span class="setting-hint" id="set-openrouterKey-hint" data-msg="optionsApiKeyHint"></span></span>
+              <input id="set-openrouterKey" data-secret="openrouterKey" type="password" autocomplete="off" spellcheck="false" aria-describedby="set-openrouterKey-hint"></div>
+            <div class="setting"><span class="setting-text"><label class="setting-title" for="set-openrouterModel" data-msg="optionsOpenRouterModel"></label><span class="setting-hint" data-msg="optionsOpenRouterHint"></span></span>
+              <input id="set-openrouterModel" name="openrouterModel" type="text" list="set-openrouterModels" spellcheck="false" class="wide"></div>
+            <datalist id="set-openrouterModels"><option value="google/gemini-2.5-flash"></option><option value="anthropic/claude-sonnet-4.5"></option><option value="openai/gpt-5-mini"></option><option value="deepseek/deepseek-chat-v3.1"></option></datalist>
+          </div>
+        </section>
+
+        <section class="card settings-section" data-section="auto" aria-labelledby="set-auto-heading">
+          <h2 id="set-auto-heading" data-msg="optionsAutoHeading"></h2>
+          <p class="section-hint" data-msg="optionsAutoHint"></p>
+          <h3 data-msg="groupAutoParts"></h3>
+          <label class="setting"><span class="setting-title" data-msg="optionsAutoWork"></span><input type="checkbox" role="switch" name="autoWork"></label>
+          <label class="setting"><span class="setting-title" data-msg="optionsAutoGames"></span><input type="checkbox" role="switch" name="autoGames"></label>
+          <label class="setting"><span class="setting-title" data-msg="optionsAutoWheel"></span><input type="checkbox" role="switch" name="autoWheel"></label>
+          <label class="setting"><span class="setting-title" data-msg="optionsAutoPrestige"></span><input type="checkbox" role="switch" name="autoPrestige"></label>
+          <label class="setting"><span class="setting-title" data-msg="optionsEdgeBets"></span><input type="checkbox" role="switch" name="edgeBets"></label>
+
+          <h3 data-msg="groupLoans"></h3>
+          <label class="setting"><span class="setting-title" data-msg="optionsRepayDebt"></span><input type="checkbox" role="switch" name="repayDebt"></label>
+          <label class="setting"><span class="setting-title" data-msg="optionsAutoBankrupt"></span><input type="checkbox" role="switch" name="autoBankrupt"></label>
+          <label class="setting sub" data-when="autoBankrupt"><span class="setting-title" data-msg="optionsLoanCycle"></span><input type="checkbox" role="switch" name="loanCycle"></label>
+          <label class="setting sub" data-when="autoBankrupt"><span class="setting-title" data-msg="optionsSprintProtect"></span><input type="checkbox" role="switch" name="sprintProtect"></label>
+          <label class="setting"><span class="setting-title" data-msg="optionsLevelLoan"></span><input type="checkbox" role="switch" name="levelLoan"></label>
+          <label class="setting"><span class="setting-title" data-msg="optionsLoanTrick"></span><input type="checkbox" role="switch" name="loanTrick"></label>
+
+          <h3 data-msg="groupXp"></h3>
+          <label class="setting"><span class="setting-title" data-msg="optionsGrindPays"></span><input type="checkbox" role="switch" name="grindPays"></label>
+          <label class="setting"><span class="setting-title" data-msg="optionsGrindEventHold"></span><input type="checkbox" role="switch" name="grindEventHold"></label>
+          <label class="setting"><span class="setting-title" data-msg="optionsLearnBlaze"></span><input type="checkbox" role="switch" name="learnBlaze"></label>
+          <div class="setting"><label class="setting-title" for="set-grindLimit" data-msg="optionsGrindLimit"></label>
+            <select id="set-grindLimit" name="grindLimit"><option value="daily" data-msg="grindLimit_daily"></option><option value="balance" data-msg="grindLimit_balance"></option><option value="off" data-msg="grindLimit_off"></option></select></div>
+          <div class="setting sub" data-when="grindLimit:daily"><label class="setting-title" for="set-xpBudget" data-msg="optionsXpBudget"></label><input id="set-xpBudget" name="xpBudget" type="number" min="0" step="100" inputmode="numeric"></div>
+          <div class="setting sub" data-when="grindLimit:balance"><label class="setting-title" for="set-grindMinBalance" data-msg="optionsGrindMinBalance"></label><input id="set-grindMinBalance" name="grindMinBalance" type="number" min="0" step="100" inputmode="numeric"></div>
+          <div data-when="grindLimit:daily xpBudget | grindLimit:balance grindMinBalance | grindLimit:off">
+            <div class="setting"><label class="setting-title" for="set-grindGame" data-msg="optionsGrindGame"></label><select id="set-grindGame" name="grindGame"></select></div>
+            <div class="setting"><label class="setting-title" for="set-grindBet" data-msg="optionsGrindBet"></label><select id="set-grindBet" name="grindBet"></select></div>
+            <div class="setting"><label class="setting-title" for="set-autoBetBump" data-msg="optionsAutoBetBump"></label><select id="set-autoBetBump" name="autoBetBump"></select></div>
+            <p class="section-hint" data-msg="optionsGrindHint"></p>
+          </div>
+
+          <h3 data-msg="groupQuests"></h3>
+          <label class="setting"><span class="setting-title" data-msg="optionsStandup"></span><input type="checkbox" role="switch" name="standup"></label>
+          <label class="setting"><span class="setting-title" data-msg="optionsAchievementHunt"></span><input type="checkbox" role="switch" name="achievementHunt"></label>
+          <div class="setting sub" data-when="achievementHunt"><label class="setting-title" for="set-huntRoundsGoal" data-msg="optionsHuntRoundsGoal"></label><select id="set-huntRoundsGoal" name="huntRoundsGoal"></select></div>
+
+          <h3 data-msg="groupRounds"></h3>
+          <label class="setting"><span class="setting-title" data-msg="optionsCrashEnabled"></span><input type="checkbox" role="switch" name="crashEnabled"></label>
+          <div data-when="crashEnabled">
+            <div class="setting sub"><label class="setting-title" for="set-crashBet" data-msg="optionsCrashBet"></label><select id="set-crashBet" name="crashBet"></select></div>
+            <div class="setting sub"><label class="setting-title" for="set-crashMinEv" data-msg="optionsCrashMinEv"></label><input id="set-crashMinEv" name="crashMinEv" type="number" min="1" step="0.01" inputmode="decimal"></div>
+            <div class="setting sub"><label class="setting-title" for="set-crashKelly" data-msg="optionsCrashKelly"></label><input id="set-crashKelly" name="crashKelly" type="number" min="0" max="1" step="0.05" inputmode="decimal"></div>
+          </div>
+          <label class="setting"><span class="setting-title" data-msg="optionsLotteryLucky"></span><input type="checkbox" role="switch" name="lotteryLucky"></label>
+          <div data-when="lotteryLucky">
+            <div class="setting sub"><label class="setting-title" for="set-lotteryPrice" data-msg="optionsLotteryPrice"></label><select id="set-lotteryPrice" name="lotteryPrice"></select></div>
+            <div class="setting sub"><label class="setting-title" for="set-lotteryTickets" data-msg="optionsLotteryTickets"></label><input id="set-lotteryTickets" name="lotteryTickets" type="number" min="1" max="5" step="1" inputmode="numeric"></div>
+          </div>
+          <div class="setting"><span class="setting-text"><label class="setting-title" for="set-lotteryPick" data-msg="optionsLotteryPick"></label><span class="setting-hint" data-msg="optionsLotteryPickHint"></span></span><select id="set-lotteryPick" name="lotteryPick"></select></div>
+          <div class="setting stacked" data-when="lotteryPick:fixed">
+            <label class="setting-title" for="set-lotteryLines" data-msg="optionsLotteryLines"></label>
+            <textarea id="set-lotteryLines" name="lotteryLines" rows="5" spellcheck="false" aria-describedby="set-lotteryLinesCheck" placeholder="7 12 19 23 38 44"></textarea>
+            <span class="setting-hint" id="set-lotteryLinesCheck" aria-live="polite"></span>
+          </div>
+        </section>
+
+        <section class="card settings-section" data-section="shop" aria-labelledby="set-shop-heading">
+          <h2 id="set-shop-heading" data-msg="optionsShopHeading"></h2>
+          <label class="setting"><span class="setting-title" data-msg="optionsBuyUpgrades"></span><input type="checkbox" role="switch" name="buyUpgrades"></label>
+          <div data-when="buyUpgrades">
+            <label class="setting sub"><span class="setting-title" data-msg="optionsSaveForUpgrades"></span><input type="checkbox" role="switch" name="saveForUpgrades"></label>
+            <label class="setting sub"><span class="setting-title" data-msg="optionsSpareUpgrades"></span><input type="checkbox" role="switch" name="spareUpgrades"></label>
+            <div class="setting sub"><label class="setting-title" for="set-firstGame" data-msg="optionsFirstGame"></label><select id="set-firstGame" name="firstGame"></select></div>
+            <p class="section-hint" data-msg="optionsShopReserveHint"></p>
+            <p class="section-hint" data-msg="optionsUpgradeHint"></p>
+          </div>
+        </section>
+
+        <section class="card settings-section" data-section="games" aria-labelledby="set-games-heading">
+          <h2 id="set-games-heading" data-msg="optionsGamesHeading"></h2>
+          <p class="section-hint" data-msg="optionsGamesHint"></p>
+          <label class="setting"><span class="setting-text"><span class="setting-title" data-msg="optionsMaxSpeed"></span><span class="setting-hint" data-msg="optionsMaxSpeedHint"></span></span><input type="checkbox" role="switch" name="maxSpeed"></label>
+          <div class="setting sub" data-when="!maxSpeed"><span class="setting-text"><label class="setting-title" for="set-gameDelayMs" data-msg="optionsGameDelay"></label><span class="setting-hint" data-msg="optionsGameDelayHint"></span></span><input id="set-gameDelayMs" name="gameDelayMs" type="number" min="0" step="100" inputmode="numeric"></div>
+          <h3 data-msg="groupLimits"></h3>
+          <div class="setting"><label class="setting-title" for="set-gameBet" data-msg="optionsGameBet"></label><select id="set-gameBet" name="gameBet"></select></div>
+          <div class="setting"><label class="setting-title" for="set-rouletteBet" data-msg="optionsRouletteBet"></label><select id="set-rouletteBet" name="rouletteBet"></select></div>
+          <div class="setting"><label class="setting-title" for="set-stopLoss" data-msg="optionsStopLoss"></label><input id="set-stopLoss" name="stopLoss" type="number" min="0" step="10" inputmode="numeric"></div>
+          <div class="setting"><label class="setting-title" for="set-takeProfit" data-msg="optionsTakeProfit"></label><input id="set-takeProfit" name="takeProfit" type="number" min="0" step="10" inputmode="numeric"></div>
+          <div class="setting"><label class="setting-title" for="set-reserve" data-msg="optionsReserve"></label><input id="set-reserve" name="reserve" type="number" min="0" step="10" inputmode="numeric"></div>
+          <h3 data-msg="groupForbes"></h3>
+          <label class="setting"><span class="setting-title" data-msg="optionsHotfixForce"></span><input type="checkbox" role="switch" name="hotfixForce"></label>
+          <div class="setting sub" data-when="hotfixForce"><span class="setting-text"><label class="setting-title" for="set-hotfixForceValue" data-msg="optionsHotfixForceValue"></label><span class="setting-hint" data-msg="panelHotfixForceHint"></span></span><input id="set-hotfixForceValue" name="hotfixForceValue" type="text" autocomplete="off" spellcheck="false" placeholder="true"></div>
+        </section>
+
+        <section class="card settings-section" data-section="wardrobe" aria-labelledby="set-wardrobe-heading">
+          <h2 id="set-wardrobe-heading" data-msg="optionsWardrobeHeading"></h2>
+          <p class="section-hint" data-msg="optionsWardrobeHint"></p>
+          <label class="setting"><span class="setting-title" data-msg="optionsBuyCosmetics"></span><input type="checkbox" role="switch" name="buyCosmetics"></label>
+          <div class="setting"><label class="setting-title" for="set-wearFrame" data-msg="optionsWearFrame"></label><select id="set-wearFrame" name="wearFrame" class="wide"></select></div>
+          <div class="setting"><label class="setting-title" for="set-wearColor" data-msg="optionsWearColor"></label><select id="set-wearColor" name="wearColor" class="wide"></select></div>
+          <div class="setting"><label class="setting-title" for="set-wearTitle" data-msg="optionsWearTitle"></label><select id="set-wearTitle" name="wearTitle" class="wide"></select></div>
+        </section>
+
+        <section class="card settings-section" data-section="data" aria-labelledby="set-backup-heading">
+          <h2 id="set-backup-heading" data-msg="optionsBackupHeading"></h2>
+          <p class="section-hint" data-msg="optionsBackupHint"></p>
+          <label class="setting"><span class="setting-title" data-msg="optionsBackupSecrets"></span><input id="set-backupSecrets" type="checkbox" role="switch"></label>
+          <div class="actions">
+            <button type="button" id="set-exportAll" class="primary" data-msg="optionsExportAll"></button>
+            <button type="button" id="set-importAllButton" data-msg="optionsImportAll"></button>
+            <input id="set-importAll" type="file" accept="application/json" hidden>
+          </div>
+
+          <h3 data-msg="optionsBankHeading"></h3>
+          <p id="set-bankSize" class="muted"></p>
+          <div class="actions">
+            <button type="button" id="set-export" data-msg="optionsExport"></button>
+            <button type="button" id="set-importButton" data-msg="optionsImport"></button>
+            <input id="set-import" type="file" accept="application/json" hidden>
+            <button type="button" id="set-clear" class="danger" data-msg="optionsClear"></button>
+          </div>
+
+          <h3 data-msg="optionsModelHeading"></h3>
+          <p class="section-hint" data-msg="optionsModelHint"></p>
+          <label class="setting"><span class="setting-title" data-msg="optionsRecordSpins"></span><input type="checkbox" role="switch" name="recordSpins"></label>
+          <p id="set-spinCount" class="muted"></p>
+          <div class="actions">
+            <button type="button" id="set-checkModel" data-msg="optionsCheckModel"></button>
+            <button type="button" id="set-exportSpins" data-msg="optionsExportSpins"></button>
+            <button type="button" id="set-clearSpins" class="danger" data-msg="optionsClearSpins"></button>
+          </div>
+          <pre id="set-modelResult" class="result-box" role="status" aria-live="polite"></pre>
+
+          <h3 data-msg="optionsHotfixHeading"></h3>
+          <p class="section-hint" data-msg="optionsHotfixHint"></p>
+          <p id="set-hotfixCount" class="muted"></p>
+          <div class="actions">
+            <button type="button" id="set-exportHotfix" data-msg="optionsExportHotfix"></button>
+            <button type="button" id="set-clearHotfix" class="danger" data-msg="optionsClearHotfix"></button>
+          </div>
+
+          <h3 data-msg="optionsDebugHeading"></h3>
+          <label class="setting"><span class="setting-text"><span class="setting-title" data-msg="optionsCaptureDebug"></span><span class="setting-hint" data-msg="optionsCaptureHint"></span></span><input type="checkbox" role="switch" name="captureDebug"></label>
+          <div class="actions">
+            <button type="button" id="set-exportCapture" data-msg="optionsExportCapture"></button>
+          </div>
+        </section>
+      </form>
+    </div>
+
+    <div role="tabpanel" id="view-stats" aria-labelledby="tab-stats" class="view side-layout" hidden>
+      <nav class="side-nav" id="stats-nav" data-msg-label="statsNavLabel">
+        <a href="#stats/profit" data-section="profit" data-msg="navProfit"></a>
+        <a href="#stats/checks" data-section="checks" data-msg="navChecks"></a>
+        <a href="#stats/levels" data-section="levels" data-msg="navLevels"></a>
+        <a href="#stats/net" data-section="net" data-msg="navNet"></a>
+        <a href="#stats/odds" data-section="odds" data-msg="navOdds"></a>
+      </nav>
+      <div class="side-body">
+        <section class="card settings-section" data-section="profit" aria-labelledby="st-profit-heading">
+          <div class="card-head">
+            <h2 id="st-profit-heading" data-msg="optionsProfitHeading"></h2>
+            <label class="inline-field"><span data-msg="colAccount"></span><select id="st-profitAccount"></select></label>
+          </div>
+          <p class="section-hint" data-msg="optionsProfitHint"></p>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th scope="col" data-msg="colGame"></th><th scope="col" class="num" data-msg="colRounds"></th><th scope="col" class="num" data-msg="colWagered"></th><th scope="col" class="num" data-msg="colReturned"></th><th scope="col" class="num" data-msg="colNet"></th><th scope="col" class="num" data-msg="colRtp"></th><th scope="col" class="num" data-msg="colPerRound"></th><th scope="col" class="num" data-msg="colXp"></th></tr></thead>
+            <tbody id="st-profitBody"></tbody><tfoot id="st-profitFoot"></tfoot>
+          </table></div>
+          <p id="st-profitEmpty" class="muted" data-msg="optionsProfitEmpty"></p>
+          <h3 data-msg="optionsCombosHeading"></h3>
+          <p class="section-hint" data-msg="optionsCombosHint"></p>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th scope="col" data-msg="colGame"></th><th scope="col" data-msg="colUpgrades"></th><th scope="col" class="num" data-msg="colRounds"></th><th scope="col" class="num" data-msg="colWagered"></th><th scope="col" class="num" data-msg="colNet"></th><th scope="col" class="num" data-msg="colRtp"></th><th scope="col" class="num" data-msg="colModelRtp"></th><th scope="col" class="num" data-msg="colXp"></th></tr></thead>
+            <tbody id="st-comboBody"></tbody>
+          </table></div>
+          <p id="st-comboEmpty" class="muted" data-msg="optionsCombosEmpty"></p>
+        </section>
+
+        <section class="card settings-section" data-section="checks" aria-labelledby="st-roulette-heading">
+          <h2 id="st-roulette-heading" data-msg="optionsRouletteHeading"></h2>
+          <p class="section-hint" data-msg="optionsRouletteHint"></p>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th scope="col" data-msg="colZerosLeft"></th><th scope="col" class="num" data-msg="colRounds"></th><th scope="col" class="num" data-msg="colZeroPockets"></th><th scope="col" class="num" data-msg="colWheelReturn"></th><th scope="col" class="num" data-msg="colModelRtp"></th><th scope="col" class="num" data-msg="colDeviations"></th><th scope="col" class="num" data-msg="colHiddenCost"></th><th scope="col" class="num" data-msg="colPayoutErrors"></th></tr></thead>
+            <tbody id="st-rouletteBody"></tbody>
+          </table></div>
+          <p id="st-rouletteEmpty" class="muted" data-msg="optionsRouletteEmpty"></p>
+          <h3 data-msg="optionsBaccaratHeading"></h3>
+          <p class="section-hint" data-msg="optionsBaccaratHint"></p>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th scope="col" data-msg="colUpgrades"></th><th scope="col" class="num" data-msg="colRounds"></th><th scope="col" class="num" data-msg="colBaccaratWinners"></th><th scope="col" class="num" data-msg="colBaccaratPairs"></th><th scope="col" class="num" data-msg="colServerReturn"></th><th scope="col" class="num" data-msg="colModelRtp"></th><th scope="col" class="num" data-msg="colHiddenCost"></th><th scope="col" class="num" data-msg="colDrawErrors"></th><th scope="col" class="num" data-msg="colPayoutErrors"></th></tr></thead>
+            <tbody id="st-baccaratBody"></tbody>
+          </table></div>
+          <p id="st-baccaratEmpty" class="muted" data-msg="optionsBaccaratEmpty"></p>
+          <h3 data-msg="optionsTablesHeading"></h3>
+          <p class="section-hint" data-msg="optionsTablesHint"></p>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th scope="col" data-msg="colGame"></th><th scope="col" data-msg="colUpgrades"></th><th scope="col" class="num" data-msg="colRounds"></th><th scope="col" class="num" data-msg="colTablesRare"></th><th scope="col" class="num" data-msg="colServerReturn"></th><th scope="col" class="num" data-msg="colModelRtp"></th><th scope="col" class="num" data-msg="colHiddenCost"></th><th scope="col" class="num" data-msg="colPayoutErrors"></th></tr></thead>
+            <tbody id="st-tablesBody"></tbody>
+          </table></div>
+          <p id="st-tablesEmpty" class="muted" data-msg="optionsTablesEmpty"></p>
+        </section>
+
+        <section class="card settings-section" data-section="levels" aria-labelledby="st-levels-heading">
+          <h2 id="st-levels-heading" data-msg="optionsLevelsHeading"></h2>
+          <p class="section-hint" data-msg="optionsLevelsHint"></p>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th scope="col" data-msg="colLevel"></th><th scope="col" class="num" data-msg="colXpNeed"></th><th scope="col" class="num" data-msg="colXpGrowth"></th><th scope="col" class="num" data-msg="colLevelReward"></th><th scope="col" class="num" data-msg="colDailyBonus"></th></tr></thead>
+            <tbody id="st-levelsBody"></tbody>
+          </table></div>
+          <p id="st-levelsEmpty" class="muted" data-msg="optionsLevelsEmpty"></p>
+        </section>
+
+        <section class="card settings-section" data-section="net" aria-labelledby="st-net-heading">
+          <div class="card-head">
+            <h2 id="st-net-heading" data-msg="optionsNetHeading"></h2>
+            <button type="button" id="st-resetNet" data-msg="optionsNetReset"></button>
+          </div>
+          <p class="section-hint" data-msg="optionsNetHint"></p>
+          <p id="st-netSpeed" aria-live="polite"></p>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th scope="col" data-msg="colNetPath"></th><th scope="col" class="num" data-msg="colNetSeen"></th><th scope="col" class="num" data-msg="colNetBot"></th><th scope="col" class="num" data-msg="colNetErrors"></th><th scope="col" class="num" data-msg="colNetLimited"></th><th scope="col" class="num" data-msg="colNetTime"></th></tr></thead>
+            <tbody id="st-netBody"></tbody>
+          </table></div>
+          <h3 data-msg="optionsNetErrorsHeading"></h3>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th scope="col" data-msg="colNetWhen"></th><th scope="col" data-msg="colNetPath"></th><th scope="col" data-msg="colNetStatus"></th><th scope="col" data-msg="colNetError"></th></tr></thead>
+            <tbody id="st-netErrors"></tbody>
+          </table></div>
+          <p id="st-netEmpty" class="muted" data-msg="optionsNetEmpty"></p>
+        </section>
+
+        <section class="card settings-section" data-section="odds" aria-labelledby="st-odds-heading">
+          <h2 id="st-odds-heading" data-msg="optionsOddsHeading"></h2>
+          <p class="section-hint" data-msg="optionsOddsHint"></p>
+          <div id="st-oddsTables" class="odds"></div>
+        </section>
+      </div>
     </div>
 
     <div role="tabpanel" id="view-accounts" aria-labelledby="tab-accounts" class="view accounts" hidden>
@@ -219,6 +529,7 @@
                 <th scope="col" class="num" data-i18n="credits">Credits</th>
                 <th scope="col" class="num" data-i18n="energy">Energy</th>
                 <th scope="col" class="num" data-i18n="debt">Debt</th>
+                <th scope="col" data-i18n="state">State</th>
                 <th scope="col"><span class="visually-hidden" data-i18n="actions">Actions</span></th>
               </tr>
             </thead>

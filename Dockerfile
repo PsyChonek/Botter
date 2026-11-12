@@ -1,11 +1,10 @@
-# Botter in a container with no browser: the extension's own scripts run in
-# Node against the casino API, and a login-protected dashboard on port 8080
-# shows their panel and settings page.
+# Botter in a container: the bot runs in Node for every saved account against
+# the casino API, and a login-protected dashboard on port 8080 controls it.
 FROM node:22-alpine
 
 ENV NODE_ENV=production \
     PORT=8080 \
-    EXTENSION_DIR=/app/extension \
+    BOT_DIR=/app/bot \
     DATA_DIR=/data
 
 WORKDIR /app/server
@@ -13,9 +12,8 @@ COPY server/package.json server/package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY server/src ./src
 COPY server/public ./public
-COPY manifest.json /app/extension/
-COPY _locales /app/extension/_locales
-COPY src /app/extension/src
+COPY _locales /app/bot/_locales
+COPY src /app/bot/src
 
 RUN mkdir -p /data && chown node:node /data
 USER node

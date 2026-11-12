@@ -1,7 +1,7 @@
 // Exact infinite-deck blackjack solver for the casino's rule set: hit, stand
 // and double only (no split, no surrender), dealer hole card resolved at the
 // end, ties push only from a minimum total, blackjack pay set by upgrades.
-// Classic script: globalThis.BotterBlackjack in the extension, require() in Node.
+// Classic script: globalThis.BotterBlackjack in the bot's contexts and the dashboard, require() in Node.
 (function (root) {
   // Card values 2..11 (11 = ace) with infinite-deck probabilities.
   const CARDS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((v) => [v, v === 10 ? 4 / 13 : 1 / 13]);

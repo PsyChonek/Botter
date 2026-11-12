@@ -4,8 +4,8 @@
 // each pair 10:1; on a tie the Hráč and Bankéř bets get half back, or all
 // with the Smírčí řízení upgrade. The deal is drawn on the server, so the
 // standard drawing rules and an infinite deck are assumptions the recorded
-// hands check (addHand). Classic script: globalThis.BotterBaccarat in the
-// extension, require() in Node.
+// hands check (addHand). Classic script: globalThis.BotterBaccarat in the bot's
+// contexts and the dashboard, require() in Node.
 (function (root) {
   // Same mapping as the shop: Vyjednaná provize levels index into CUTS.
   const CUTS = [0.08, 0.06, 0.04, 0.025];

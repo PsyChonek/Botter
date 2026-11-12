@@ -2,7 +2,7 @@
 // reel weights, paytable, upgrade effects, win evaluation and RTP simulation.
 // The client does not show whether the star scatter counts star symbols or reels
 // with a star, so both variants are evaluated and checked against real spins.
-// Classic script: globalThis.BotterBlaze in the extension, require() in Node.
+// Classic script: globalThis.BotterBlaze in the bot's contexts and the dashboard, require() in Node.
 (function (root) {
   const SYMBOLS = ['cherry', 'lemon', 'orange', 'plum', 'grapes', 'melon', 'seven', 'star', 'wild'];
   const LINES = [

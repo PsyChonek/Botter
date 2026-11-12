@@ -1,4 +1,4 @@
-// What the extension keeps in chrome.storage.local and the page's localStorage,
+// The bot's shared storage and each account's localStorage,
 // in one JSON file under /data. Writes are batched and land atomically.
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -21,7 +21,7 @@ export class Store {
     }
   }
 
-  // chrome.storage.local.get: null for everything, a key, a list of keys, or
+  // get: null for everything, a key, a list of keys, or
   // an object of keys with defaults.
   get(keys) {
     if (keys === null || keys === undefined) return structuredClone(this.local);
@@ -59,7 +59,7 @@ export class Store {
     if (!Object.keys(changes).length) return;
     this.scheduleSave();
     for (const listener of this.listeners) {
-      // Listeners get their own copy, like chrome.storage.onChanged.
+      // Every listener gets its own copy.
       setImmediate(() => listener(structuredClone(changes), 'local'));
     }
   }

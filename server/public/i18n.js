@@ -31,6 +31,18 @@
       activity: 'Aktivita',
       panel: 'Bot',
       panelNone: 'Bot se spouští.',
+      stats: 'Statistiky',
+      controls: 'Ovládání bota',
+      controlsNote: 'Každý účet má vlastní přepínače. Auto pracuje i hraje samo; Práce a Hry jsou ruční režim, když je Auto vypnuté.',
+      allSettings: 'Všechna nastavení',
+      books: 'Účetnictví účtu',
+      autoRunsAll: 'Auto řídí práci i hry tohoto účtu.',
+      autoAll: 'Auto na všech účtech',
+      autoSome: 'zapnuto na {0} z {1}',
+      state: 'Stav',
+      forget: 'Zapomenout',
+      forgetLabel: 'Zapomenout účet {0}',
+      forgetConfirm: 'Zapomenout uložené přihlášení účtu {0}? Bot na něm přestane hrát. Statistiky zůstanou.',
       recent: 'Poslední aktivita',
       runningAccounts: 'Běží teď',
       running: 'Běží',
@@ -225,6 +237,18 @@
       activity: 'Activity',
       panel: 'Bot',
       panelNone: 'The bot is starting.',
+      stats: 'Statistics',
+      controls: 'Bot controls',
+      controlsNote: 'Every account has its own switches. Auto works and plays by itself; Work and Games are the manual mode while Auto is off.',
+      allSettings: 'All settings',
+      books: 'Account books',
+      autoRunsAll: "Auto runs this account's work and games.",
+      autoAll: 'Auto on every account',
+      autoSome: 'on for {0} of {1}',
+      state: 'State',
+      forget: 'Forget',
+      forgetLabel: 'Forget account {0}',
+      forgetConfirm: 'Forget the saved login of {0}? The bot stops playing it. Its stats stay.',
       recent: 'Recent activity',
       runningAccounts: 'Running now',
       running: 'Running',
@@ -426,7 +450,7 @@
   }
 
   // Picks a language without remembering it in this browser: the dashboard
-  // takes the server's, which the panel is rendered in.
+  // takes the server's, which the bot writes its status lines in.
   function set(next) {
     if (MESSAGES[next]) lang = next;
   }

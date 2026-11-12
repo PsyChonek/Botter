@@ -1,6 +1,6 @@
-// Pure helpers shared by the content script, the service worker and the tests.
-// Loaded as a classic script in the extension (exposes globalThis.BotterCore)
-// and via require() in Node.
+// Pure helpers shared by the bot, the server, the dashboard and the tests.
+// Loaded as a classic script in the bot's contexts and the dashboard (exposes
+// globalThis.BotterCore) and via require() in Node.
 (function (root) {
   // Same order as the job cards on the work screen. "Přepiš kód" (typing) has
   // its answer in the task, so it is never wrong.

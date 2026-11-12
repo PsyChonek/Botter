@@ -1,6 +1,6 @@
 // Pure casino helpers: bet sizing, blackjack decisions, energy and profit
-// bookkeeping. Classic script like core.js (globalThis.BotterGames in the
-// extension, require() in Node).
+// bookkeeping. Classic script like core.js (globalThis.BotterGames in the bot's
+// contexts and the dashboard, require() in Node).
 (function (root) {
   const BET_LEVELS = [20, 40, 100, 200, 400, 1000];
   // Produkce padá takes stakes up to 10x the slot max bet (10,000 from level 15).
@@ -27,7 +27,7 @@
   const ROULETTE_BETS = ['red', 'black', 'even', 'odd', 'low', 'high'];
 
   // Crash is not here: its auto cash-out is paid without a response, so its
-  // bets are booked from the round's bet list instead (see the content script).
+  // bets are booked from the round's bet list instead (see content.js).
   const PATH_GAME = {
     '/api/slot/spin': 'blaze',
     '/api/skeleton/spin': 'skeleton',
@@ -536,7 +536,7 @@
     return Object.fromEntries(Object.entries(games).map(([game, row]) => [game, rowLess(row, base[game])]));
   }
 
-  // Where the panel's Profit table starts counting: from the account's last
+  // Where the dashboard's Profit table starts counting: from the account's last
   // výpověď (player.prestige), and each game from its last upgrade, so a row
   // shows the return of what is played now. The base holds the stats as they
   // were then, and the table subtracts it. Returns the same base when nothing
