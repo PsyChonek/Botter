@@ -1806,5 +1806,8 @@
   },
   "shopState_unplanned": {
     "message": "spare only"
+  },
+  "shopState_betCapped": {
+    "message": "top bet already reached"
   }
 }

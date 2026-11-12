@@ -168,10 +168,18 @@
     for (const { game, key } of plan) {
       const offer = upgradeOffer(player?.upgrades, game, key);
       if (!offer) continue;
-      queue.push({ ...offer, reason: player.level < offer.minLevel ? 'level' : skip(offer) });
+      let reason = skip(offer);
+      if (player.level < offer.minLevel) reason = 'level';
+      else if (betCapped(offer, player)) reason = 'betCapped';
+      queue.push({ ...offer, reason });
     }
     return queue;
   }
+
+  // global:bets raises the max bet, but once the level already allows the top
+  // bet level the server refuses it ("Nejvyssi sazku uz mas i bez toho").
+  const betCapped = (offer, player) =>
+    offer.game === 'global' && offer.key === 'bets' && player.maxBet >= BET_LEVELS.at(-1);
 
   // Highest allowed bet level that does not exceed what the user asked for.
   function betFor(wanted, maxBet, levels = BET_LEVELS) {

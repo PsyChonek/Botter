@@ -1806,5 +1806,8 @@
   },
   "shopState_unplanned": {
     "message": "jen z přebytku"
+  },
+  "shopState_betCapped": {
+    "message": "nejvyšší sázka už je"
   }
 }

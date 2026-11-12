@@ -1368,3 +1368,9 @@ test('wardrobePlan buys and wears an item picked by hand before the rest', () =>
   const owned = { owned: ['title.ceo', 'title.investor'], look: { title: 'title.investor' } };
   assert.deepEqual(A.wardrobePlan(G.COSMETICS, owned, wear).equip, { kind: 'title', id: 'title.ceo' });
 });
+
+test('spareUpgrade and shopGoal never pick an upgrade the server refuses as useless', () => {
+  const queue = [{ game: 'global', key: 'bets', price: 1000, reason: 'betCapped' }];
+  assert.equal(A.spareUpgrade(queue, 100_000, 0), null);
+  assert.equal(A.shopGoal(queue, 'global'), null);
+});

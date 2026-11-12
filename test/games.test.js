@@ -319,3 +319,10 @@ test('UPGRADE_EXTRAS holds every shop upgrade the plan leaves out', () => {
   assert.deepEqual([...listed].sort(), [...all].sort());
   assert.ok(listed.includes('global:bets') && listed.includes('crash:sla'));
 });
+
+test('shopQueue marks global:bets useless once the max bet is already the top level', () => {
+  const plan = [{ game: 'global', key: 'bets' }];
+  const top = G.BET_LEVELS.at(-1);
+  assert.equal(G.shopQueue(plan, { level: 10, maxBet: top, upgrades: {} }, () => 'unplanned')[0].reason, 'betCapped');
+  assert.equal(G.shopQueue(plan, { level: 10, maxBet: 400, upgrades: {} }, () => 'unplanned')[0].reason, 'unplanned');
+});

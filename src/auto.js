@@ -496,13 +496,17 @@
     return [...steps, maxed].some(pays) ? null : 'xpFarmingBetter';
   }
 
+  // Shop queue reasons that rule an upgrade out of every buy: the player level
+  // does not allow it yet, or the server would refuse it as useless.
+  const UNBUYABLE = new Set(['level', 'betCapped']);
+
   // Goal of the shop queue (G.shopQueue): the cheapest upgrade of the priority
   // game (null for none) that the player level allows, whatever its verdict, or
   // else the first entry worth buying. Null when there is neither.
   function shopGoal(queue, priority = null) {
     let best = null;
     for (const offer of queue) {
-      if (offer.game !== priority || offer.reason === 'level') continue;
+      if (offer.game !== priority || UNBUYABLE.has(offer.reason)) continue;
       if (!best || offer.price < best.price) best = offer;
     }
     return best ?? queue.find((offer) => !offer.reason) ?? null;
@@ -517,7 +521,7 @@
     const rank = (offer) => (offer.game === priority ? 0 : 1);
     let best = null;
     for (const offer of queue) {
-      if (!offer.reason || offer.reason === 'level' || credits - offer.price < need) continue;
+      if (!offer.reason || UNBUYABLE.has(offer.reason) || credits - offer.price < need) continue;
       if (!best || rank(offer) < rank(best) || (rank(offer) === rank(best) && offer.price < best.price)) best = offer;
     }
     return best;
