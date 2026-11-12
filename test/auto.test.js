@@ -1347,3 +1347,24 @@ test('bumpLevel makes the auto bet size riskier by whole levels, within the limi
   assert.deepEqual(plan, { game: 'roulette', bet: 400 }, 'the limits (bet 400) still cap the bump');
   assert.deepEqual(A.autoGrindPlan(['roulette'], 1000, 20, { roulette: 1 }, { roulette: 0.027 }, { roulette: 752 }, levels, 1), { game: 'roulette', bet: 1000 });
 });
+
+test('wardrobePlan wears the dearest owned item and buys the cheapest missing one', () => {
+  const G = require('../src/games.js');
+  const wear = { frame: 'auto', color: 'auto', title: 'keep' };
+  const cosmetics = { owned: ['frame.bronze', 'frame.gold', 'color.green'], look: { frame: 'frame.bronze', color: 'color.green', title: null } };
+  const plan = A.wardrobePlan(G.COSMETICS, cosmetics, wear, { buyAll: true, onSale: (item) => !item.season });
+  assert.deepEqual(plan.equip, { kind: 'frame', id: 'frame.gold' });
+  assert.equal(plan.buy.id, 'title.intern');
+  assert.equal(A.wardrobePlan(G.COSMETICS, cosmetics, wear).buy, null);
+});
+
+test('wardrobePlan buys and wears an item picked by hand before the rest', () => {
+  const G = require('../src/games.js');
+  const wear = { frame: 'auto', color: 'auto', title: 'title.ceo' };
+  const cosmetics = { owned: [], look: {} };
+  const plan = A.wardrobePlan(G.COSMETICS, cosmetics, wear, { buyAll: true });
+  assert.equal(plan.equip, null);
+  assert.equal(plan.buy.id, 'title.ceo');
+  const owned = { owned: ['title.ceo', 'title.investor'], look: { title: 'title.investor' } };
+  assert.deepEqual(A.wardrobePlan(G.COSMETICS, owned, wear).equip, { kind: 'title', id: 'title.ceo' });
+});

@@ -82,6 +82,10 @@
     saveForUpgrades: true,
     spareUpgrades: true,
     firstGame: '', // game whose upgrades are bought first (shopPriority), '' for none
+    buyCosmetics: true, // buy every Šatna item from spare credits (wardrobeStep)
+    wearFrame: 'auto', // per kind: 'auto' (dearest owned), 'keep' or an item id
+    wearColor: 'auto',
+    wearTitle: 'auto',
     recordSpins: true,
     learnBlaze: true,
     captureDebug: false,
@@ -2089,7 +2093,9 @@
     if (!settings.buyUpgrades || !player) return (shopReview = null);
     const key = JSON.stringify([accountId, player.level, player.prestige, player.upgrades, resetPlanned(), blazeRule().mode, blazeRule().decided, settings.learnBlaze, settings.firstGame, Number(planXpRate()?.toFixed(3))]);
     if (shopReview?.key === key && Date.now() - shopReview.at < SHOP_REVIEW_MS) return shopReview;
-    const queue = G.shopQueue(G.UPGRADE_PLAN, player, upgradeSkip);
+    // Upgrades the plan leaves out come last and only ever as spare buys.
+    const extra = (offer) => G.UPGRADE_EXTRAS.some((e) => e.game === offer.game && e.key === offer.key);
+    const queue = G.shopQueue([...G.UPGRADE_PLAN, ...G.UPGRADE_EXTRAS], player, (offer) => (extra(offer) ? 'unplanned' : upgradeSkip(offer)));
     const goal = A.shopGoal(queue, shopPriority());
     const skipped = queue.filter((o) => o.reason && o.reason !== 'level').map((o) => `${o.game}:${o.key} ${o.reason}`);
     if (skipped.join() !== shopReview?.skipped.join() && skipped.length) log.info('upgrades_skipped', { skipped });
@@ -2239,6 +2245,48 @@
       log.info('upgrade_bought', offer);
     }
     return true;
+  }
+
+  // Šatna: wears the look picked per kind (the dearest owned item by default)
+  // and buys what is picked, or every item with buyCosmetics, cheapest first.
+  // Looks change no game, so an item is bought only from credits left over after
+  // the next upgrade buy (nextBuy) or, with none, after goalNeed. Seasonal items
+  // only sell while their weekend event runs, and nothing sells with a loan open.
+  async function wardrobeStep() {
+    if (!player.cosmetics || Date.now() - (claimTried.wardrobe ?? 0) < CRASH_POLL_MS) return false;
+    const event = A.weekendEvent();
+    const wear = { frame: settings.wearFrame, color: settings.wearColor, title: settings.wearTitle };
+    const plan = A.wardrobePlan(G.COSMETICS, player.cosmetics, wear, {
+      buyAll: settings.buyCosmetics,
+      onSale: (item) => !item.season || (event.active && event.key === item.season),
+    });
+    let path = null;
+    let body = null;
+    if (plan.equip) {
+      setStatus('statusWardrobeEquip', [plan.equip.id]);
+      [path, body] = ['/api/cosmetics/equip', plan.equip];
+    } else if (plan.buy && !player.loan && player.credits - plan.buy.price >= wardrobeNeed()) {
+      setStatus('statusWardrobeBuy', [plan.buy.name, credits(plan.buy.price)]);
+      [path, body] = ['/api/cosmetics/buy', { id: plan.buy.id }];
+    } else return false;
+    const res = await api(path, body);
+    if (!res.ok) {
+      claimTried.wardrobe = Date.now();
+      log.warn('wardrobe_failed', { path, ...body, status: res.status, error: res.data?.error });
+    } else {
+      log.info(plan.equip ? 'cosmetic_equipped' : 'cosmetic_bought', plan.equip ?? plan.buy);
+    }
+    return true;
+  }
+
+  // Credits a Šatna purchase must leave: what the next upgrade buy waits for
+  // (its price on top of the grind floor before the XP rate is measured), or
+  // with no upgrade left goalNeed.
+  function wardrobeNeed() {
+    const review = reviewShop();
+    const next = review ? nextBuy(review) : null;
+    if (!next) return goalNeed(null);
+    return next.need ?? grindFloor() + next.offer.price;
   }
 
   // Opening the boards is what checks the podium achievement (top 3 on any board).
@@ -2703,6 +2751,7 @@
     if (await levelLoanStep()) return;
     if (await loanCycleStep()) return;
     if (await buyStep()) return;
+    if (await wardrobeStep()) return;
     if (await leaderboardStep()) return;
     const games = settings.autoGames;
     if (games && (await crashStep())) return;

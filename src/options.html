@@ -17,6 +17,7 @@
         <button type="button" role="tab" id="tab-ai" aria-controls="panel-ai" data-i18n="tabAi"></button>
         <button type="button" role="tab" id="tab-auto" aria-controls="panel-auto" data-i18n="tabAuto"></button>
         <button type="button" role="tab" id="tab-games" aria-controls="panel-games" data-i18n="tabGames"></button>
+        <button type="button" role="tab" id="tab-wardrobe" aria-controls="panel-wardrobe" data-i18n="tabWardrobe"></button>
         <button type="button" role="tab" id="tab-profit" aria-controls="panel-profit" data-i18n="tabProfit"></button>
         <button type="button" role="tab" id="tab-data" aria-controls="panel-data" data-i18n="tabData"></button>
       </div>
@@ -310,6 +311,28 @@
           <h2 id="odds-heading" data-i18n="optionsOddsHeading"></h2>
           <p class="hint" data-i18n="optionsOddsHint"></p>
           <div id="oddsTables"></div>
+        </section>
+      </div>
+
+      <div role="tabpanel" id="panel-wardrobe" aria-labelledby="tab-wardrobe" tabindex="0" hidden>
+        <section class="card" aria-labelledby="wardrobe-heading">
+          <h2 id="wardrobe-heading" data-i18n="optionsWardrobeHeading"></h2>
+          <label class="check"><span data-i18n="optionsBuyCosmetics"></span><input type="checkbox" role="switch" name="buyCosmetics" /></label>
+          <div class="grid">
+            <div>
+              <label for="wearFrame" data-i18n="optionsWearFrame"></label>
+              <select id="wearFrame" name="wearFrame"></select>
+            </div>
+            <div>
+              <label for="wearColor" data-i18n="optionsWearColor"></label>
+              <select id="wearColor" name="wearColor"></select>
+            </div>
+            <div>
+              <label for="wearTitle" data-i18n="optionsWearTitle"></label>
+              <select id="wearTitle" name="wearTitle"></select>
+            </div>
+          </div>
+          <p class="hint" data-i18n="optionsWardrobeHint"></p>
         </section>
       </div>
 

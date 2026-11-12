@@ -257,7 +257,14 @@ progress shows at `chrome://on-device-internals`.
   the grinding budget, and achievement rewards offset the day's grinding loss. The slot
   achievements (wild, star, cascade and jackpot events) are left to the grinder: their
   chances are not modelled yet. Left out on purpose: Bug hned v prvním commitu and Dress
-  code pay nothing, and the wardrobe (Šatna, since 2026-10-24) only sells looks.
+  code pay nothing.
+- **Šatna** (wardrobe, since 2026-10-24, `/api/cosmetics/buy` and `/api/cosmetics/equip`,
+  `wardrobeStep`, settings tab Šatna): looks only, no effect on any game, catalog copied in
+  `G.COSMETICS`. Each kind (frame, name colour, title) wears the item picked for it, by
+  default the dearest one owned (`BotterAuto.wardrobePlan`). With **Buy every wardrobe item**
+  on (default) the cheapest item not owned is bought, an item picked to wear first, but
+  only from credits left after the next upgrade buy (`wardrobeNeed`), never with a loan
+  open, and seasonal items only on their weekend. Bought items survive a výpověď.
 - **Wheel of fortune** (Kolo štěstí, `/api/wheel/spin`): free once an hour, paid in
   multiples of the player's work pay (100 for Stážista up to 500 for Architekt) or a
   coffee that refills energy. It is spun 5 seconds after `player.wheelNextAt` has passed (a refused spin is retried after a minute), with the other free
@@ -468,9 +475,12 @@ progress shows at `chrome://on-device-internals`.
   round cheaper, and the credits held back would not be ground meanwhile either. On
   Forbes z Chánova, whose rounds swing about 10 bets, the cushion runs to hundreds of
   thousands and would stop both buying and grinding until work paid it.
-  Saving for the goal holds the same amount back from the grinder. `crash:sla` is never bought:
+  Saving for the goal holds the same amount back from the grinder. `crash:sla` is never a goal:
   Produkce padá's daily payout is too small to earn it back. `global:bets` (higher max bet) is not in the plan: XP per round
-  is proportional to the bet, so a bigger bet never buys XP cheaper. The whole plan is judged again every 10 minutes and as soon as the level, the
+  is proportional to the bet, so a bigger bet never buys XP cheaper. Every upgrade the plan leaves out
+  (`G.UPGRADE_EXTRAS`: those two, `blackjack:hint/double/soft17`, `slotingi:mint`) is queued after it as
+  `unplanned` and bought only as a spare upgrade (since 2026-11-12), so an account that earns ends up
+  owning every upgrade instead of an empty queue. The whole plan is judged again every 10 minutes and as soon as the level, the
   upgrades or the max bet change (`G.shopQueue` with `reviewShop` in `src/content.js`);
   the first entry worth buying at the current level is the goal, logged as
   `upgrade_goal`. With **Save for the next upgrade** (on by default) the grinder keeps

@@ -98,6 +98,52 @@
     return { game, key };
   });
 
+  // Every shop upgrade the plan leaves out (global:bets, crash:sla, the small
+  // blackjack and Slotingi ones), in catalog order. They are never a goal, only
+  // bought from spare credits once the plan has nothing better to buy.
+  const UPGRADE_EXTRAS = Object.entries(SHOP).flatMap(([game, items]) =>
+    Object.keys(items)
+      .filter((key) => !UPGRADE_PLAN.some((entry) => entry.game === game && entry.key === key))
+      .map((key) => ({ game, key })),
+  );
+
+  // Šatna (wardrobe) catalog copied from the client: looks only, no effect on
+  // any game. A seasonal item is sold only while its weekend event runs.
+  // Bought items stay through a výpověď.
+  const COSMETIC_KINDS = ['frame', 'color', 'title'];
+  const COSMETICS = [
+    ['frame', 'bronze', 'Bronzový', 5000],
+    ['frame', 'silver', 'Stříbrný', 15000],
+    ['frame', 'neon', 'Neonový', 30000],
+    ['frame', 'gold', 'Zlatý', 60000],
+    ['frame', 'fire', 'Hořící produkce', 120000],
+    ['frame', 'rgb', 'RGB jako herní PC', 250000],
+    ['frame', 'diamond', 'Diamantový', 750000],
+    ['frame', 'pumpkin', 'Dýňový', 20000, 'halloween'],
+    ['frame', 'cobweb', 'Pavučina', 40000, 'halloween'],
+    ['color', 'green', 'Firemní zelená', 2000],
+    ['color', 'bsod', 'Modrá jako BSOD', 3000],
+    ['color', 'prod', 'Červená jako produkce', 5000],
+    ['color', 'teams', 'Fialová jako Teams', 5000],
+    ['color', 'gold', 'Zlatá', 40000],
+    ['color', 'matrix', 'Matrix', 80000],
+    ['color', 'rainbow', 'Duhová', 200000],
+    ['color', 'pumpkin', 'Dýňová', 10000, 'halloween'],
+    ['color', 'ghost', 'Přízračná', 25000, 'halloween'],
+    ['title', 'intern', 'Věčný stážista', 2000],
+    ['title', 'works', 'U mě to funguje', 5000],
+    ['title', 'overflow', 'Full-stack Overflow', 10000],
+    ['title', 'prompt', 'Senior Prompt Engineer', 15000],
+    ['title', 'friday', 'Deployuje v pátek', 25000],
+    ['title', 'legacy', 'Architekt legacy', 40000],
+    ['title', 'tenx', '10× vývojář', 100000],
+    ['title', 'ceo', 'Budoucí CEO', 300000],
+    ['title', 'investor', 'Strategický investor kasina', 1000000],
+    ['title', 'closet', 'Kostlivec ve skříni', 15000, 'halloween'],
+    ['title', 'zombie', 'Zombie proces', 15000, 'halloween'],
+    ['title', 'ghost', 'Duch v produkci', 30000, 'halloween'],
+  ].map(([kind, key, name, price, season = null]) => ({ id: `${kind}.${key}`, kind, name, price, season }));
+
   // Price of buying the given upgrades of one game up to level upTo (default
   // their max), and the upgrades after that.
   function upgradeRest(upgrades, game, keys, upTo = Infinity) {
@@ -539,6 +585,9 @@
     PATH_GAME,
     SHOP,
     UPGRADE_PLAN,
+    UPGRADE_EXTRAS,
+    COSMETIC_KINDS,
+    COSMETICS,
     upgradeOffer,
     upgradeRest,
     shopQueue,

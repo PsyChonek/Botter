@@ -312,3 +312,10 @@ test('animationLockMs holds roulette, a Forbes trigger and free spins for as lon
   assert.equal(G.animationLockMs('/api/slot/spin', { outcome: { trigger: 4 } }), 0);
   assert.equal(G.animationLockMs('/api/roulette/spin', { pocket: '7' }), 4200);
 });
+
+test('UPGRADE_EXTRAS holds every shop upgrade the plan leaves out', () => {
+  const all = Object.entries(G.SHOP).flatMap(([game, items]) => Object.keys(items).map((key) => `${game}:${key}`));
+  const listed = [...G.UPGRADE_PLAN, ...G.UPGRADE_EXTRAS].map(({ game, key }) => `${game}:${key}`);
+  assert.deepEqual([...listed].sort(), [...all].sort());
+  assert.ok(listed.includes('global:bets') && listed.includes('crash:sla'));
+});

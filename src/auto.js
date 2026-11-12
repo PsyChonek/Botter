@@ -523,6 +523,34 @@
     return best;
   }
 
+  // Šatna step: { equip, buy }. catalog: BotterGames.COSMETICS; cosmetics: the
+  // player's { owned: ids, look: { kind: id or null } }; wear: { kind: 'auto' |
+  // 'keep' | item id }; buyAll: buy every item; onSale(item): sold right now.
+  // equip ({ kind, id }) is the first kind not wearing what it should: the item
+  // picked for it once owned, or under 'auto' the dearest owned item of the kind.
+  // buy is an item picked to wear that is not owned yet, or with buyAll the
+  // cheapest item not owned, or null. Whether it is affordable is left to the caller.
+  function wardrobePlan(catalog, cosmetics, wear, { buyAll = false, onSale = () => true } = {}) {
+    const owned = new Set(cosmetics?.owned ?? []);
+    const look = cosmetics?.look ?? {};
+    let equip = null;
+    for (const kind of Object.keys(wear)) {
+      const pick = wear[kind];
+      if (pick === 'keep') continue;
+      const mine = catalog.filter((item) => item.kind === kind && owned.has(item.id));
+      const id = pick === 'auto' ? (mine.sort((a, b) => b.price - a.price)[0]?.id ?? null) : owned.has(pick) ? pick : null;
+      if (id && look[kind] !== id) {
+        equip = { kind, id };
+        break;
+      }
+    }
+    const buyable = (item) => !owned.has(item.id) && onSale(item);
+    const picked = catalog.filter((item) => Object.values(wear).includes(item.id) && buyable(item));
+    const rest = buyAll ? catalog.filter(buyable) : [];
+    const buy = [...picked, ...rest].sort((a, b) => (picked.includes(b) - picked.includes(a)) || a.price - b.price)[0] ?? null;
+    return { equip, buy };
+  }
+
   // Bet levels XP grinding may use now: allowed by the limits, and under a daily
   // budget no bigger than what is left of it, so one lost round cannot overshoot.
   function grindBets(settings, credits, lostToday, levels) {
@@ -1416,6 +1444,7 @@
     upgradeHorizon,
     upgradeVerdict,
     shopGoal,
+    wardrobePlan,
     spareUpgrade,
     MARGIN_LEVELS,
     MARGIN_SIGMAS,

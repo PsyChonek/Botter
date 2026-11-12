@@ -21,6 +21,7 @@ const CHECKBOXES = [
   'buyUpgrades',
   'saveForUpgrades',
   'spareUpgrades',
+  'buyCosmetics',
   'recordSpins',
   'learnBlaze',
   'captureDebug',
@@ -30,7 +31,7 @@ const CHECKBOXES = [
   'rotateLottery',
   'playOnScreen',
 ];
-const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet', 'grindLimit', 'grindGame', 'firstGame', 'lotteryPick'];
+const SELECTS = ['aiSolver', 'model', 'effort', 'logLevel', 'rouletteBet', 'grindLimit', 'grindGame', 'firstGame', 'lotteryPick', 'wearFrame', 'wearColor', 'wearTitle'];
 const BET_SELECTS = ['gameBet', 'crashBet', 'grindBet', 'lotteryPrice'];
 const INT_SELECTS = [...BET_SELECTS, 'huntRoundsGoal', 'autoBetBump'];
 const TEXTS = ['openrouterModel', 'lotteryLines'];
@@ -83,6 +84,10 @@ const DEFAULTS = {
   saveForUpgrades: true,
   spareUpgrades: true,
   firstGame: '',
+  buyCosmetics: true,
+  wearFrame: 'auto',
+  wearColor: 'auto',
+  wearTitle: 'auto',
   recordSpins: true,
   learnBlaze: true,
   captureDebug: false,
@@ -143,6 +148,16 @@ field('grindGame').add(new Option(msg('grind_auto'), 'auto'));
 for (const game of G.GAME_KEYS) field('grindGame').add(new Option(msg(`game_${game}`), game));
 field('firstGame').add(new Option(msg('firstGame_none'), ''));
 for (const game of ['hotfix', 'blaze']) field('firstGame').add(new Option(msg(`game_${game}`), game));
+for (const kind of G.COSMETIC_KINDS) {
+  const select = field(`wear${kind[0].toUpperCase()}${kind.slice(1)}`);
+  select.add(new Option(msg('wear_auto'), 'auto'));
+  select.add(new Option(msg('wear_keep'), 'keep'));
+  const items = G.COSMETICS.filter((item) => item.kind === kind).sort((a, b) => a.price - b.price);
+  for (const item of items) {
+    const label = msg(item.season ? 'wearItemSeasonal' : 'wearItem', [item.name, num.format(item.price)]);
+    select.add(new Option(label, item.id));
+  }
+}
 
 async function load() {
   const { settings = {}, apiKey = '', openrouterKey = '', bank = {} } = await chrome.storage.local.get([

@@ -32,7 +32,8 @@ math says it pays, using exact odds models of each game at your account's upgrad
 | **AI fallback** | Unknown tickets go to on-device Gemini Nano (free, offline), the Claude API or any OpenRouter model. |
 | **Games** | Blaze 20 Wild, Skeleton Slots, Slotingi, Forbes z Chánova, roulette, blackjack, baccarat, Kostky, Case opening, Kniha mrtvého kódu and Hledání bugů, through the API or (for the older games) by pressing the real game screen's buttons. |
 | **Auto mode** | One switch. Claims the daily bonus, wheel and bailout, repays debt or declares bankruptcy when that is cheaper, runs the daily standup quests, hunts achievements, plays the lottery when it pays, and grinds XP on the lowest-edge game within a loss budget. |
-| **Upgrades** | Buys shop upgrades only when the XP still to grind earns the price back. |
+| **Upgrades** | Buys shop upgrades when the XP still to grind earns the price back, and every other upgrade from spare credits. |
+| **Šatna** | Buys every wardrobe item from spare credits and wears the most expensive one of each kind, or the one you pick. |
 | **Books** | Profit, return and XP per credit for every game, upgrade level and account. Roulette, baccarat, Kostky and Case opening results are checked against the model. |
 | **Accounts** | Saves logins, switches without logging out and rotates so every account's energy gets used, every account bets on a Produkce padá round that pays and buys its lottery tickets on random, weighted or your own numbers. |
 | **Bundle watch** | Spots a new casino deploy and flags any game table the models copied that changed. |
