@@ -5,28 +5,32 @@ The full description of every feature, model and setting. The short version is t
 
 ## How it works
 
-- `src/page-hook.js` runs in the page's own JS world before the app loads and
-  wraps `fetch`. It forwards every `/api/` response to the content script, tagged
-  with the user id (`sub`) decoded from the token the request was sent with, so
-  each response is booked to the right account.
-- `src/content.js` runs the loop: open the work screen, pick a ticket card,
-  choose an answer, click the app's own button, dismiss the result with Escape, repeat.
-  There are four ticket types: bug hunt (click the buggy line), "Co to vypíše?"
-  (pick the printed output), "Založ task" (read a help-desk message and pick type,
-  priority and team; the app submits it as one number, `type*100 + priority*10 + team`)
-  and "Přepiš kód" (retype a line of code character by character; the app blocks
-  pasting, so the bot types the line from the task at a quick typist's pace through the
-  input's native value setter and sends it with Enter). **Alternate** cycles through
-  all four, in auto mode too. "Přepiš kód" is never wrong, since its answer is in the
-  task, while a wrong answer on the others spends the energy without pay; pick it in
-  the panel to work only those.
-  When energy runs out it waits for the refill. It also dismisses the level-up
-  and daily-bonus modals, which would otherwise block the screen.
+- `server/src/runner.mjs` runs the bot for every saved account at once. Each account
+  gets its own Node vm context with `src/page-hook.js` and the bot scripts in it, pinned
+  to that account, with its own localStorage (session, pacing, learned speeds). The
+  scripts see `storage` (get, set, remove and onChanged over the shared store in
+  `/data/storage.json`), `i18n` (getMessage, locale) and `BotterHeadless` (the account,
+  the casino bundle address, `play` for the dashboard's live play, `solve` for the AI
+  solver, and `report` / `command` for the dashboard). The server has no dependencies.
+- `src/page-hook.js` runs in the account's context before the other scripts and
+  wraps `fetch`. It forwards every `/api/` response to `content.js`, tagged with the
+  user id (`sub`) decoded from the token the request was sent with, so each response
+  is booked to the right account, and it performs the bot's API calls with the
+  account's session.
+- `src/content.js` runs the loop: start a ticket through `/api/work/start`, choose an
+  answer, send it to `/api/work/submit`, repeat. There are four ticket types: bug hunt
+  (pick the buggy line), "Co to vypíše?" (pick the printed output), "Založ task" (read a
+  help-desk message and pick type, priority and team; the answer is sent as one number,
+  `type*100 + priority*10 + team`) and "Přepiš kód" (retype a line of code; the bot
+  sends the line from the task as text once a quick typist would have finished it).
+  **Alternate** cycles through all four, in auto mode too. "Přepiš kód" is never wrong,
+  since its answer is in the task, while a wrong answer on the others spends the energy
+  without pay; pick it in the Overview's Bot controls to work only those.
+  When energy runs out it waits for the refill.
 - **Max speed for work** (the same `maxSpeed` setting as games, since 2026-10-21;
   `workDwell` / `learnWork` in `src/content.js`, `workSpeedLearn` in `src/auto.js`):
-  no human delays, reading time or typing pace. A "Přepiš kód" line is entered at once,
-  since the server only sees the finished text, and the work screen is polled every
-  150 ms. Each ticket is submitted once it has been open for the least time learned for
+  no human delays, reading time or typing pace. A "Přepiš kód" line is sent at once,
+  since the server only sees the finished text. Each ticket is submitted once it has been open for the least time learned for
   its type, under `work:<type>` in the same `botter:speed` table as the game waits
   (starting at 0). A submit the server refuses raises that time to just past the one
   refused, by 150 ms, 300 ms, 600 ms and so on for each refusal of the same ticket, and
@@ -39,59 +43,46 @@ The full description of every feature, model and setting. The short version is t
   in both speed modes, with the same steps as the submit wait: a refused pick raises it
   just past the refused gap and is retried as soon as that has passed, 10 accepted in
   a row trim 50 ms. Refusals are logged as `work_start_learned`. Before this the bot
-  clicked the next card at once and retried a refusal after a fixed 3 s, so about
+  started the next ticket at once and retried a refusal after a fixed 3 s, so about
   every other start failed.
-- **Unloadable accounts**: a logged-in account whose profile (`/api/me`) fails three
-  times in a row is set aside for 30 minutes (`brokenUntil` on its saved record), and
-  the page switches back to the account it came from, else home, else any other saved
-  one. Rotation skips it until then, and a profile that loads clears it.
+- **Unloadable accounts**: an account whose profile (`/api/me`) fails three times in a
+  row is set aside for 30 minutes (`brokenUntil` on its saved record, shown as set aside
+  on the Accounts tab) and its bot waits; the other accounts carry on. A profile that
+  loads clears it.
 - The answer is chosen in this order:
   1. **Answer bank**: every submit response contains the correct answer
-     (`result.answer`), so each ticket is learned the first time it is seen,
-     whether the bot or you answered it. Output puzzles are stored by option text,
+     (`result.answer`), so each ticket is learned the first time it is seen.
+     Output puzzles are stored by option text,
      so a reshuffled copy of the same puzzle still matches. "Založ task" tickets are
      stored by sender and message.
-  2. **AI solver**, chosen in settings:
-     - **On-device AI** (default): Chrome's built-in Prompt API with Gemini Nano
-       (`src/local-model.js`), JSON-constrained to `{"index": n}` (one index per field for tickets). Free, offline, no key.
-       It runs in the service worker if Chrome exposes `LanguageModel` there, otherwise
-       in an offscreen document (`src/offscreen.html`). Requires Chrome 138+, about 22 GB
-       free disk and a GPU with more than 4 GB VRAM or 16 GB RAM. The first download
-       needs a click, so use **Download the model** in the settings (AI tab) once.
-       It is a small model: expect noticeably more misses than Claude on tricky
-       "what does it print" puzzles.
-     - **Claude API**: `src/background.js` calls the Messages API with structured
-       output. Default model `claude-opus-5-5` at `medium` effort. Needs an API key.
+  2. **AI solver** (Settings, AI solver; off by default, a stored `local` from the
+     old on-device solver counts as off), in `server/src/solver.mjs`:
+     - **Claude API**: calls the Messages API with structured output. Default model
+       `claude-opus-5-5` at `medium` effort. Needs an API key.
      - **OpenRouter**: any model ID from openrouter.ai/models (default
        `google/gemini-2.5-flash`). Sends a `json_schema` response format; models
        that ignore it still work because the answer parser accepts a number in prose.
 
-If the on-device model reports "not supported" or "The feature flag gating model
-execution was disabled", open `chrome://flags`, set **Enables optimization guide on
-device** to **Enabled BypassPerfRequirement** and **Prompt API for Gemini Nano** to
-**Enabled**, relaunch Chrome and press **Download the model** again. Download
-progress shows at `chrome://on-device-internals`.
+     The keys are kept on the server like saved logins: the dashboard only shows a
+     placeholder and the key fields take a new key, never show the old one.
   3. **Guess** (optional): a random valid choice. A wrong answer costs energy
      but teaches the bank.
 - **Game bot** (`src/games.js`, game loop in `src/content.js`): plays Blaze 20 Wild,
   Skeleton Slots, Slotingi, Forbes z Chánova, Roulette (one outside bet, red by default),
   Blackjack (follows the table's own hint) and Baccarat (Bankéř, see below) through the casino API. The page hook performs the
-  calls with the session the app already holds (supabase session in localStorage,
-  falling back to the last Authorization header the app sent), so the bot never
-  sends the token anywhere itself (saved sessions for account switching are
-  described under Accounts). The game screen does not animate, but after every bot
-  round the hook hands the fresh player snapshot to the app's own state, so the
-  credits, XP bar and level in the top bar update live. Guardrails: stop-loss and take-profit per
+  calls with the account's supabase session from its localStorage, which the server
+  refreshes, so the bot code never handles the token (saved sessions are described
+  under Accounts). Guardrails: stop-loss and take-profit per
   session, a credit reserve, and the game's unlock level. With both bots on, work
   goes first and games fill the time while energy refills.
-- **Minimum time between game requests** (settings Games tab, 1,500 ms by default,
+- **Minimum time between game requests** (Settings, Games, 1,500 ms by default,
   `gameDelayMs`): every game request (a round, a blackjack move, Forbes free spins, a
-  lottery ticket, a round on the game screen) starts at least this long after the last
-  one. It is enforced in one place (`pace` in `src/content.js`) and the last start is
-  kept in the page's localStorage, which every casino tab shares, so a second tab
-  cannot double the speed. The bot ticks every 700 ms, which is the floor below that.
+  lottery ticket) starts at least this long after the last one of that account. It is
+  enforced in one place (`pace` in `src/content.js`) and the last start is kept in the
+  account's own localStorage (`botter:nextGameAt`), so a restart never plays faster.
+  The bot ticks every 700 ms, which is the floor below that.
   Since 2026-10-17 the server does not let any game play faster than its animations.
-- **Max speed** (settings Games tab, on by default since 2026-10-20, `maxSpeed`):
+- **Max speed** (Settings, Games, on by default since 2026-10-20, `maxSpeed`):
   instead of that minimum, a game request waits only as long after the last game
   response as the server takes. The wait is learned per path of that response
   (`speedWait` / `speedLearn` in `src/auto.js`, `learnSpeed` in `src/content.js`):
@@ -111,15 +102,15 @@ progress shows at `chrome://on-device-internals`.
   "počkej na animaci" counted, so mines kept trimming its wait and every start, reveal
   and cashout was refused twice. No refusal teaches more than 5 s of extra, nor more
   than 1 s from its hint, and rows past 5 s (the start gap too) are dropped when the
-  page loads (`speedClean`, since 2026-11-06): a refusal 30 s after a roulette spin had
+  account's context starts (`speedClean`, since 2026-11-06): a refusal 30 s after a roulette spin had
   taught a 25.8 s floor, and since trimming below a floor waits for up to 640 accepted
   per 50 ms, roulette ran at 29.5 s a spin and levelling all but stopped from 2026-11-03.
   A refused request is retried after its hint plus 30 ms
   when it has one, else after 150 ms, 300 ms, 600 ms and so on (6
   times) instead of the 30 s the server asks for, and only first attempts teach the
   wait, so one long animation does not slow every later round. A step that played
-  runs again at once instead of on the next tick. The learned waits sit in the page's
-  localStorage (`botter:speed`), shared by every casino tab, and refusals are logged
+  runs again at once instead of on the next tick. The learned waits sit in each
+  account's own localStorage (`botter:speed`), so every account learns its own, and refusals are logged
   as `speed_learned`. Off, the minimum above applies and known animations are held
   1 s longer.
 - **Rate limits** (`api` in `src/content.js`, `rateLimitWait` in `src/auto.js`): a bot
@@ -129,7 +120,7 @@ progress shows at `chrome://on-device-internals`.
   milliseconds in the seconds fields, so a number above 30 is read as ms, since
   2026-10-25 when "Zpomal trochu." with 233 cost every work start 30 s) and is sent again,
   up to 3 times, logged as `rate_limit_retry` and finally `rate_limited`. A game
-  request's wait also holds the next game request of every tab. Before this, such a
+  request's wait also holds that account's next game request. Before this, such a
   rejection counted as a failed round and paused that step for 10 minutes. The log
   line carries the server's own hint (`hint`: `Retry-After` or the body's field).
 - **Animation lock** (`animationLockMs` in `src/games.js`, applied in `onResponse`
@@ -137,35 +128,24 @@ progress shows at `chrome://on-device-internals`.
   2026-10-20) and on Forbes z Chánova after a spin that triggers free spins and again
   after the free spins, the server turns every game request away until the app would have
   animated them ("počkej na animaci", a 429 whose wait is always 30 s, so it says
-  nothing about the real lock). Any such response (the bot's or the app's) holds the
-  next game request of every tab for the app's animation time plus 1 s, from the
+  nothing about the real lock). Any such response holds the
+  account's next game request for the app's animation time plus 1 s, from the
   app's own timings: about 10 s before the free-spin pick, when the app shows it to
   a player. After free spins the hold stops at 32 s (`ANIM_LOCK_MAX_MS`), because
   the server has always let the next spin through by then while the app's
   animation of a long free-spin game runs past a minute.
-- **Speed and server responses** (settings Games tab): game requests in the last
+- **Speed and server responses** (Statistics, Server speed): game requests in the last
   minute and the average gap between the last 20 against the minimum set, all API
-  responses (the app's and the bot's) in the last minute, then per path the responses
+  responses in the last minute, then per path the responses
   seen, the bot's own calls, errors, rate limits / retries and the bot's average
-  response time, and the last 20 errors. The content script keeps the figures in
+  response time, and the last 20 errors. The bot keeps the figures in
   `net`, saves them every 5 seconds while they change, and **Reset** starts over.
 - **Fewer reads**: Produkce padá is read once a minute only while a round runs and the
   bot has no bet in it; with a bet every 10 minutes, and after the round has crashed
   not again until the next 9:00 deploy. The profile (`/api/me`) is read only when
   no response has given the player yet.
-- **Play on the game screen** (panel toggle, also in the settings Games tab, off by
-  default; `src/screen.js`): every round the bot plays (game bot, grinder, standup)
-  goes through the app's own game screen instead of the API. It opens the game from
-  the lobby, sets the bet with the +/- buttons (roulette, baccarat and Kostky: clears
-  the table and lays chips on the spot), presses spin, open, deal, roll or
-  hit/stand/double (Forbes: also the free-spin pick), and waits until the screen is
-  idle again, so reels, cards, cases and dice animate as if you played. The result is
-  the app's own response, booked like a manual round. Every game has screen play since
-  2026-10-19; bets the screen has no spot for (a straight roulette number, Kostky
-  spots other than the main row and the sums) and Forbes spins with **Forbes force**
-  go through the API. It is several times slower per round than the API, so leave it
-  off for grinding.
-- **Auto mode** (`src/auto.js`, one toggle in the panel) runs everything in order of
+- **Auto mode** (`src/auto.js`, one switch per account in the account strip and the
+  Overview's Bot controls) runs everything in order of
   value each tick: declare personal bankruptcy when it is cheaper than paying (see
   below), claim the daily bonus, the free hourly wheel of fortune and the bailout,
   repay debt (8 %/h compounding
@@ -194,15 +174,15 @@ progress shows at `chrome://on-device-internals`.
   `grindBet` 0): each game may bet at most the credits above the reserve, less what a
   loan still owes, over 185 standard deviations of one round (`A.autoBetCap`), so
   Forbes z Chánova (sd about 6.5 bets) keeps about 1,200 bets behind it and roulette
-  185. **Auto bet size risk** (`autoBetBump`, Auto tab, since 2026-11-06 default one
+  185. **Auto bet size risk** (`autoBetBump`, Settings, Auto mode, since 2026-11-06 default one
   level higher): the auto size is moved that many bet levels up (`A.bumpLevel`), never
   past what the limits allow, so roulette on 139,000 credits bets 1,000 instead of 400.
   A game that swings too hard for the credits
   gives way to the next cheapest (`A.autoGrindPlan`), and with nothing that fits the
-  grinder waits. The panel shows each game's XP per credit and loss per XP
+  grinder waits. Account books show each game's XP per credit and loss per XP
   measured from its tracked rounds, for information only. Near a limit the grinder
   steps down to a smaller bet; under a daily budget it never bets more than what is
-  left of it. With **Grind only while the level pays** (`grindPays`, Auto tab, on by
+  left of it. With **Grind only while the level pays** (`grindPays`, Settings, Auto mode, on by
   default) the grinder holds while the XP left in the level is expected to lose more
   than the next level-up reward (`levelCost` in `src/auto.js`): the XP over the plain
   XP rate (the Hackathon +50 % counted while it is on) times the game's edge. The
@@ -210,11 +190,10 @@ progress shows at `chrome://on-device-internals`.
   (`stats.combos`) once that is worse than the model by more than two standard
   errors, then its lower bound (`pricedEdge`). The XP curve grows as level^1.35 and
   the reward only linearly, so at about 1 credit per XP leveling stops paying near
-  level 38. A held account logs `grind_level_unpaid`, says so in the status, works its
-  energy without waiting for the grinder, and rotation skips it until it levels up
-  some other way (work XP). A planned bankruptcy wipes the credits anyway, so the
+  level 38. A held account logs `grind_level_unpaid`, says so in the status and works its
+  energy without waiting for the grinder until it levels up some other way (work XP). A planned bankruptcy wipes the credits anyway, so the
   grinder does not hold then. Before the XP rate is measured it grinds to measure it.
-- **Daily standup** (Dnešní standup, settings Auto tab, on by default): three quests a
+- **Daily standup** (Dnešní standup, Settings, Auto mode, on by default): three quests a
   day in `player.quests`, such as spinning a game 25 times, wagering 2,500 credits or
   finishing 10 rounds ahead. The server tracks the progress and pays each reward (about
   480) as soon as a quest is done, plus a bonus for all three and the Standup achievement
@@ -222,7 +201,7 @@ progress shows at `chrome://on-device-internals`.
   from the quest text and plays it before work when its expected loss is below its
   reward (`standupPlan` in `src/auto.js`): game rounds at the smallest bet, a wager on
   the lowest-edge game at the biggest bet that does not overshoot, rounds ahead on the
-  game where the simulated share of rounds that end ahead (see Odds in the settings)
+  game where the simulated share of rounds that end ahead (see Statistics, Odds)
   makes them cheapest, and a big / mega / super win (a round paying 10x / 25x / 50x the
   bet, as in the client's big_fish achievement) at the smallest bet on the slot where the
   simulated chance of one makes it cheapest; roulette and blackjack never pay one. The
@@ -231,7 +210,7 @@ progress shows at `chrome://on-device-internals`.
   rewards are booked as free income, kept out of game and work profit, and the standup
   reward offsets the day's grinding loss. Quests it cannot read, crash quests and ones
   on a locked game are skipped and logged as `standup_skipped`.
-- **Achievement hunt** (settings Auto tab, on by default; `huntPlan` in `src/auto.js`):
+- **Achievement hunt** (Settings, Auto mode, on by default; `huntPlan` in `src/auto.js`):
   goes after the credit achievements the bot can steer, read from `player.achievements`,
   and only while the reward beats the expected loss. Each round is valued at the
   rewards it can unlock times their chance and played at the smallest bet on the game
@@ -259,7 +238,7 @@ progress shows at `chrome://on-device-internals`.
   chances are not modelled yet. Left out on purpose: Bug hned v prvním commitu and Dress
   code pay nothing.
 - **Šatna** (wardrobe, since 2026-10-24, `/api/cosmetics/buy` and `/api/cosmetics/equip`,
-  `wardrobeStep`, settings tab Šatna): looks only, no effect on any game, catalog copied in
+  `wardrobeStep`, Settings, Šatna): looks only, no effect on any game, catalog copied in
   `G.COSMETICS`. Each kind (frame, name colour, title) wears the item picked for it, by
   default the dearest one owned (`BotterAuto.wardrobePlan`). With **Buy every wardrobe item**
   on (default) the cheapest item not owned is bought, an item picked to wear first, but
@@ -268,9 +247,8 @@ progress shows at `chrome://on-device-internals`.
 - **Wheel of fortune** (Kolo štěstí, `/api/wheel/spin`): free once an hour, paid in
   multiples of the player's work pay (100 for Stážista up to 500 for Architekt) or a
   coffee that refills energy. It is spun 5 seconds after `player.wheelNextAt` has passed (a refused spin is retried after a minute), with the other free
-  claims (also outside auto mode), and booked as free income. Account rotation visits
-  another account whose wheel is ready, right after accounts not seen today.
-- **Výpověď** (prestige, `/api/profile/prestige`, `prestigeStep`, settings Auto tab
+  claims (also outside auto mode), and booked as free income. Every account spins its own.
+- **Výpověď** (prestige, `/api/profile/prestige`, `prestigeStep`, Settings, Auto mode
   **Hand in a výpověď at level 40**, on by default): handed in as soon as the account
   reaches level 40, before anything else in the auto step, while it has fewer than five
   (the XP bonus stops at +50 %) and no loan open (`G.prestigeReady`). It wipes level,
@@ -283,8 +261,6 @@ progress shows at `chrome://on-device-internals`.
     (no reserve, daily budget or minimum balance), **Grind only while the level pays**
     and the XP weekend hold are ignored, and no upgrade is bought or saved for and
     no level or cycle loan taken, as a loan open at 40 would hold the výpověď back.
-    Saved accounts keep their prestige and XP in their snapshot, so rotation judges
-    them the same way, priced at the logged-in account's XP price.
   - With all five handed in (`G.prestigeMaxed`, since 2026-11-09) nothing wipes the
     upgrades again and leveling keeps paying to about level 160 on roulette, so
     upgrades pay back over 30 levels instead of 10 (`A.upgradeHorizon`) and only that
@@ -300,7 +276,7 @@ progress shows at `chrome://on-device-internals`.
     if the server pays it clearly less than the model, the grinder goes back to
     roulette on its own. A level loan is not taken while an upgrade fits
     (`shopOffer`), so the shop gets its turn between two loans.
-- **Personal bankruptcy** (Insolvence, `/api/loan/bankrupt`, settings Auto tab, on by
+- **Personal bankruptcy** (Insolvence, `/api/loan/bankrupt`, Settings, Auto mode, on by
   default): offered only in execution. The debt is wiped and credits are set to 500,
   but the XP into the current level is lost, as are this week's sprint points, and
   the shark lends nothing for a week (the clean-loan trick waits). Paying costs the
@@ -362,22 +338,24 @@ progress shows at `chrome://on-device-internals`.
   expected loss, always at the cheapest price. That means five tickets a draw until 3
   numbers hit once, then one ticket a draw for the draws-played tiers, then none. Ticket
   purchases and the payouts of each draw are booked as the Lottery game.
-  - "Feeling lucky" (settings, Auto tab, off by default; `luckyPlan`) buys a set number
+  - "Feeling lucky" (Settings, Auto mode, off by default; `luckyPlan`) buys a set number
     of tickets (1 to 5) every draw at a chosen price, or the biggest affordable one
     below it, whatever they are worth. It keeps the reserve and runs without the hunt;
     with the hunt on, the hunt can still add cheap tickets up to five.
-  - **Ticket numbers** (settings, Auto tab; `lotteryNumbers` in `src/auto.js`) apply to
+  - **Ticket numbers** (Settings, Auto mode; `lotteryNumbers` in `src/auto.js`) apply to
     every ticket the bot buys: random for every ticket (default), my numbers for each
     ticket (one line per ticket in buying order, six different numbers from 1 to 49;
-    a blank or invalid line is bought on random numbers and the settings page names
-    the bad lines), or random weighted toward the numbers drawn most or least often in
+    a blank or invalid line is bought on random numbers and Settings names the bad
+    lines), or random weighted toward the numbers drawn most or least often in
     the recent draws the lottery screen lists. Every ticket has the same odds, so this
     only chooses which numbers are held.
-- **Auto mode switches** (panel, all on by default): Games (crash, lottery, standup,
-  wins-bonus bets, achievement hunt and XP grinding), Work, Wheel (the free
-  hourly spin; the daily bonus and bailout stay), Achievements (the hunt) and Sprint (when off, bankruptcy and the loan cycle
-  no longer wait to protect a sprint podium). With Games and Work off the bot still
-  claims, repays, buys and rotates accounts.
+- **Auto mode parts** (Settings, Auto mode, all on by default, shared by every account):
+  under What Auto does, Work (`autoWork`), Games (`autoGames`: crash, lottery, standup,
+  wins-bonus bets, achievement hunt and XP grinding) and Wheel (`autoWheel`, the free
+  hourly spin; the daily bonus and bailout stay); the hunt (`achievementHunt`) under
+  quests; and the sprint hold (`sprintProtect`, under loans: when off, bankruptcy and the
+  loan cycle no longer wait to protect a sprint podium). With Games and Work off the bot
+  still claims, repays and buys.
 - **Payroll fund** (Mzdový fond, since 2026-10-15): 0.5 % of every bet goes into a
   shared fund that can drop on any bet. Every bet the bot places takes part anyway, so
   there is no separate fund mode (removed 2026-10-19); a fund win is booked as free
@@ -430,12 +408,13 @@ progress shows at `chrome://on-device-internals`.
     budget is kept, and on the weekend those budgets plus one per weekend day are
     pooled against the weekend's loss (`grindBudget`). Under the balance or no limit
     the held credits simply wait for the weekend.
-    **Hold XP grinding before XP weekends** (`grindEventHold`, Auto tab, on by default)
+    **Hold XP grinding before XP weekends** (`grindEventHold`, Settings, Auto mode, on by default)
     switches this hold off, for when levels are worth more than the credits saved,
     such as racing to a výpověď.
   - Teambuilding needs nothing: the wheel is spun anyway.
-- **Settings for the rest** (settings, Auto tab): XP grinding game (cheapest
-  per XP or a fixed game), bet (a fixed level, 20 by default); automatic shop purchases from
+- **Settings for the rest**: XP grinding game (cheapest per XP or a fixed game) and
+  bet (a fixed level, 20 by default) in Settings, Auto mode; automatic shop purchases
+  (Settings, Upgrades) from
   a priority plan (`game:key` list, off by default) using the client's price and
   level formulas. A plan entry is skipped when it is not worth its price
   (`upgradeVerdict` in `src/auto.js`): it adds less than 0.5 % return per 10,000
@@ -451,7 +430,7 @@ progress shows at `chrome://on-device-internals`.
   without buying anything, since an upgrade of a game left behind at the next unlock
   stops paying; while the recorded Blaze spins have not settled the star rule and
   the two rules point at different final games and learning is on, nothing is bought, and with **Learn
-  the Blaze star rule** (Auto tab, on by default) the grinder plays Blaze at the
+  the Blaze star rule** (Settings, Auto mode, on by default) the grinder plays Blaze at the
   smallest bet, within its limits, until they do. A tie over 1,000 spins counts as
   settled on per reel: the model expects 1 deciding spin in 110, so none means stars
   do not stack on a reel and both rules pay the same; 2,000 recorded spins showed
@@ -486,7 +465,7 @@ progress shows at `chrome://on-device-internals`.
   `upgrade_goal`. With **Save for the next upgrade** (on by default) the grinder keeps
   the goal's price on top of the reserve, so work pay saves up to it instead of being
   ground away (not past a planned bankruptcy, which wipes the savings). Once bought, the
-  next goal is bought on the next tick if it fits too. The panel's **Upgrade queue**
+  next goal is bought on the next tick if it fits too. The **Upgrade queue** in Account books
   shows the next upgrade (the goal, or with none the first spare one), its price, the
   balance it is bought at (the floor, the price and the leveling cushion) and how much is
   still missing, then why every other upgrade waits. With
@@ -500,21 +479,21 @@ progress shows at `chrome://on-device-internals`.
   with its board and the server win, reports which scatter rule reproduces the
   server and simulates the payout rate for current and maxed upgrades; and a debug
   capture of raw loan, crash, shop, leaderboard and bonus responses for export.
-- **Profit tracking**: every game response (bot or manual play) is booked per game
+- **Profit tracking**: every game response is booked per game
   from the credit balance before and after, plus anything the debt collector took
-  from the win. The panel shows rounds, net and return rate per game, counted from the
+  from the win. Account books show rounds, net and return rate per game, counted from the
   account's last výpověď and each game from its last upgrade (bought by the bot or by
   hand; the bet limits do not count), so a row shows the return of what is played now
   (`stats.profitBase`, `G.profitBase`, since 2026-10-20; the first base started each
-  game at its current upgrade level). The settings
-  Profit tab keeps every round: wagered, returned, net, return rate, net per round and XP, plus credits
+  game at its current upgrade level). Statistics,
+  Profit keeps every round, per account or summed over all of them: wagered, returned, net, return rate, net per round and XP, plus credits
   earned per work ticket. Crash bets are booked when they settle, from the round's bet list.
   Every round of a game with an odds model is also booked under the upgrade levels it
-  was played with (`stats.combos`, keyed by `BotterOdds.combo`), and the Profit tab's
-  **Profit per upgrade level** table shows each combination's rounds, wagered, net,
+  was played with (`stats.combos`, keyed by `BotterOdds.combo`), and the
+  **Profit per upgrade level** table under it shows each combination's rounds, wagered, net,
   measured return and the return the model gives it (Blaze on the per reel rule), so an
   upgrade can be checked against what it promised.
-  The **Roulette check** table below it splits roulette's measured return into its
+  The **Roulette check** (Statistics, Model checks) splits roulette's measured return into its
   causes, per zeros level (`stats.roulette`, `G.addRouletteSpin`): zero pockets seen
   against the wheel's share, what the server paid against what the client's rules pay
   on that wheel (with how many standard deviations apart, so luck and a changed wheel
@@ -525,19 +504,19 @@ progress shows at `chrome://on-device-internals`.
   server, so its stats start over too: profit, XP per game, free income and the
   achievement flags, so the clean-loan trick and the podium run again. Only the submit
   dwell times are kept.
-- **Levels** (settings, Profit tab): the XP each level needs (`player.xpNeed`) and
+- **Levels** (Statistics, Levels): the XP each level needs (`player.xpNeed`) and
   the credits paid on reaching it (`levelUp.reward`), recorded from every response of
   every account into one shared `levels` table (`G.recordLevel`), with the growth over
   the level below and the daily bonus at a 7-day streak (the client's formula,
   `G.dailyBonus`: each level adds 10 % of the base, 15 % from level 5). The server
   sends both numbers only for the current level, so the curve fills in as accounts
   level up. Level-ups are logged as `level_up`.
-- **Odds per upgrade** (settings, Games tab): for every game and every combination of
+- **Odds per upgrade** (Statistics, Odds): for every game and every combination of
   its shop upgrades the return to player, the share of rounds won (more back than the
   bet), the chance that 1,000 rounds end ahead and the return on a Konec kvartálu
   weekend, all from the simulation in `scripts/odds.mjs`. Roulette is an even-money bet, blackjack the bot's own strategy,
   Blaze is listed per scatter rule; once the recorded spins settle the rule, the other
-  table is marked as ruled out. The current account's upgrades are marked.
+  table is marked as ruled out. The upgrades of the account seen last are marked.
 - **Forbes z Chánova** (from level 13): a Megaways slot with cascades, the Hotfix
   wheel of modifiers and free spins on 4+ incidents. When free spins start, the bot
   plays them at once with Postupný rollout (`HOTFIX_CHOICE`), and free spins left
@@ -545,7 +524,7 @@ progress shows at `chrome://on-device-internals`.
   sees them, whatever else it plans (`hotfixFreeStep`): they cost nothing and block
   every Forbes spin until they are played. It is played by the
   grinder, by the game bot when picked there, and by the **Forbes z Chánova test**
-  (panel, More), started by hand: 500 spins at the smallest bet in auto mode with games
+  (the start button in Account books, per account), started by hand: 500 spins at the smallest bet in auto mode with games
   on, keeping the reserve (`hotfixTestStep`).
   The 2026-10-17 update retuned it: fewer rows (weights 25 / 30 / 20 / 13 / 8 / 4 for 2
   to 7), pays 0.97 x [25-50] up to [110-1400] % of the bet per way, the incident weight
@@ -573,9 +552,9 @@ progress shows at `chrome://on-device-internals`.
   deviations), and the modifier sizes stayed inside the client's ranges. The
   measured return, 74.3 %, is 0.6 deviations below the model's 100.7 %: luck at that
   sample size, not a mismatch.
-  Every spin and free-spin response, from the bot or played by hand, is
+  Every spin and free-spin response is
   recorded (`hotfixRounds`, up to 800, free-spin games kept first) and can be exported
-  from the settings (Data tab) to settle those against the server.
+  from Settings, Data and backup to settle those against the server.
   `node scripts/hotfix-check.mjs <export>... [--spins N]` does that (several exports
   count each round once): it recomputes every
   cascade step's wins from its grid, checks row heights and symbol weights on clean
@@ -587,7 +566,7 @@ progress shows at `chrome://on-device-internals`.
   sync copies wilds onto reel 6) were used until the client gave its own; it also
   measured the wheel at 9.4 % against the client's 7 % then (46 of 491, 2 deviations
   above), so the server may pay more than the model.
-  **Forbes force** (panel, More, off by default) sends the server's test switch `force` on
+  **Forbes force** (Settings, Games, off by default, `hotfixForce` and `hotfixForceValue`) sends the server's test switch `force` on
   every Forbes spin the bot plays (the client has the field but never sets it). The
   value field is read as JSON (`4`, `true`, `"free"`), anything else is sent as text,
   and an empty field sends `true`. Forced spins are booked and recorded like any
@@ -611,9 +590,9 @@ progress shows at `chrome://on-device-internals`.
 
   The tie bet returns 85.9 % and a pair bet 84.6 % (11 / 13), so they are only
   played for their achievements. Smírčí řízení alone is the cheapest gain (+4.8 %
-  for 25,000) but still leaves baccarat behind fully upgraded roulette. Every hand,
-  from the bot or played by hand, is checked against the model per upgrade
-  combination (`stats.baccarat`, the **Baccarat check** on the Profit tab): winners
+  for 25,000) but still leaves baccarat behind fully upgraded roulette. Every hand
+  is checked against the model per upgrade
+  combination (`stats.baccarat`, the **Baccarat check** in Statistics, Model checks): winners
   and pairs seen against the model, the server's return against the client's pays,
   the hidden cost, hands dealt against the drawing rules and payouts off the pays
   (which shows whether the cut is also taken from tie and pair wins).
@@ -647,7 +626,7 @@ progress shows at `chrome://on-device-internals`.
   500). Every roll is checked per upgrade combination (`stats.dice`): triples against 1
   in 36, faces per die and payouts off the model's commission rule, logged as
   `dice_payout_mismatch` when a roll pays more than a credit off.
-  Both checks are on the Profit tab (**Dice and Case opening check**).
+  Both checks are in Statistics, Model checks (**Dice and Case opening check**).
 - **Kniha mrtvého kódu** (from level 30, `src/egypt.js`, since 2026-10-21): a Book of
   Ra style slot, 5 reels of 3 and 10 lines left to right. Every cell is drawn on its
   own by weight (scarab and cobra 24, urn 23, cat and eye 19, anubis and horus 6, mummy
@@ -682,96 +661,66 @@ progress shows at `chrome://on-device-internals`.
   even with its affordable upgrades, and maxed it stays under roulette and Kostky, so
   the plan never buys its upgrades. Its value is the hunt: 17,500 credits of
   achievements for under 1,000 credits of expected loss at the smallest bet.
-- **XP per game** (panel): for each unlocked game and the next one to unlock, the house
+- **XP per game** (Account books): for each unlocked game and the next one to unlock, the house
   edge the grinder plans with, credits lost per XP point and its state (locked or
   playing at the chosen bet). The row the grinder plays next is highlighted.
-- A small panel in the bottom-left corner of the page (300 px wide, no table wider
-  than four columns) has the auto switch, the account, the status line, Start/Stop
-  for work and for games with the ticket type and the game, and the auto mode parts
-  as chips. Below them are collapsible sections, which stay open or closed across
-  reloads (`panelOpen`): **Profit** (net and return per game since its last upgrade,
-  work, bonuses summed, a total, all since the last výpověď; rounds in the row tooltip), **XP per game** (unlocked games and the next
-  unlock only), **Upgrade queue** and **More** (play on the game
-  screen, the Forbes z Chánova test, Forbes force, answer accuracy and AI cost).
-  Longer explanations are tooltips. A bundle update shows as one small line at the
-  bottom. **Hide** collapses it to a small Botter button in the same corner
-  (highlighted while a bot runs); click it to bring the panel back. The same switch is
-  in the settings (Bot tab).
+- **Dashboard controls**: Auto, Work, Games, the ticket type and the game are kept per
+  account under `run:<user id>` (`RUN_KEYS` in `src/content.js`); every other setting is
+  shared under `settings`. An account with no run state yet starts from the shared
+  values. The Overview's **Bot controls** card has a row per account with its Auto
+  switch, Work with the ticket type and Games with the game; the manual switches are off
+  while Auto runs. Every account card in the account strip has its Auto switch too, and
+  **Auto on every account** switches all of them. The switches go to the account's bot
+  through `POST /api/bot/command` (`{account, command, value}`, commands `auto`, `work`,
+  `games`, `taskType`, `game` and `hotfixTest`). **Account books** shows one account at a
+  time, picked above it: **Profit** (net and return per game since its last upgrade,
+  work, bonuses summed, a total, all since the last výpověď), **XP per game**, the
+  **Upgrade queue**, the Forbes z Chánova test, the bank and answer counters and the AI
+  cost. A bundle a model no longer matches shows as a banner over every tab.
 - **Accounts**: stats, profit, achievement flags (clean loan, leaderboards) and the
   daily XP budget are kept per account under `stats:<user id>`; the answer bank and
   settings are shared. Stats from before this existed go to the first account that
-  logs in. The content script saves each account's supabase session (the
-  `sb-*-auth-token` entry in the page's localStorage) under `account:<user id>` in
-  `chrome.storage.local`, together with a snapshot of its level, credits and energy.
-  - **Add** in the panel saves the current session, removes it from the page without
-    logging out and reloads to the login screen. Never use the casino's own Log out
-    to switch: it signs out with scope `global`, which revokes every session of that
-    account on the server, so the saved copy dies too.
+  logs in. The bot saves each account's supabase session (the `sb-*-auth-token` entry
+  in the account's localStorage) under `account:<user id>` in the shared storage,
+  together with a snapshot of its level, credits and energy. Accounts are added with
+  the GitHub or e-mail sign-in on the Accounts tab, or from a backup.
+  - Every saved account runs at once in its own context, so there is no switching and
+    no rotation: each account works its own energy, grinds, claims its wheel, bets on
+    Produkce padá and buys its lottery tickets on its own.
+  - Never use the casino's own Log out on a saved account: it signs out with scope
+    `global`, which revokes every session of that account on the server, including the
+    copy the server holds.
   - Supabase rotates the refresh token on every refresh and revokes the whole login
     when a replaced one is used again, so the saved copy must always hold the newest
-    token. The page hook reports every `/auth/v1/token` response and the content
-    script writes it into the saved login at once, even when supabase-js discards it
-    (it does when localStorage changes mid-refresh, as on a switch) or the page
-    reloads first. A saved copy is never replaced by one with an earlier
-    `expires_at`, and a switch waits until no refresh is in flight.
-  - The account dropdown in the panel writes the chosen session back and reloads.
-    If that login has expired, auto mode forgets it and switches back.
-  - **Rotate accounts** (settings, Auto tab, on by default): when the current
-    account is out of energy and has nothing else to do, auto mode (or the work bot
-    alone) switches to an account not visited today, otherwise to the one with the
-    most projected energy (more than 15), so every account's energy gets used. In
-    auto mode, once the current account can no longer grind XP (out of credits or
-    budget), it also switches to the richest account that still can and bets there.
-    When that account is done it returns to the **home** account: the one picked in
-    the dropdown, or the one auto mode was started on (marked in the dropdown). It
-    stays at least a minute on each account. With one saved account it does nothing.
-  - **Crash and lottery visits** (settings, Auto tab, both on by default, need auto mode
-    with Games on; `roundsDue` in `src/auto.js`): each saved login records the crash
-    round it bet in (`crashRound`) and the lottery draw it finished buying for with the
-    tickets it held (`lotteryDraw`, `lotteryBought`). The rounds themselves are shared
-    under the `rounds` storage key. When an account bets on a running Produkce padá
-    round because it pays, the round stays open to the others for 10 minutes (each bet
-    there extends it), and every account from level 3 that has not entered it is
-    visited first, before accounts not seen today. Each one checks the round again
-    and closes it when entering no longer pays. Lottery visits go to every account
-    from level 4 that has not finished buying for the next draw, while "Feeling lucky"
-    or the hunt buys tickets, after accounts not seen today and before a ready wheel,
-    and stop 2 minutes before the draw. An account the hunt bought nothing for last
-    draw is skipped unless "Feeling lucky" is on. Both check the reserve against the
-    smallest stake or price. An account that still owes a bet or tickets is not left
-    for up to 5 minutes.
+    token. The server refreshes each session 5 minutes before it runs out, and the bot
+    writes every new session into the saved login at once. A saved copy is never
+    replaced by one with an earlier `expires_at`. Playing a saved account in a browser
+    at the same time makes the two log each other out.
   - Work starts only once energy is above 5 and then works it down to zero, so single
     refilled points do not keep interrupting the grinder. In auto mode, while the
     account can still grind XP, it grinds first and works only to keep energy 2 below
     the cap (at the cap the refill clock stops): tickets pay more at a higher level,
     so the rest of the energy is spent once grinding is done.
-  - Use one casino tab per account. Two tabs on the same origin share one supabase
-    session, so a second tab can write its old session back. To run two accounts at
-    once, open the second in an incognito window with Botter allowed in incognito;
-    both share the bank and settings and keep separate stats.
-  - The Profit tab in the settings lists the saved accounts with level, výpovědi
-    (prestige), credits and energy (Forget drops a saved login, not its stats) and shows profit per account or summed over all of them.
+  - The Accounts tab lists the saved accounts with level, výpovědi (prestige), credits,
+    energy, debt and state (**Forget** drops a saved login, not its stats), and
+    Statistics, Profit shows profit per account or summed over all of them.
 
 ## Install
 
-1. `chrome://extensions` > enable Developer mode > Load unpacked > pick this folder.
-2. Click the extension icon to open the settings in Chrome's side panel, next to
-   the casino tab. Every change saves as you make it; there is no Save button. For the default on-device solver,
-   press **Download the model** once. For Claude, switch the solver and paste an
-   Anthropic API key; it is stored only in `chrome.storage.local` of that browser
-   profile and is sent only to `api.anthropic.com`.
-3. Open the casino, log in, and press **Start** in the panel.
+Botter runs on the server, in Docker or with `cd server && npm start`; see the
+[README](../README.md#install). Settings save as you make them; there is no Save button.
 
-The bank can be exported and imported as JSON from the settings (Data tab), so a
-bank learned on one machine can be reused on another.
+The answer bank can be exported and imported as JSON from Settings, Data and backup, so
+a bank learned on one install can be reused on another.
 
-**Backup** (Data tab) exports everything to one file: settings, profit stats of
-every account, the bank, the level curve, recorded Blaze spins and saved accounts.
-API keys and login sessions are left out unless the switch to include them is on.
-Importing applies the file's settings and merges the rest: stats are added up per
-account, the other data only fills in what is missing. Each export has an id and
-names the install it came from, so importing it twice, or back into the same
-browser, never adds the stats again.
+**Backup** (Settings, Data and backup) exports everything to one file: settings, profit
+stats of every account, the bank, the level curve, recorded Blaze spins and saved
+accounts. The server builds it (`GET /api/backup?secrets=0|1`) and imports it
+(`POST /api/backup/import`). API keys and login sessions are left out unless *Include
+API keys and saved logins* is on. Importing applies the file's settings and merges the
+rest: stats are added up per account, the other data only fills in what is missing.
+Each export has an id and names the install it came from, so importing it twice, or
+back into the same install, never adds the stats again.
 
 ## Development
 
@@ -780,8 +729,8 @@ npm run check
 ```
 
 **App bundle tracking**: the casino ships as one bundle (`/assets/index-<hash>.js`)
-whose name changes with every deploy. When a page loads a name not seen before, the
-content script fetches it once and checks it with `src/bundle.js`: every client table
+whose name changes with every deploy. The server finds the current one when an
+account's context starts; when its name has not been seen before, the bot fetches it once and checks it with `src/bundle.js`: every client table
 the models copy (slot weights, paytables, upgrade effects, blackjack and roulette
 rules, the payroll share, big-win multiples, max bet by level) must still be in it,
 and the shop catalog, unlock levels, bet levels and roulette zeros are read out and
@@ -789,9 +738,9 @@ compared with `src/games.js` and `src/odds.js`. A game in the lobby or the shop
 that the bot does not know is reported too, unless the lobby marks it as coming
 (Kostky and Tajemný automat, 2026-10-14; Tajemný automat shipped as Kniha mrtvého
 kódu on 2026-10-21). A lobby entry may give its icon as a getter (Skeleton Slots,
-which wears a pumpkin on Halloween, since 2026-10-24). The panel shows a red line naming
-every difference until a bundle matches again, and a new bundle that matches for a
-day; the log gets `bundle_models_stale`, `bundle_changed` or `bundle_seen`.
+which wears a pumpkin on Halloween, since 2026-10-24). The dashboard shows a "Botter needs an update" banner over
+every tab and the Changes tab names every difference until a bundle matches again, and
+a new bundle that matches is listed there; the log gets `bundle_models_stale`, `bundle_changed` or `bundle_seen`.
 `node scripts/bundle.mjs [saved bundle]` runs the same check on the live site (or a
 saved copy) and exits with 1 when a model is stale. When a table changes, update the
 model, its needle in `src/bundle.js` and rerun the simulation below.
@@ -811,16 +760,23 @@ server, so their models follow the client's rules text where it leaves details o
 Skeleton counts rockets after the last cascade and lets free spins retrigger, Slotingi
 lands each respin coin independently per empty cell.
 
-`npm run check` parses every script, checks that both locales (`cs`, `en`) carry the same
-message keys and that every key used in code exists, then runs the unit tests
-for `src/core.js`. There are no dependencies and no build step. After editing,
-press reload on the extension card in `chrome://extensions` and refresh the
-casino tab.
+`npm run check` parses every script (the bot, `server/src` and `server/public`), checks
+that both locales (`cs`, `en`) carry the same message keys and that every key used in
+the code, `server/public/settings.js`, `server/public/controls.js` and the `data-msg`
+attributes of `server/public/app.html` exists, then runs the unit tests for
+`src/core.js`. `cd server && npm test` runs the server tests. There are no dependencies
+and no build step. After editing, restart the server, or let the updater rebuild the
+container.
 
-Selectors the bot relies on (from the app bundle): `nav.views button` (2nd is
-Práce), `.work-screen`, `.work-pick .job-card` (bug hunt, output, ticket, then typing), `.typing-input`,
-`section.task`, `.ticket`, `ol.code.lines > li button`, `.options button`,
-`.ticket-field .ticket-options button` and `.ticket-submit` (the triage rules are
-copied into `TICKET_FIELDS` in `src/core.js`),
-`button.right` / `button.wrong` and `section.work-result` after a submit, `.modal .sheet.levelup`,
-`.modal .sheet.daily`. If the casino UI changes, start there.
+Casino API calls the bot relies on: `/api/me`, `/api/work/start` and `/api/work/submit`
+(the triage rules of "Založ task" are copied into `TICKET_FIELDS` in `src/core.js`), the
+game paths in `PATH_GAME` in `src/games.js` (`/api/slot/spin`, `/api/skeleton/spin`,
+`/api/slotingi/spin`, `/api/hotfix/spin` and `/api/hotfix/free`, `/api/roulette/spin`,
+`/api/blackjack/deal` and `/api/blackjack/action`, `/api/baccarat/deal`,
+`/api/dice/roll`, `/api/cases/open`, `/api/egypt/spin`, `/api/mines/start`,
+`/api/mines/reveal` and `/api/mines/cashout`), `/api/crash` and `/api/crash/bet`,
+`/api/lottery` and `/api/lottery/buy`, `/api/bonus/daily`, `/api/bonus/bailout`,
+`/api/wheel/spin`, `/api/loan/take`, `/api/loan/repay`, `/api/loan/bankrupt`,
+`/api/shop/buy`, `/api/cosmetics/buy` and `/api/cosmetics/equip`,
+`/api/profile/prestige`, `/api/profile/reset` and `/api/leaderboard`. If the casino
+changes, start there.
