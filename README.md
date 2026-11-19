@@ -25,7 +25,7 @@ the account's upgrades. A login-protected dashboard shows every account and cont
 | **Work** | Solves all four ticket types: bug hunt, "Co to vypíše?", "Založ task" and "Přepiš kód". Every submit response carries the right answer, so the bank learns each ticket the first time it sees it. |
 | **AI fallback** | Unknown tickets go to the Claude API or any OpenRouter model, if you add a key. |
 | **Games** | Blaze 20 Wild, Skeleton Slots, Slotingi, Forbes z Chánova, roulette, blackjack, baccarat, Kostky, Case opening, Kniha mrtvého kódu and Hledání bugů, all through the casino API. |
-| **Auto mode** | One switch per account. Claims the daily bonus, wheel and bailout, repays debt or declares bankruptcy when that is cheaper, runs the daily standup quests, hunts achievements, plays the lottery when it pays, and grinds XP on the lowest-edge game within a loss budget. |
+| **Auto mode** | One switch per account. Claims the daily bonus, wheel and bailout, repays debt or declares bankruptcy when that is cheaper, runs the daily standup quests, hunts every achievement within a daily budget, plays the lottery when it pays, and grinds XP on the lowest-edge game within a loss budget. |
 | **Upgrades** | Buys shop upgrades when the XP still to grind earns the price back, and every other upgrade from spare credits. |
 | **Šatna** | Buys every wardrobe item from spare credits and wears the most expensive one of each kind, or the one you pick. |
 | **Books** | Profit, return and XP per credit for every game, upgrade level and account. Roulette, baccarat, Kostky and Case opening results are checked against the model. |

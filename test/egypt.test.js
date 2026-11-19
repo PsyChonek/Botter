@@ -20,3 +20,9 @@ test('upgrades move the book, scarab and cobra weights and add free spins', () =
   assert.equal(E.minCount('pharaoh'), 2);
   assert.equal(E.minCount('scarab'), 3);
 });
+
+test('jackpotChance is a pharaoh free-spin game times a free spin with it on all five reels', () => {
+  const chance = E.jackpotChance({});
+  assert.ok(chance > 0 && chance < E.freeChance({}) / 9);
+  assert.ok(E.jackpotChance({ archeo: 3, deadline: 2 }) > chance);
+});

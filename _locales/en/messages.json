@@ -555,6 +555,12 @@
   "optionsHuntRoundsGoal": {
     "message": "Hunt rounds played up to"
   },
+  "optionsHuntAll": {
+    "message": "Hunt every achievement, also at a loss: rare slot events (Blaze three wilds, Slotingi GRAND, Forbes free spins, Kniha mrtvého kódu five books and jackpot), all five lottery tickets every draw, Inspektor and Hackerman. Skips any achievement expected to cost over 500,000 credits"
+  },
+  "optionsHuntAllBudget": {
+    "message": "Daily budget for hunt rounds that lose (credits)"
+  },
   "optionsLearnBlaze": {
     "message": "Grind Blaze at the smallest bet until its recorded spins show how stars are counted (per reel or per symbol), and hold upgrades until then; off buys on the per-reel rule"
   },
@@ -1641,6 +1647,21 @@
   },
   "ach_egypt_books5": {
     "message": "five books at once"
+  },
+  "ach_egypt_jackpot": {
+    "message": "the jackpot"
+  },
+  "ach_on_fire": {
+    "message": "three wilds"
+  },
+  "ach_lingi_cash": {
+    "message": "Lingi Cash"
+  },
+  "ach_grand_lingi": {
+    "message": "GRAND"
+  },
+  "ach_hotfix_free": {
+    "message": "free spins"
   },
   "ach_mines_clear": {
     "message": "every clean Bug Hunt cell"

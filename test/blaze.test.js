@@ -83,3 +83,10 @@ test('simulated base RTP lands in a plausible band', () => {
   const rtp = Z.simulateRtp(Z.config({}), 'symbols', 50_000, rand);
   assert.ok(rtp > 0.5 && rtp < 0.85, `rtp ${rtp}`);
 });
+
+test('threeWildsChance needs a wild on each of reels 2 to 4 and grows with the wild upgrade', () => {
+  const { weights } = Z.config({});
+  const p = weights[1].wild / Object.values(weights[1]).reduce((a, b) => a + b, 0);
+  assert.ok(Math.abs(Z.threeWildsChance({}) - (1 - (1 - p) ** 3) ** 3) < 1e-15);
+  assert.ok(Z.threeWildsChance({ wild: 5 }) > Z.threeWildsChance({}));
+});

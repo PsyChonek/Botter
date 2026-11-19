@@ -58,6 +58,8 @@
     standup: true,
     achievementHunt: true,
     huntRoundsGoal: 10_000,
+    huntAll: true, // also play hunt rounds that do not pay, within huntAllBudget a day (BotterAuto.huntPlan)
+    huntAllBudget: 50_000,
     autoGames: true,
     autoWork: true,
     autoWheel: true,
@@ -112,6 +114,7 @@
     free: { daily: 0, bailout: 0 },
     crashBooked: [],
     grind: { day: '', net: 0, pool: null }, // pool: Hackathon budget, see BotterAuto.grindBudget
+    hunt: { day: '', lost: 0 }, // expected loss of today's hunt rounds that do not pay (huntAll)
     flags: { cleanDone: false, cleanTaken: false, boardsDay: '', lotteryDraw: '', winsCapped: 0 },
     dwell: {}, // task type -> least ms open before a submit the server accepts
   };
@@ -2004,15 +2007,63 @@
   }
 
   const huntOn = () => settings.autoMode && settings.achievementHunt;
+  const huntAllOn = () => huntOn() && settings.huntAll;
+
+  // Credits left of today's budget for hunt rounds that do not pay (huntAll).
+  function huntAllLeft() {
+    const today = A.dayKey();
+    if (stats.hunt?.day !== today) stats.hunt = { day: today, lost: 0 };
+    return Math.max(0, (Number(settings.huntAllBudget) || 0) - stats.hunt.lost);
+  }
+
+  // The secret achievements that pay nothing, taken only with every
+  // achievement on: Inspektor counts paytables opened (the client sends a
+  // paytable event each time one opens), one every few seconds up to 50, and
+  // Hackerman wants the API sent a forced result, one Forbes z Chánova spin
+  // at the smallest bet with force set, tried again after an hour.
+  const PAYTABLE_EVERY_MS = 3000;
+  const PAYTABLE_MAX_SENT = 60;
+  const HACKERMAN_RETRY_MS = 60 * 60_000;
+  let paytablesSent = 0;
+  async function secretStep() {
+    const now = Date.now();
+    if (A.achievementTier(player, 'inspector') !== null && paytablesSent < PAYTABLE_MAX_SENT && now >= (claimTried.paytable ?? 0)) {
+      paytablesSent++;
+      claimTried.paytable = now + PAYTABLE_EVERY_MS;
+      const res = await api('/api/achievements/event', { type: 'paytable' });
+      if (!res.ok) {
+        log.warn('hunt_paytable_failed', { status: res.status, error: res.data?.error });
+        claimTried.paytable = now + CLAIM_RETRY_MS;
+      }
+      return true;
+    }
+    const bet = G.BET_LEVELS[0];
+    if (
+      A.achievementTier(player, 'hackerman') !== null &&
+      player.level >= G.GAMES.hotfix.unlock &&
+      !player.hotfixFree &&
+      player.credits - bet >= limits().reserve &&
+      now - (claimTried.hackerman ?? 0) >= HACKERMAN_RETRY_MS
+    ) {
+      claimTried.hackerman = now;
+      const res = await api(G.GAMES.hotfix.path, { bet, force: true });
+      log.info('hunt_hackerman', { status: res.status, error: res.data?.error });
+      return true;
+    }
+    return false;
+  }
 
   // Logged when the hunt's targets change, not on every round.
   let huntTargets = '';
 
   // Plays the next round worth it for achievements (BotterAuto.huntPlan) at the
   // smallest bet. Like the standup it keeps the reserve but not the grinding
-  // budget: the rewards pay for the rounds.
+  // budget: the rewards pay for the rounds. With every achievement on
+  // (huntAll) it also plays rounds that do not pay, their expected loss taken
+  // from the day's hunt budget, and takes the secret achievements first.
   async function huntStep() {
     if (!huntOn() || Date.now() - (claimTried.hunt ?? 0) < CLAIM_RETRY_MS) return false;
+    if (huntAllOn() && (await secretStep())) return true;
     const reserve = limits().reserve;
     const plan = A.huntPlan(player, {
       level: player.level,
@@ -2020,13 +2071,16 @@
       edges: O.edges(G.GAME_KEYS, player.upgrades, blazeMode()),
       levels: G.BET_LEVELS.filter((bet) => bet <= player.maxBet && player.credits - bet >= reserve),
       roundsGoal: settings.huntRoundsGoal,
+      all: huntAllOn(),
+      allLeft: huntAllLeft(),
     });
-    const note = plan ? `${plan.game} ${plan.targets}` : '';
+    const note = plan ? `${plan.game} ${plan.targets} ${plan.paid}` : '';
     if (note !== huntTargets) {
       huntTargets = note;
-      if (plan) log.info('hunt_plan', { game: plan.game, targets: plan.targets, value: plan.value, loss: plan.loss });
+      if (plan) log.info('hunt_plan', { game: plan.game, targets: plan.targets, value: plan.value, loss: plan.loss, paid: plan.paid });
     }
     if (!plan) return false;
+    if (!plan.paid) stats.hunt.lost += plan.loss;
     const { game, bet, spot } = plan;
     setStatus('statusHunt', [plan.targets.map((key) => msg(`ach_${key}`)).join(', '), msg(`game_${game}`), credits(bet)]);
     const res = await playRound(game, bet, spot ?? settings.rouletteBet);
@@ -2057,7 +2111,7 @@
     const mine = lottery.next.mine?.length ?? 0;
     const prices = (lottery.prices ?? []).filter((price) => player.credits - price >= reserve);
     const luckyBuy = lucky ? A.luckyPlan({ mine, prices, price: settings.lotteryPrice, tickets: settings.lotteryTickets }) : null;
-    const plan = luckyBuy ?? (huntOn() ? A.lotteryPlan(player, { mine, prices }) : null);
+    const plan = luckyBuy ?? (huntOn() ? A.lotteryPlan(player, { mine, prices, all: huntAllOn() }) : null);
     if (!plan) {
       markAccount({ lotteryDraw: lottery.next.drawAt, lotteryBought: mine });
       return false;

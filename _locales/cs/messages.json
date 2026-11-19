@@ -555,6 +555,12 @@
   "optionsHuntRoundsGoal": {
     "message": "Lovit odehraná kola až do"
   },
+  "optionsHuntAll": {
+    "message": "Lovit každý achievement, i se ztrátou: vzácné události na automatech (tři wildy v Blaze, GRAND ve Slotingi, free spiny ve Forbes z Chánova, pět knih a jackpot v Knize mrtvého kódu), všech pět tiketů v každém tahu loterie, Inspektor a Hackerman. Vynechá achievement, jehož očekávaná cena přesáhne 500 000 kreditů"
+  },
+  "optionsHuntAllBudget": {
+    "message": "Denní rozpočet na prodělečná kola lovu (kredity)"
+  },
   "optionsLearnBlaze": {
     "message": "Grindovat Blaze s nejnižší sázkou, dokud zaznamenaná točení neukážou, jak se počítají hvězdy (po válcích, nebo po symbolech), a do té doby nekupovat vylepšení; vypnuté kupuje podle počítání po válcích"
   },
@@ -1641,6 +1647,21 @@
   },
   "ach_egypt_books5": {
     "message": "pět knih naráz"
+  },
+  "ach_egypt_jackpot": {
+    "message": "jackpot"
+  },
+  "ach_on_fire": {
+    "message": "tři wildy"
+  },
+  "ach_lingi_cash": {
+    "message": "Lingi Cash"
+  },
+  "ach_grand_lingi": {
+    "message": "GRAND"
+  },
+  "ach_hotfix_free": {
+    "message": "free spiny"
   },
   "ach_mines_clear": {
     "message": "všechna čistá pole v Hledání bugů"

@@ -114,7 +114,18 @@
     return result;
   }
 
-  const api = { SYMBOLS, LINES, SCATTER_MODES, config, evaluate, expand, simulateRtp, checkSpins };
+  // Chance of a spin showing a wild on each of reels 2 to 4, which expands
+  // all three (the Hořím! achievement). Every cell is drawn on its own.
+  function threeWildsChance(upgrades) {
+    const { weights } = config(upgrades);
+    return [1, 2, 3].reduce((chance, reel) => {
+      const w = weights[reel];
+      const p = w.wild / Object.values(w).reduce((a, b) => a + b, 0);
+      return chance * (1 - (1 - p) ** 3);
+    }, 1);
+  }
+
+  const api = { SYMBOLS, LINES, SCATTER_MODES, config, evaluate, expand, simulateRtp, checkSpins, threeWildsChance };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BotterBlaze = api;
 })(globalThis);

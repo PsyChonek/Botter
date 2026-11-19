@@ -7,6 +7,7 @@
   const CASES = root.BotterCases ?? require('./cases.js');
   const EGYPT = root.BotterEgypt ?? require('./egypt.js');
   const MINES = root.BotterMines ?? require('./mines.js');
+  const BLAZE = root.BotterBlaze ?? require('./blaze.js');
   const CRASH_DOUBLING_MS = 4 * 60 * 60 * 1000;
   // A round that survives until the next 9:00 deploy pays every open bet at the
   // production multiplier reached after 24 hours.
@@ -755,10 +756,12 @@
     return best;
   }
 
-  // Credit-paying achievements the hunt goes after, copied from the client's
-  // catalog (reward per tier, and the tier thresholds of counted ones). The
-  // rest either happen on their own, are claimed elsewhere (clean loan,
-  // podium, standup, wheel, attendance, maxed) or hinge on rare slot events.
+  // Achievements the hunt goes after, copied from the client's catalog (reward
+  // per tier, and the tier thresholds of counted ones). The rest happen on
+  // their own or are claimed elsewhere (clean loan, podium, standup, wheel,
+  // attendance, maxed); the Skeleton Slots events and Blaze's four stars are
+  // not modelled. Hackerman and Inspektor pay nothing and are taken only when
+  // the hunt goes after every achievement.
   const HUNT_ROUNDS_TIERS = [1000, 10_000, 100_000];
   const HUNT_ACHIEVEMENTS = {
     zero_hero: { reward: 1000 }, // win a roulette bet on a zero
@@ -788,7 +791,26 @@
     mines_100x: { reward: 5000 }, // cash out Hledání bugů at 100x the bet or more
     big_fish: { reward: [500, 2000, 5000], tiers: [1, 2, 3] }, // best win so far: 10x / 25x / 50x the bet
     halloween: { reward: 1000 }, // play on the Halloween weekend
+    on_fire: { reward: 1000 }, // Blaze: three expanded wilds on one spin
+    lingi_cash: { reward: 1000 }, // Slotingi: start Lingi Cash (6+ coins)
+    grand_lingi: { reward: 5000 }, // Slotingi: the GRAND jackpot, a full screen of coins
+    hotfix_free: { reward: 1500 }, // Forbes z Chánova: start free spins (4+ incidents)
+    egypt_jackpot: { reward: 10_000 }, // Kniha mrtvého kódu: the pharaoh over all five reels
+    hackerman: { reward: 0 }, // send the API a forced result
+    inspector: { reward: 0, tiers: [50] }, // open a paytable 50 times
   };
+  // Per spin with every upgrade maxed, simulated on 2026-11-19 with the models
+  // in scripts/odds.mjs and scripts/hotfix-sim.mjs. Fewer upgrades make them
+  // rarer, so an unupgraded account rates these spins a little high.
+  const SLOTINGI_CASH = 1 / 85;
+  const SLOTINGI_GRAND = 1 / 30_600;
+  const HOTFIX_FREE = 1 / 283;
+  // With "every achievement" on, a round that does not pay for itself is
+  // still played while the day's hunt budget lasts, but only for an
+  // achievement expected to cost at most this much to unlock (the loss per
+  // round over its chance). That leaves out the lottery's five numbers and
+  // Forbes z Chánova's x25 multiplier (millions of spins).
+  const HUNT_ALL_MAX_COST = 500_000;
   // Per hand of the bot's strategy, from 2,000,000 simulated hands with no
   // upgrades (natural 4.76 %, five-card win 0.51 %; maxed upgrades 0.65 %).
   const BJ_NATURAL = 0.0476;
@@ -852,98 +874,110 @@
   // tie or pair bet per baccarat hand (whichever pays more), a sum, triple or
   // Malá bet per Kostky roll (the same way), a gold knife, the burning Fabia
   // and a third pen in a row per case (the pens counted as three in a row),
-  // three and five books per Kniha mrtvého kódu spin, a cleared board, a
-  // 100x cash-out or a 50x win per Hledání bugů round (whichever pays most), any round on
-  // the Halloween weekend,
-  // any round at night, and the next rounds-played tier spread over the rounds
-  // it still needs (finishing it costs those rounds, so a round is worth the
-  // reward over that count). A round is played when that beats its expected
-  // loss, on the game where the margin is biggest, at the smallest bet.
+  // three and five books and the jackpot per Kniha mrtvého kódu spin, a
+  // cleared board, a 100x cash-out or a 50x win per Hledání bugů round
+  // (whichever pays most), three wilds per Blaze spin, Lingi Cash and the
+  // GRAND per Slotingi spin, free spins per Forbes z Chánova spin, any round
+  // on the Halloween weekend, any round at night, and the next rounds-played
+  // tier spread over the rounds it still needs (finishing it costs those
+  // rounds, so a round is worth the reward over that count). A round is
+  // played when that beats its expected loss, on the game where the margin is
+  // biggest, at the smallest bet. With ctx.all (hunt every achievement) a
+  // round that does not pay is played too while its loss fits ctx.allLeft,
+  // the credits left of the day's hunt budget, and one of its achievements is
+  // expected to cost at most HUNT_ALL_MAX_COST; such a plan has paid false.
   // ctx: level, unlocks, edges (house edge per game), levels (affordable bet
-  // levels), roundsGoal (highest rounds-played tier to chase, all when unset), now.
+  // levels), roundsGoal (highest rounds-played tier to chase, all when unset),
+  // all, allLeft, now.
   function huntPlan(player, ctx) {
     const bet = Math.min(...(ctx.levels ?? []));
     if (!Number.isFinite(bet)) return null;
     const now = ctx.now ?? Date.now();
     const open = (key) => achievementTier(player, key) !== null;
+    // A target: an achievement this round unlocks with chance.
+    const hit = (key, chance, reward = achievementReward(key, 0)) => ({ key, chance, value: chance * reward });
 
     const shared = [];
-    if (open('night_owl') && nightHours(now)) shared.push({ key: 'night_owl', value: achievementReward('night_owl', 0) });
+    if (open('night_owl') && nightHours(now)) shared.push(hit('night_owl', 1));
     const event = weekendEvent(now);
-    if (open('halloween') && event.active && event.key === 'halloween') shared.push({ key: 'halloween', value: achievementReward('halloween', 0) });
+    if (open('halloween') && event.active && event.key === 'halloween') shared.push(hit('halloween', 1));
     const tier = achievementTier(player, 'regular');
     // The client shows counter progress from achProgress; totalSpins is the same count.
     const played = player.achProgress?.regular ?? player.totalSpins ?? Infinity;
     const goal = HUNT_ACHIEVEMENTS.regular.tiers[tier];
     const left = tier === null || goal > (ctx.roundsGoal ?? Infinity) ? 0 : goal - played;
-    if (left > 0) shared.push({ key: 'regular', value: achievementReward('regular', tier) / left });
+    if (left > 0) shared.push(hit('regular', 1 / left, achievementReward('regular', tier)));
 
     let best = null;
     for (const game of Object.keys(ctx.unlocks)) {
       const edge = ctx.edges[game];
       if (edge === undefined || ctx.level < ctx.unlocks[game]) continue;
+      const upgrades = player.upgrades?.[game];
       const own = [];
-      if (game === 'blackjack') {
-        if (open('natural')) own.push({ key: 'natural', value: BJ_NATURAL * achievementReward('natural', 0) });
-        if (open('five_cards')) own.push({ key: 'five_cards', value: BJ_FIVE_CARD_WIN * achievementReward('five_cards', 0) });
-      }
+      const chances = (list) => {
+        for (const [key, chance] of list) if (open(key)) own.push(hit(key, chance));
+      };
+      if (game === 'blackjack') chances([['natural', BJ_NATURAL], ['five_cards', BJ_FIVE_CARD_WIN]]);
       let spot = null;
       let spotEdge = edge;
       if (game === 'roulette' && open('zero_hero')) {
         // A straight bet pays 36 like the outside bets, so it has the same edge.
-        const pockets = 36 / (1 - edge);
-        own.push({ key: 'zero_hero', value: achievementReward('zero_hero', 0) / pockets });
+        own.push(hit('zero_hero', (1 - edge) / 36));
         spot = ROULETTE_ZERO_SPOT;
       }
-      if (game === 'baccarat' || game === 'dice') {
-        // One side bet a round, the one with the best value over its own loss.
-        const upgrades = player.upgrades?.dice;
-        const sides = game === 'baccarat' ? BAC_HUNT : Object.fromEntries(
+      // One side bet a round, the one with the best value over its own loss.
+      let sides = null;
+      if (game === 'baccarat') sides = BAC_HUNT;
+      if (game === 'dice') {
+        sides = Object.fromEntries(
           Object.entries(DICE_HUNT).map(([key, side]) => [key, { ...side, edge: 1 - DICE.spotRtp(side.spot, upgrades) }]),
         );
-        const side = bestSide(sides, open, bet);
-        if (side) {
-          own.push({ key: side.key, value: side.value });
-          spot = side.spot;
-          spotEdge = side.edge;
-        }
-      }
-      if (game === 'cases') {
-        const upgrades = player.upgrades?.cases;
-        if (open('case_knife')) own.push({ key: 'case_knife', value: CASES.chance('gold', upgrades) * achievementReward('case_knife', 0) });
-        if (open('case_car')) own.push({ key: 'case_car', value: CASES.chance('car', upgrades) * achievementReward('case_car', 0) });
-        if (open('case_pen')) own.push({ key: 'case_pen', value: CASES.chance('pen', upgrades) ** 3 * achievementReward('case_pen', 0) });
       }
       if (game === 'mines') {
         // One shape a round: 24 bugs and the one clean cell clears the board 1
         // in 25, a 100x shape hits about 1 in 115 to 170, and a 50x win, about
         // 1 in 65, unlocks every Velká ryba tier still open at once.
-        const upgrades = player.upgrades?.mines;
         const fish = achievementTier(player, 'big_fish');
         const fishLeft = fish === null ? 0 : HUNT_ACHIEVEMENTS.big_fish.reward.slice(fish).reduce((sum, r) => sum + r, 0);
-        const sides = {};
+        sides = {};
         for (const [key, target, reward] of [['mines_clear', 'clear'], ['mines_100x', 'x100'], ['big_fish', 'x50', fishLeft]]) {
           const shape = MINES.plan(upgrades, bet, target);
           if (shape) sides[key] = { spot: target, chance: shape.chance, edge: 1 - shape.ev, reward };
         }
-        const side = bestSide(sides, open, bet);
-        if (side) {
-          own.push({ key: side.key, value: side.value });
-          spot = side.spot;
-          spotEdge = side.edge;
-        }
+      }
+      const side = sides && bestSide(sides, open, bet);
+      if (side) {
+        own.push({ key: side.key, chance: side.chance, value: side.value });
+        spot = side.spot;
+        spotEdge = side.edge;
+      }
+      if (game === 'cases') {
+        chances([
+          ['case_knife', CASES.chance('gold', upgrades)],
+          ['case_car', CASES.chance('car', upgrades)],
+          ['case_pen', CASES.chance('pen', upgrades) ** 3],
+        ]);
       }
       if (game === 'egypt') {
-        const upgrades = player.upgrades?.egypt;
-        if (open('egypt_free')) own.push({ key: 'egypt_free', value: EGYPT.freeChance(upgrades) * achievementReward('egypt_free', 0) });
-        if (open('egypt_books5')) own.push({ key: 'egypt_books5', value: EGYPT.bookChance(5, upgrades) * achievementReward('egypt_books5', 0) });
+        chances([
+          ['egypt_free', EGYPT.freeChance(upgrades)],
+          ['egypt_books5', EGYPT.bookChance(5, upgrades)],
+          ['egypt_jackpot', EGYPT.jackpotChance(upgrades)],
+        ]);
       }
+      if (game === 'blaze') chances([['on_fire', BLAZE.threeWildsChance(upgrades)]]);
+      if (game === 'slotingi') chances([['lingi_cash', SLOTINGI_CASH], ['grand_lingi', SLOTINGI_GRAND]]);
+      if (game === 'hotfix') chances([['hotfix_free', HOTFIX_FREE]]);
       const targets = [...shared, ...own];
       if (!targets.length) continue;
       const value = targets.reduce((sum, t) => sum + t.value, 0);
       const loss = bet * Math.max(0, spotEdge);
-      if (value <= loss) continue;
-      const plan = { game, bet, spot, targets: targets.map((t) => t.key), value, loss };
+      const paid = value > loss;
+      if (!paid) {
+        if (!ctx.all || loss > (ctx.allLeft ?? 0)) continue;
+        if (!targets.some((t) => t.chance > 0 && loss / t.chance <= HUNT_ALL_MAX_COST)) continue;
+      }
+      const plan = { game, bet, spot, targets: targets.map((t) => t.key), value, loss, paid };
       if (!best || value - loss > best.value - best.loss) best = plan;
     }
     return best;
@@ -970,7 +1004,9 @@
   // the next draws-played tier spread over the draws it still needs, and the
   // fifth at the all-five achievement, against the ticket's expected loss.
   // Tickets go at the cheapest price: the rewards do not grow with it, the loss
-  // does. ctx: mine (tickets already on this draw), prices (affordable prices).
+  // does. With ctx.all (hunt every achievement) every ticket left on the draw
+  // is bought while 4 or 5 numbers are still open, whatever it is worth.
+  // ctx: mine (tickets already on this draw), prices (affordable prices), all.
   function lotteryPlan(player, ctx) {
     const price = Math.min(...(ctx.prices ?? []));
     const mine = ctx.mine ?? 0;
@@ -993,6 +1029,9 @@
     for (let n = 1; n <= room; n++) {
       const value = n * perTicket + first + (mine + n === LOTTERY_MAX_TICKETS ? full : 0);
       if (value > 0 && (!best || value > best.value)) best = { price, tickets: n, value };
+    }
+    if (ctx.all && (open('lottery_4') || open('lottery_5'))) {
+      return { price, tickets: room, value: room * perTicket + first + full };
     }
     return best;
   }
@@ -1461,6 +1500,7 @@
     achievementTier,
     fridayEvening,
     HUNT_ROUNDS_TIERS,
+    HUNT_ALL_MAX_COST,
     huntPlan,
     crashHitChance,
     crashHuntWorth,

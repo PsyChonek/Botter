@@ -1215,12 +1215,12 @@ test('workSpeedLearn steps past a refused submit by a doubling step and trims af
   assert.equal(A.speedWait(speed, key, 0, 60_000), 850);
 });
 
-test('huntPlan spins Kniha mrtvého kódu for its free spins and five books', () => {
+test('huntPlan spins Kniha mrtvého kódu for its free spins, five books and the jackpot', () => {
   const ctx = huntCtx({ level: 30, unlocks: { egypt: 30 }, edges: { egypt: 0.2 } });
   const plan = A.huntPlan(hunter({ achievements: { regular: { tier: 3 } } }), ctx);
   assert.equal(plan.game, 'egypt');
-  assert.deepEqual(plan.targets, ['egypt_free', 'egypt_books5']);
-  const expected = E.freeChance({}) * 2000 + E.bookChance(5, {}) * 4000;
+  assert.deepEqual(plan.targets, ['egypt_free', 'egypt_books5', 'egypt_jackpot']);
+  const expected = E.freeChance({}) * 2000 + E.bookChance(5, {}) * 4000 + E.jackpotChance({}) * 10_000;
   assert.ok(Math.abs(plan.value - expected) < 1e-9, `value ${plan.value}`);
   assert.equal(A.questGame({ key: 'rounds_x', text: 'Zatoč 20× Knihou mrtvého kódu' }), 'egypt');
   assert.equal(A.questGame({ key: 'spins_egypt', text: 'Zatoč 20×' }), 'egypt');
@@ -1373,4 +1373,53 @@ test('spareUpgrade and shopGoal never pick an upgrade the server refuses as usel
   const queue = [{ game: 'global', key: 'bets', price: 1000, reason: 'betCapped' }];
   assert.equal(A.spareUpgrade(queue, 100_000, 0), null);
   assert.equal(A.shopGoal(queue, 'global'), null);
+});
+
+// Every hunted achievement done but the rare slot ones, at level 30 with every slot unlocked.
+const slotsLeft = (keys) => hunter({
+  achievements: Object.fromEntries(
+    ['zero_hero', 'natural', 'five_cards', 'egypt_free', 'egypt_books5', 'egypt_jackpot', 'on_fire', 'lingi_cash', 'grand_lingi', 'hotfix_free']
+      .filter((key) => !keys.includes(key))
+      .map((key) => [key, { tier: 1 }])
+      .concat([['regular', { tier: 3 }]]),
+  ),
+});
+const slotCtx = (extra = {}) =>
+  huntCtx({ level: 30, unlocks: { blaze: 1, slotingi: 7, hotfix: 20, egypt: 30 }, edges: { blaze: 0.06, slotingi: 0.055, hotfix: 0.09, egypt: 0.05 }, ...extra });
+
+test('huntPlan spins Forbes z Chánova for its free spins, which pay for themselves', () => {
+  const plan = A.huntPlan(slotsLeft(['hotfix_free', 'grand_lingi']), slotCtx());
+  assert.equal(plan.game, 'hotfix');
+  assert.deepEqual(plan.targets, ['hotfix_free']);
+  assert.equal(plan.paid, true);
+});
+
+test('huntPlan chases the rare slot achievements only with every achievement on and budget left', () => {
+  const player = slotsLeft(['grand_lingi', 'egypt_jackpot']);
+  assert.equal(A.huntPlan(player, slotCtx()), null);
+  assert.equal(A.huntPlan(player, slotCtx({ all: true, allLeft: 0 })), null);
+  const plan = A.huntPlan(player, slotCtx({ all: true, allLeft: 1000 }));
+  assert.equal(plan.paid, false);
+  assert.equal(plan.bet, 20);
+  // The GRAND (5,000 over 30,600 spins) loses less per spin than the jackpot.
+  assert.equal(plan.game, 'slotingi');
+  assert.deepEqual(plan.targets, ['grand_lingi']);
+  const jackpot = A.huntPlan(slotsLeft(['egypt_jackpot']), slotCtx({ all: true, allLeft: 1000 }));
+  assert.equal(jackpot.game, 'egypt');
+});
+
+test('huntPlan leaves an achievement expected to cost more than HUNT_ALL_MAX_COST', () => {
+  // The jackpot at a 30 % edge: 6 a spin over about 1 in 370,000 unupgraded.
+  const ctx = slotCtx({ all: true, allLeft: 1000, edges: { egypt: 0.3 } });
+  assert.ok(6 / E.jackpotChance({}) > A.HUNT_ALL_MAX_COST);
+  assert.equal(A.huntPlan(slotsLeft(['egypt_jackpot']), ctx), null);
+});
+
+test('lotteryPlan with every achievement on buys every ticket left while 4 or 5 numbers are open', () => {
+  const done = { lottery_3: { tier: 1 }, lottery_full: { tier: 1 }, lottery_days: { tier: 3 } };
+  assert.equal(A.lotteryPlan({ achievements: done }, { mine: 0, prices: [100] }), null);
+  assert.equal(A.lotteryPlan({ achievements: done }, { mine: 1, prices: [100, 200], all: true }).tickets, 4);
+  assert.equal(A.lotteryPlan({ achievements: done }, { mine: 1, prices: [100, 200], all: true }).price, 100);
+  const all = { ...done, lottery_4: { tier: 1 }, lottery_5: { tier: 1 } };
+  assert.equal(A.lotteryPlan({ achievements: all }, { mine: 0, prices: [100], all: true }), null);
 });

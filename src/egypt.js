@@ -59,7 +59,18 @@
   }
   const freeChance = (upgrades) => bookChance(3, upgrades);
 
-  const api = { SYMBOLS, WEIGHTS, HIGH, LINES, PAYTABLE, SCATTER, FREE_SPINS, FREE_BOOST, minCount, config, bookChance, freeChance };
+  // Chance of a base spin leading to the jackpot (the Kletba původního autora
+  // achievement): free spins whose special symbol is the pharaoh, drawn evenly
+  // from the nine paying symbols, then a free spin with the pharaoh on all
+  // five reels. Retriggered free spins are left out, so it is a little low.
+  function jackpotChance(upgrades) {
+    const { weights, freeSpins } = config(upgrades, 'pharaoh');
+    const p = weights.pharaoh / Object.values(weights).reduce((a, b) => a + b, 0);
+    const allReels = (1 - (1 - p) ** 3) ** 5;
+    return (freeChance(upgrades) / (SYMBOLS.length - 1)) * (1 - (1 - allReels) ** freeSpins);
+  }
+
+  const api = { SYMBOLS, WEIGHTS, HIGH, LINES, PAYTABLE, SCATTER, FREE_SPINS, FREE_BOOST, minCount, config, bookChance, freeChance, jackpotChance };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BotterEgypt = api;
 })(globalThis);

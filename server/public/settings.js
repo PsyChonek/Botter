@@ -28,6 +28,7 @@
     'loanTrick',
     'standup',
     'achievementHunt',
+    'huntAll',
     'edgeBets',
     'crashEnabled',
     'lotteryLucky',
@@ -44,7 +45,7 @@
   const BET_SELECTS = ['gameBet', 'crashBet', 'grindBet', 'lotteryPrice'];
   const INT_SELECTS = [...BET_SELECTS, 'huntRoundsGoal', 'autoBetBump'];
   const TEXTS = ['openrouterModel', 'lotteryLines', 'hotfixForceValue'];
-  const NUMBERS = ['minDelayMs', 'maxDelayMs', 'stopLoss', 'takeProfit', 'reserve', 'gameDelayMs', 'crashMinEv', 'crashKelly', 'xpBudget', 'grindMinBalance', 'lotteryTickets'];
+  const NUMBERS = ['minDelayMs', 'maxDelayMs', 'stopLoss', 'takeProfit', 'reserve', 'gameDelayMs', 'crashMinEv', 'crashKelly', 'xpBudget', 'grindMinBalance', 'lotteryTickets', 'huntAllBudget'];
   // The same defaults as the bot (DEFAULT_SETTINGS in content.js).
   const DEFAULTS = {
     aiSolver: 'off',
@@ -66,6 +67,8 @@
     standup: true,
     achievementHunt: true,
     huntRoundsGoal: 10_000,
+    huntAll: true,
+    huntAllBudget: 50_000,
     edgeBets: true,
     crashEnabled: true,
     crashBet: 100,

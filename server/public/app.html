@@ -320,6 +320,8 @@
           <label class="setting"><span class="setting-title" data-msg="optionsStandup"></span><input type="checkbox" role="switch" name="standup"></label>
           <label class="setting"><span class="setting-title" data-msg="optionsAchievementHunt"></span><input type="checkbox" role="switch" name="achievementHunt"></label>
           <div class="setting sub" data-when="achievementHunt"><label class="setting-title" for="set-huntRoundsGoal" data-msg="optionsHuntRoundsGoal"></label><select id="set-huntRoundsGoal" name="huntRoundsGoal"></select></div>
+          <label class="setting sub" data-when="achievementHunt"><span class="setting-title" data-msg="optionsHuntAll"></span><input type="checkbox" role="switch" name="huntAll"></label>
+          <div class="setting sub" data-when="achievementHunt huntAll"><label class="setting-title" for="set-huntAllBudget" data-msg="optionsHuntAllBudget"></label><input id="set-huntAllBudget" name="huntAllBudget" type="number" min="0" step="1000" inputmode="numeric"></div>
 
           <h3 data-msg="groupRounds"></h3>
           <label class="setting"><span class="setting-title" data-msg="optionsCrashEnabled"></span><input type="checkbox" role="switch" name="crashEnabled"></label>

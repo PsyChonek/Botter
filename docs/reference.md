@@ -233,10 +233,31 @@ The full description of every feature, model and setting. The short version is t
   betting off. It works one ticket on Friday after 17:00 (Deploy v pátek, 200) and
   answers a banked bug or output ticket inside 3 seconds (Rychloprsťák, 200) unless the
   server has rejected that fast a submit. Like the standup it keeps the reserve but not
-  the grinding budget, and achievement rewards offset the day's grinding loss. The slot
-  achievements (wild, star, cascade and jackpot events) are left to the grinder: their
-  chances are not modelled yet. Left out on purpose: Bug hned v prvním commitu and Dress
-  code pay nothing.
+  the grinding budget, and achievement rewards offset the day's grinding loss. Since
+  2026-11-19 it also spins Forbes z Chánova for free spins (Incident na produkci, 1,500,
+  1 in 283 maxed), Blaze for three expanded wilds (Hořím!, 1,000, 1 in 3,059 maxed, from
+  `BotterBlaze.threeWildsChance`), Slotingi for Lingi Cash (1,000, 1 in 85) and the GRAND
+  (Král všech Lingiů, 5,000, 1 in 30,600) and Kniha mrtvého kódu for the jackpot (Kletba
+  původního autora, 10,000, 1 in 230,000 maxed, `BotterEgypt.jackpotChance`). The
+  Slotingi and Forbes chances are simulated with every upgrade maxed. The Skeleton Slots
+  events and Blaze's four stars are still not modelled.
+  - **Every achievement** (`huntAll`, Settings, Auto mode under the hunt, on by default):
+    also plays hunt rounds that do not pay for themselves, at the smallest bet on the game
+    whose reward value comes closest to its loss, while the day's expected loss on them
+    stays within **Daily budget for hunt rounds that lose** (`huntAllBudget`, 50,000 by
+    default, booked in `stats.hunt`). An achievement expected to cost more than 500,000
+    credits to unlock (`HUNT_ALL_MAX_COST`, the loss per round over its chance) is left
+    out: the lottery's five numbers (1 in 54,000 tickets) and Forbes z Chánova's x25
+    multiplier (Eskalace, about 1 in 2 million spins in the model). With it the lottery
+    gets all five tickets on every draw at the cheapest price while 4 or 5 numbers are
+    open (4 numbers is 1 in 1,032 tickets, so about 200 draws). It also takes the two
+    secret achievements that pay nothing: Inspektor (a paytable opened 50 times, sent as
+    the client's `paytable` event every 3 seconds) and Hackerman (one Forbes z Chánova
+    spin at the smallest bet with `force` set, retried after an hour). At maxed upgrades
+    and the default budget the hunt plays about 14 hours a day until the jackpot, then
+    the GRAND, and the grinder gets the rest of the day. Left alone on purpose: Bug hned v
+    prvním commitu and Dress code (they happen on their own), Zaměstnanec týdne 3 and 10
+    (winning the sprint) and Docházka 60 (the daily bonus streak).
 - **Šatna** (wardrobe, since 2026-10-24, `/api/cosmetics/buy` and `/api/cosmetics/equip`,
   `wardrobeStep`, Settings, Šatna): looks only, no effect on any game, catalog copied in
   `G.COSMETICS`. Each kind (frame, name colour, title) wears the item picked for it, by
